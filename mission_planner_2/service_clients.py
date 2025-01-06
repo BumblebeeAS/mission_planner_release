@@ -5,7 +5,6 @@
 Behaviours for ROS services
 """
 
-from asyncio.tasks import wait_for
 import typing
 import uuid
 
@@ -161,7 +160,7 @@ class FromBlackboard(py_trees.behaviour.Behaviour):
         If running and current request has not already succeeded, cancel it.
         The behaviour transitions to new_status.
         """
-        self.logger().debug(
+        self.logger.debug(
             "{}.terminate({})".format(
                 self.qualified_name,
                 "{}->{}".format(self.status, new_status) if self.status != new_status else "{}".format(new_status)
