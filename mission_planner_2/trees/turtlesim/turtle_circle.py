@@ -61,7 +61,7 @@ def create_turtle_circle_root() -> py_trees.behaviour.Behaviour:
         variable_name="pose"
     )
     def guard(blackboard: py_trees.blackboard.Blackboard) -> bool:
-        return blackboard.pose.x <= 10.0 # and False
+        return blackboard.pose.x <= 10.0
     test_move = py_trees.decorators.EternalGuard(
         name="check_valid_pose",
         child=TurtleMove(name="move", x_vel=0.05, z_vel=0.05),
@@ -71,7 +71,7 @@ def create_turtle_circle_root() -> py_trees.behaviour.Behaviour:
     move_a_bit = py_trees.decorators.Repeat(
         name="repeat to move a bit",
         child=test_move,
-        num_success=500
+        num_success=1000
     )
     stop = TurtleMove(name="stop", x_vel=0.0, z_vel=0.0)
     reset = mission_planner_2.service_clients.FromConstant(
