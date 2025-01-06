@@ -1,26 +1,16 @@
 #!/usr/bin/env python3
-import mission_planner_2
 import py_trees
-import py_trees_ros
 import py_trees.console as console
-from std_srvs.srv import Empty, Trigger
+import py_trees_ros.trees
+
 import rclpy
-import sys
 
-def generate_reset_tree():
-    reset_node = mission_planner_2.service_clients.FromConstant(
-        name="reset_node",
-        service_type=Empty,
-        service_name="/reset",
-        service_request=Empty.Request(),
-    )
-
-    root = py_trees.composites.Sequence("root", True, [reset_node])
-    return root
+from mission_planner_2.trees.turtlesim.turtle_circle import create_turtle_circle_root
 
 def main():
     rclpy.init(args=None)
-    root = generate_reset_tree()
+    root = create_turtle_circle_root()
+    py_trees.logging.level = py_trees.logging.Level.DEBUG
     tree = py_trees_ros.trees.BehaviourTree(
         root=root,
         unicode_tree_debug=True
@@ -43,5 +33,5 @@ def main():
     except KeyboardInterrupt:
         pass
 
-if name == "main":
+if __name__ == "__main__":
     main()
