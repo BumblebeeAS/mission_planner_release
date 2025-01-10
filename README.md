@@ -3,7 +3,7 @@
 ## About
 New BumblebeeAS mission planner stack using py_trees.
 
-Refer to the [notion page](https://www.notion.so/nusbbas/Mission-Planner-2-1683cacaefa180c28574f8291d6e2977) for documentation to get started. The development guide is on the same page [here](https://www.notion.so/nusbbas/Mission-Planner-2-1683cacaefa180c28574f8291d6e2977?pvs=4#1733cacaefa180eeaaa8d984da26dc57).
+Refer to the [notion page](https://www.notion.so/nusbbas/Mission-Planner-2-1683cacaefa180c28574f8291d6e2977) for documentation to get started. The development guide is at the bottom of the documentation.
 
 ## Organization
 Convenience API is located in `mission_planner_2/`.
