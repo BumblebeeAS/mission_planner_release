@@ -4,13 +4,14 @@ import py_trees.console as console
 import py_trees_ros.trees
 import rclpy
 
+from mission_planner_2.trees.auv.goto import create_goto_root
 from mission_planner_2.trees.pre_quali_test.prequali import create_pre_qual_root
 from mission_planner_2.trees.turtlesim.turtle_circle import create_turtle_circle_root
 
 
 def main():
     rclpy.init(args=None)
-    root = create_pre_qual_root()
+    root = create_goto_root()
     py_trees.logging.level = py_trees.logging.Level.DEBUG
     tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
     try:
