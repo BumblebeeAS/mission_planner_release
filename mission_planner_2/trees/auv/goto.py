@@ -11,7 +11,7 @@ from mission_planner_2 import dynamic_set_blackboard, service_clients
 
 
 def _gen_goal(response: GetPoseToControlsFrame.Response):
-    output_pose = response.output_pose.pose.pose
+    output_pose = response.output_pose.pose
 
     goal_msg = Locomotion.Goal()
 
@@ -54,8 +54,11 @@ def _gen_goal(response: GetPoseToControlsFrame.Response):
 
 def _gen_service_request(pose):
     req = GetPoseToControlsFrame.Request()
-    req.pose = pose
+    req.input_pose = pose
     return req
+
+
+# TODO: create a GOTO class that follows the current pytree_ros action client but in the update or setup do the conversions might be better
 
 
 def create_goto_root():
@@ -103,6 +106,7 @@ def create_goto_root():
         key=controls_coverted_pose,
         update_key=action_goal,
         func=_gen_goal,
+        overwrite=True,
     )
 
     send_action_goal = py_trees_ros.action_clients.FromBlackboard(

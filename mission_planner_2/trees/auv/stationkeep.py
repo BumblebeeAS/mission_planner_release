@@ -1,10 +1,5 @@
-import operator
-
-import py_trees
 import py_trees_ros.trees
 from bb_controls_msgs.action import Locomotion
-
-from mission_planner_2 import dynamic_set_blackboard, service_clients
 
 
 def _gen_stationkeep_goal():
