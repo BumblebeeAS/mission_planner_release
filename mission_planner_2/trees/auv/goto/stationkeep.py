@@ -1,4 +1,4 @@
-import py_trees_ros.trees
+import py_trees_ros
 from bb_controls_msgs.action import Locomotion
 
 

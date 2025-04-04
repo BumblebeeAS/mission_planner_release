@@ -1,7 +1,7 @@
 import operator
 
 import py_trees
-import py_trees_ros.trees
+import py_trees_ros
 from bb_controls_msgs.action import Locomotion
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 from numpy import rad2deg
@@ -56,9 +56,6 @@ def _gen_service_request(pose):
     req = GetPoseToControlsFrame.Request()
     req.input_pose = pose
     return req
-
-
-# TODO: create a GOTO class that follows the current pytree_ros action client but in the update or setup do the conversions might be better
 
 
 def create_goto_root():

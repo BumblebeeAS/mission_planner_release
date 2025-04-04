@@ -7,7 +7,7 @@ from bb_auv_msgs.srv import ResetPose
 from bb_controls_msgs.action import Locomotion
 from bb_controls_msgs.srv import Controller
 
-from mission_planner_2 import service_clients
+from mission_planner_2 import dynamic_set_blackboard, service_clients
 
 WAYPOINTS = []
 OFFSET = []
@@ -42,44 +42,6 @@ def _gen_goal(idx):
     goal_msg.altitude_setpoints = []
 
     return goal_msg
-
-
-class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
-    def __init__(
-        self,
-        name,
-        key,
-        update_key,
-        overwrite=False,
-        func=lambda x: x,
-    ):
-        super().__init__(name)
-        self.key = key
-        self.update_key = update_key
-        self.func = func
-        self.overwrite = overwrite
-        self.blackboard = self.attach_blackboard_client(name="updater")
-        self.blackboard.register_key(
-            key=self.update_key,
-            access=py_trees.common.Access.WRITE,
-        )
-        self.blackboard.register_key(
-            key=self.key,
-            access=py_trees.common.Access.READ,
-        )
-
-    # TODO: write the initialise to validate the blackboard
-
-    def update(self) -> py_trees.common.Status:
-        curr = self.blackboard.get(self.key)
-        if self.blackboard.set(
-            name=self.update_key,
-            value=self.func(curr),
-            overwrite=self.overwrite,
-        ):
-            return py_trees.common.Status.SUCCESS
-
-        return py_trees.common.Status.FAILURE
 
 
 def _set_waypoints(csv_filepath):
@@ -174,7 +136,7 @@ def create_pre_qual_root() -> py_trees.common.Status:
         memory=True,
     )
 
-    idx_updater = DynamicSetBlackboard(
+    idx_updater = dynamic_set_blackboard.DynamicSetBlackboard(
         name="idx_updater",
         key="idx",
         update_key="idx",
@@ -182,7 +144,7 @@ def create_pre_qual_root() -> py_trees.common.Status:
         overwrite=True,
     )
 
-    waypoint_updater = DynamicSetBlackboard(
+    waypoint_updater = dynamic_set_blackboard.DynamicSetBlackboard(
         name="waypoint_updater",
         key="idx",
         update_key="waypoint_goal",
@@ -216,12 +178,6 @@ def create_pre_qual_root() -> py_trees.common.Status:
     main_seq.add_children(
         [
             init_seq,
-            # py_trees.decorators.OneShot(
-            #     name="weee",
-            #     child=init_seq,
-            #     policy=py_trees.common.OneShotPolicy.ON_SUCCESSFUL_COMPLETION,
-            # ),
-            # movement_selector,
             py_trees.decorators.Retry(
                 name="retry_until_success",
                 child=movement_selector,
