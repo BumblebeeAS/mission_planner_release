@@ -73,10 +73,6 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         generate_feedback_message=None,
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
-        move_rel=False,
-        depth_rel=False,
-        heading_rel=False,
-        specified_heading=True,
         roll_setpoints=[0.0],
         pitch_setpoints=[0.0],
         altitude_setpoints=[],
@@ -102,11 +98,6 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         )
 
         self.service_client = None
-
-        self.move_rel = move_rel
-        self.depth_rel = depth_rel
-        self.heading_rel = heading_rel
-        self.specified_heading = specified_heading
         self.roll_setpoints = roll_setpoints
         self.pitch_setpoints = pitch_setpoints
         self.altitude_setpoints = altitude_setpoints
@@ -241,16 +232,17 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         goal_msg = Locomotion.Goal()
 
         # Set the required fields
-        goal_msg.move_rel = self.move_rel
-        goal_msg.depth_rel = self.depth_rel
-        goal_msg.heading_rel = self.heading_rel
+        goal_msg.move_rel = False
+        goal_msg.depth_rel = False
+        goal_msg.heading_rel = False
+
         try:
             goal_msg.depth_ctrl = Locomotion.Goal.DEPTH_MODE_DEPTH
         except Exception as e:
             print(e)
             goal_msg.depth_ctrl = 0
 
-        goal_msg.specified_heading = self.specified_heading
+        goal_msg.specified_heading = True
 
         _, _, yaw = rad2deg(
             quat2euler(
