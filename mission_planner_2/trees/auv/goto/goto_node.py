@@ -52,10 +52,6 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         generate_feedback_message (callable, optional): A callable to generate feedback messages.
         wait_for_server_timeout_sec (float): Timeout for waiting for the action server to be ready.
         wait_for_service_timeout_sec (float): Timeout for waiting for the service to be ready.
-        move_rel (bool): Whether the movement is relative.
-        depth_rel (bool): Whether the depth is relative.
-        heading_rel (bool): Whether the heading is relative.
-        specified_heading (bool): Whether a specific heading is required.
         roll_setpoints (list[float]): List of roll setpoints.
         pitch_setpoints (list[float]): List of pitch setpoints.
         altitude_setpoints (list[float]): List of altitude setpoints.
