@@ -4,6 +4,7 @@ import py_trees
 import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from std_msgs.msg import UInt8
 
 from mission_planner_2.dynamic_set_blackboard import DynamicSetBlackboard
 from mission_planner_2.trees.auv.goto import goto_node
@@ -121,6 +122,24 @@ def create_torpedo_root():
         pose_key="torpedo_pose",
     )
 
+    # TODO: for now this is only one torpedo
+    # later we will have to add the logic for more torpedoes
+
+    set_torp_actuation = py_trees.behaviours.SetBlackboardVariable(
+        name="Set Torpedo Actuation",
+        variable_name="torpedo_actuation",
+        variable_value=2,
+        overwrite=True,
+    )
+
+    fire_torpedo = py_trees_ros.publishers.FromBlackboard(
+        name="Fire Torpedo",
+        topic_name="/auv4/actuation/input",
+        topic_type=UInt8,
+        qos_profile=1,
+        blackboard_variable="torpedo_actuation",
+    )
+
     launch_seq.add_children(
         children=[
             enable_detections,
@@ -128,6 +147,8 @@ def create_torpedo_root():
             pose_sub,
             convert_pose,
             align_to_target,
+            set_torp_actuation,
+            fire_torpedo,
             disable_detections,
             disable_detections_succeeded,
         ],
