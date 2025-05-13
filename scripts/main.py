@@ -4,8 +4,8 @@ import py_trees.console as console
 import py_trees_ros.trees
 import rclpy
 
-from mission_planner_2.trees.auv.goto import create_goto_root
-from mission_planner_2.trees.pre_quali_test.prequali import create_pre_qual_root
+from mission_planner_2.trees.auv.goto.goto import create_goto_root
+from mission_planner_2.trees.auv.tests.test_prequali import create_pre_qual_root
 from mission_planner_2.trees.turtlesim.turtle_circle import create_turtle_circle_root
 
 
