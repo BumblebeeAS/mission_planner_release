@@ -17,7 +17,7 @@ def _gen_enable_req():
     """
     req = IMPoseEstimatorToggleTemplate.Request()
     req.enabled = True
-    req.template_name = "torpedo"
+    req.template_name = "Task04_Tagging_01.png"
     return req
 
 
@@ -88,7 +88,7 @@ def create_torpedo_root():
         check=py_trees.common.ComparisonExpression(
             variable="torpedo_enable_detections",
             value=True,
-            operator=lambda x, y: operator.eq(x, y),
+            operator=lambda x, y: operator.eq(x.new_state, y),
         ),
     )
 
@@ -97,7 +97,7 @@ def create_torpedo_root():
         check=py_trees.common.ComparisonExpression(
             variable="torpedo_disable_detections",
             value=True,
-            operator=lambda x, y: operator.eq(x, y),
+            operator=lambda x, y: operator.eq(x.new_state, y),
         ),
     )
 
