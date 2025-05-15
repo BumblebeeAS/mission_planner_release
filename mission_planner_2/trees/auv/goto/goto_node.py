@@ -5,8 +5,7 @@
 Behaviours for ROS services
 """
 
-import typing
-import uuid
+from typing import Callable
 
 import action_msgs
 import action_msgs.msg as action_msgs
@@ -21,82 +20,110 @@ from transforms3d.euler import quat2euler
 
 class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
     """
-    Interface to communicate with controls `Locomotion Action server`
+    Interface to communicate with controls `Locomotion Action Server` using a pose stored in the blackboard.
+
+    This behavior reads a PoseStamped message from the blackboard, converts it to the appropriate
+    control frame using a ROS service, and then sends it as a goal to the Locomotion Action Server.
+    The behavior will return SUCCESS when the locomotion action completes successfully, or FAILURE
+    if any step in the process fails.
+
+    Execution Flow:
+    1. Read PoseStamped from blackboard at the specified key
+    2. Convert the pose to the control frame using the conversion service
+    3. Generate a Locomotion goal from the converted pose
+    4. Send the goal to the Locomotion Action Server
+    5. Monitor the action execution and return appropriate status
 
     Example usage:
     ```python
     from mission_planner_2.trees.auv.goto import goto_mine
 
+    NAMESPACE = "/auv4/mission_1"
+
+    pose_key = "input_pose_to_goto"
+    full_key = py_trees.blackboard.Blackboard.absolute_name(NAMESPACE, key=pose_key)
+
     root.add_children(
         [
             py_trees.behaviours.SetBlackboardVariable(
                 name="set_goto_1",
-                variable_name="input_pose_to_goto",
+                variable_name=full_key,
                 variable_value=_create_pose(0, 0, 0),
                 overwrite=True,
             ),
-            goto_mine.FromBlackboard(name="goto", pose_key="input_pose_to_goto"),
+            goto_mine.FromBlackboard(
+                name="goto",
+                parent_namespace=NAMESPACE,
+                pose_key=pose_key,
+            ),
         ]
     )
     ```
 
     Args:
         name (str): The name of the behaviour.
-        pose_key (str): The key of the blackboard variable to read from, the BB entry at this key **MUST**
-                        be of type `PoseStamped`.
-        action_type (type): The type of the controls action server.
-        action_name (str): The name of the controls action server.
-        service_type (type): The type of the service used to convert poses.
-        service_name (str): The name of the service used to convert poses.
-        key_action (str): The key of the blackboard variable for the action goal.
+        parent_namespace (str): The namespace of the parent behaviour to properly scope blackboard variables.
+        pose_key (str): The key of the blackboard variable to read the pose from. The BB entry at this key
+                        **MUST** be of type `geometry_msgs.msg.PoseStamped`.
+        key_action (str): The key of the blackboard variable for the action goal (default: "goto_goal").
         generate_feedback_message (callable, optional): A callable to generate feedback messages.
         wait_for_server_timeout_sec (float): Timeout for waiting for the action server to be ready.
+                                            Negative values will repeatedly try with the absolute value as the period.
+                                            Zero will not wait at all. (default: -3).
         wait_for_service_timeout_sec (float): Timeout for waiting for the service to be ready.
-        roll_setpoints (list[float]): List of roll setpoints.
-        pitch_setpoints (list[float]): List of pitch setpoints.
-        altitude_setpoints (list[float]): List of altitude setpoints.
+                                             Same timeout policy as wait_for_server_timeout_sec (default: -3).
+        anchor_frame_name (str): The name of the frame that is to be brought to the target pose
+                                (default: "auv4/base_link_ned").
+
+    Returns:
+        py_trees.common.Status.SUCCESS: When the locomotion action completes successfully
+        py_trees.common.Status.RUNNING: While the service call or action is in progress
+        py_trees.common.Status.FAILURE: If the pose is not found on the blackboard, service call fails,
+                                       goal is rejected, or action fails
     """
+
+    ACTION_TYPE = Locomotion
+    ACTION_NAME = "/auv4/controls"
+    SERVICE_TYPE = GetPoseToControlsFrame
+    SERVICE_NAME = "/auv4/convert_to_controls_pose"
 
     def __init__(
         self,
-        name,
-        pose_key,
-        action_type=Locomotion,
-        action_name="/auv4/controls",
-        service_type=GetPoseToControlsFrame,
-        service_name="/auv4/convert_to_controls_pose",
-        key_action="placeholder",
-        generate_feedback_message=None,
-        wait_for_server_timeout_sec=-3,
-        wait_for_service_timeout_sec=-3,
-        roll_setpoints=[0.0],
-        pitch_setpoints=[0.0],
-        altitude_setpoints=[],
+        name: str,
+        parent_namespace: str,
+        pose_key: str,
+        key_action: str = "goto_goal",
+        generate_feedback_message: Callable | None = None,
+        wait_for_server_timeout_sec: int = -3,
+        wait_for_service_timeout_sec: int = -3,
+        anchor_frame_name: str = "auv4/base_link_ned",
     ):
+        self.parent_namespace = parent_namespace
+        self.namespace = parent_namespace + "/" + name
+
         super().__init__(
             name,
-            action_type,
-            action_name,
-            key_action,
+            self.ACTION_TYPE,
+            self.ACTION_NAME,
+            self.namespace + "/" + key_action,
             generate_feedback_message,
             wait_for_server_timeout_sec,
         )
-        self.service_type = service_type
-        self.service_name = service_name
+
         self.wait_for_service_timeout_sec = wait_for_service_timeout_sec
+        self.anchor_frame_name = anchor_frame_name
 
         # Register the pose_key on the BB as the req to be converted
         # pose_key entry should be a pose stamped
         self.blackboard.register_key(
             key="request",
             access=py_trees.common.Access.READ,
-            remap_to=py_trees.blackboard.Blackboard.absolute_name("/", key=pose_key),
+            remap_to=py_trees.blackboard.Blackboard.absolute_name(
+                self.parent_namespace, key=pose_key
+            ),
         )
 
         self.service_client = None
-        self.roll_setpoints = roll_setpoints
-        self.pitch_setpoints = pitch_setpoints
-        self.altitude_setpoints = altitude_setpoints
 
     def setup(self, **kwargs):
         """
@@ -106,7 +133,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         super().setup(**kwargs)
 
         self.service_client = self.node.create_client(
-            srv_type=self.service_type, srv_name=self.service_name
+            srv_type=self.SERVICE_TYPE, srv_name=self.SERVICE_NAME
         )
 
         self._check_srv_setup()
@@ -180,7 +207,9 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
             return py_trees.common.Status.RUNNING
         else:
             self.node.get_logger().debug("goal result [{}]".format(self.qualified_name))
-            self.node.get_logger().debug("  status: {}".format(self.result_status_string))
+            self.node.get_logger().debug(
+                "  status: {}".format(self.result_status_string)
+            )
             self.node.get_logger().debug("  message: {}".format(self.result_message))
             if self.result_status == action_msgs.GoalStatus.STATUS_SUCCEEDED:  # noqa
                 self.feedback_message = "successfully completed"
@@ -220,6 +249,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         request = GetPoseToControlsFrame.Request()
         print(type(pose))
         request.input_pose = pose
+        request.anchor_frame_name = self.anchor_frame_name
         return request
 
     def _gen_goal(self, service_response: PoseStamped):
@@ -258,9 +288,9 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         goal_msg.heading_setpoints = [yaw]
 
         # Lists that need to be populated but aren't used
-        goal_msg.roll_setpoints = self.roll_setpoints
-        goal_msg.pitch_setpoints = self.pitch_setpoints
-        goal_msg.altitude_setpoints = self.altitude_setpoints
+        goal_msg.roll_setpoints = [0.0]
+        goal_msg.pitch_setpoints = [0.0]
+        goal_msg.altitude_setpoints = []
 
         return goal_msg
 
@@ -282,14 +312,14 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
                     self.node.get_logger().warning(
                         "waiting for service server ... [{}s][{}][{}]".format(
                             iterations * period_sec,
-                            self.node.resolve_service_name(self.service_name),
+                            self.node.resolve_service_name(self.SERVICE_NAME),
                             self.qualified_name,
                         )
                     )
 
         if not result:
             self.feedback_message = "timed out waiting for the server [{}]".format(
-                self.node.resolve_service_name(self.service_name)
+                self.node.resolve_service_name(self.SERVICE_NAME)
             )
             self.node.get_logger().error(
                 "{}[{}]".format(self.feedback_message, self.qualified_name)
@@ -297,9 +327,11 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
             raise py_trees_ros.exceptions.TimedOutError(self.feedback_message)
         else:
             self.feedback_message = "... connected to service server [{}]".format(
-                self.node.resolve_service_name(self.service_name)
+                self.node.resolve_service_name(self.SERVICE_NAME)
             )
-            self.node.get_logger().info("{}[{}]".format(self.feedback_message, self.qualified_name))
+            self.node.get_logger().info(
+                "{}[{}]".format(self.feedback_message, self.qualified_name)
+            )
 
     def _srv_done_callback(self, fut):
         resp = fut.result()
@@ -323,28 +355,70 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         self.feedback_message = "sent action goal request"
 
 
-# TODO: does this even work and is it even worth to make it work
 class FromConstant(FromBlackboard):
     """
-    Convenience version of service client that only send the same goal.
+    Interface to communicate with controls `Locomotion Action server` using a constant pose.
+
+    Instead of reading a pose from the blackboard, this behavior uses a pose provided at initialization.
+
+    Example usage:
+    ```python
+    from mission_planner_2.trees.auv.goto import goto_mine
+
+    root.add_children(
+        [
+            goto_mine.FromConstant(
+                name="goto_point",
+                parent_namespace="/auv4/mission_1",
+                pose=_create_pose(0, 0, 0)
+            ),
+        ]
+    )
+    ```
+
+    Args:
+        name (str): The name of the behaviour.
+        parent_namespace (str): The namespace of the parent behaviour
+        pose (PoseStamped): The constant pose to use for the goto action.
+        key_action (str): The key of the blackboard variable for the action goal.
+        generate_feedback_message (callable, optional): A callable to generate feedback messages.
+        wait_for_server_timeout_sec (float): Timeout for waiting for the action server to be ready.
+        wait_for_service_timeout_sec (float): Timeout for waiting for the service to be ready.
+        anchor_frame_name (str): The name of the frame that is to be brought to the target.
     """
 
     def __init__(
         self,
-        name: str,
-        target_pose: PoseStamped,
-        key_response: typing.Optional[str] = None,
-        wait_for_server_timeout_sec: float = -3.0,
+        name,
+        parent_namespace,
+        pose,
+        key_action="goto_goal",
+        generate_feedback_message=None,
+        wait_for_server_timeout_sec=-3,
+        wait_for_service_timeout_sec=-3,
+        anchor_frame_name="auv4/base_link_ned",
     ):
-        unique_id = uuid.uuid4()
-        key_request = "/goal_" + str(unique_id)
+        import uuid
+
+        pose_key = f"pose_{str(uuid.uuid4()).replace('-', '')}"
+
         super().__init__(
             name=name,
-            key_request=key_request,
-            key_response=key_response,
+            parent_namespace=parent_namespace,
+            pose_key=pose_key,
+            key_action=key_action,
+            generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
+            wait_for_service_timeout_sec=wait_for_service_timeout_sec,
+            anchor_frame_name=anchor_frame_name,
         )
 
-        # parent already instantiated blackboard client
-        self.blackboard.register_key(key=key_request, access=py_trees.common.Access.WRITE)
-        self.blackboard.set(name=key_request, value=target_pose)
+        # Store the pose directly on the blackboard
+        self.blackboard.register_key(
+            key="request",
+            access=py_trees.common.Access.WRITE,
+            remap_to=py_trees.blackboard.Blackboard.absolute_name(
+                self.parent_namespace, key=pose_key
+            ),
+        )
+        self.blackboard.set(name="request", value=pose)
