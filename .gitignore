@@ -1,2 +1,6 @@
 .vscode/
-images/  # store rendered trees
+
+# rendered trees
+*.png
+*.svg
+*.dot
