@@ -7,7 +7,7 @@ from bb_auv_msgs.srv import ResetPose
 from bb_controls_msgs.action import Locomotion
 from bb_controls_msgs.srv import Controller
 
-from mission_planner_2 import dynamic_set_blackboard, service_clients
+from mission_planner_2.commons import blackboard, service_clients
 
 WAYPOINTS = []
 OFFSET = []
@@ -136,7 +136,7 @@ def create_pre_qual_root() -> py_trees.common.Status:
         memory=True,
     )
 
-    idx_updater = dynamic_set_blackboard.DynamicSetBlackboard(
+    idx_updater = blackboard.DynamicSetBlackboard(
         name="idx_updater",
         key="idx",
         update_key="idx",
@@ -144,7 +144,7 @@ def create_pre_qual_root() -> py_trees.common.Status:
         overwrite=True,
     )
 
-    waypoint_updater = dynamic_set_blackboard.DynamicSetBlackboard(
+    waypoint_updater = blackboard.DynamicSetBlackboard(
         name="waypoint_updater",
         key="idx",
         update_key="waypoint_goal",

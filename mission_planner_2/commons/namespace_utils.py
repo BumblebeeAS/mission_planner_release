@@ -1,0 +1,64 @@
+"""
+Module for automatically generating namespaces for behavior trees based on file paths.
+"""
+
+import inspect
+import os
+
+
+def generate_namespace(depth=1):
+    """
+    Generate a namespace automatically from the calling file's directory structure.
+    This function inspects the caller's file path and extracts the directory structure
+    to generate a namespace that matches the file's location in the project.
+
+    Args:
+        depth (int): Call stack depth.
+
+    Example:
+    - For a file at mission_planner_2/trees/auv/gate/gate.py,
+      this will return "/auv/gate/gate"
+    - For a file at mission_planner_2/trees/auv/torpedo/torpedo.py,
+      this will return "/auv/torpedo/torpedo"
+    - For a file at mission_planner_2/trees/auv/tests/test_namespacing.py,
+      this will return "/auv/tests/test_namespacing"
+
+    Returns:
+        str: A namespace string based on the directory structure
+    """
+    # Get the frame of the caller
+    frame = inspect.currentframe()
+    try:
+        # Go up 'depth' frames in the call stack to find the caller's frame
+        for _ in range(depth):
+            if frame.f_back is not None:
+                frame = frame.f_back
+            else:
+                break
+
+        # Get the file path of the caller
+        caller_file = inspect.getframeinfo(frame).filename
+        abs_path = os.path.abspath(caller_file)
+
+        # Find the last (innermost) occurrence of '/trees/' in the path
+        trees_pattern = os.path.sep + "trees" + os.path.sep
+        last_trees_index = abs_path.rfind(trees_pattern)
+
+        if last_trees_index == -1:
+            raise ValueError(f"File {caller_file} is not under a 'trees' directory")
+
+        # Extract the path starting from the directory after the last 'trees'
+        start_index = last_trees_index + len(trees_pattern)
+        relative_path = abs_path[start_index:]
+
+        # Remove the .py extension if it exists
+        if relative_path.endswith(".py"):
+            relative_path = relative_path[:-3]
+
+        # Add leading slash to the path
+        relative_path = os.path.sep + relative_path
+
+        return relative_path
+    finally:
+        # Always clean up the frame reference to prevent reference cycles
+        del frame

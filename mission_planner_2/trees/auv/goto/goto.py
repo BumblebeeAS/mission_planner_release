@@ -7,7 +7,8 @@ from bb_planner_msgs.srv import GetPoseToControlsFrame
 from numpy import rad2deg
 from transforms3d.euler import quat2euler
 
-from mission_planner_2 import dynamic_set_blackboard, service_clients
+from mission_planner_2.commons import service_clients
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 
 
 def _gen_goal(response: GetPoseToControlsFrame.Response):
@@ -74,7 +75,7 @@ def create_goto_root():
         variable_name=input_pose_to_goto,
     )
 
-    create_srv_request = dynamic_set_blackboard.DynamicSetBlackboard(
+    create_srv_request = DynamicSetBlackboard(
         name="create_srv_request",
         key=input_pose_to_goto,
         update_key=input_pose_to_goto,
@@ -98,7 +99,7 @@ def create_goto_root():
         ),
     )
 
-    convert_to_action_goal = dynamic_set_blackboard.DynamicSetBlackboard(
+    convert_to_action_goal = DynamicSetBlackboard(
         name="convert_to_action_goal",
         key=controls_coverted_pose,
         update_key=action_goal,

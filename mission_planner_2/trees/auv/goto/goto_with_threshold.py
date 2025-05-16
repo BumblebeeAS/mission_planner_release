@@ -2,8 +2,8 @@ import py_trees
 from nav_msgs.msg import Odometry
 from py_trees_ros import subscribers
 
-from mission_planner_2 import is_within_threshold
-from mission_planner_2.trees.auv.goto import goto, goto_node
+from mission_planner_2.commons import is_within_threshold
+from mission_planner_2.trees.auv.goto import goto_node
 from mission_planner_2.trees.auv.goto.stationkeep import create_stationkeep_root
 
 
