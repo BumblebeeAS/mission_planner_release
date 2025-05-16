@@ -6,9 +6,18 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from std_msgs.msg import UInt8
 
-from mission_planner_2.dynamic_set_blackboard import DynamicSetBlackboard
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard, full_key
 from mission_planner_2.trees.auv.goto import goto_node
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
+
+NAMESPACE = "/auv4/torpedo_task"
+
+
+def fk(key):
+    """
+    Generate the absolute blackboard key based on tree namespace and key name.
+    """
+    return full_key(NAMESPACE, key)
 
 
 def _gen_enable_req():
@@ -71,7 +80,7 @@ def create_torpedo_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_enable_req(),
-        key_response="torpedo_enable_detections",
+        key_response=fk("torpedo_enable_detections"),
     )
 
     disable_detections = py_trees_ros.service_clients.FromConstant(
@@ -79,14 +88,14 @@ def create_torpedo_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_disable_req(),
-        key_response="torpedo_disable_detections",
+        key_response=fk("torpedo_disable_detections"),
     )
 
     # check srv call succeeded from the BB
     enable_detections_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Enable Detections Succeeded",
         check=py_trees.common.ComparisonExpression(
-            variable="torpedo_enable_detections",
+            variable=fk("torpedo_enable_detections"),
             value=True,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
@@ -95,7 +104,7 @@ def create_torpedo_root():
     disable_detections_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Disable Detections Succeeded",
         check=py_trees.common.ComparisonExpression(
-            variable="torpedo_disable_detections",
+            variable=fk("torpedo_disable_detections"),
             value=True,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
@@ -106,11 +115,12 @@ def create_torpedo_root():
         topic_name="/auv4/front_cam/image_matching/pose",
         topic_type=PoseWithCovarianceStamped,
         qos_profile=1,
-        blackboard_variables={"torpedo_pose": None},
+        blackboard_variables={fk("torpedo_pose"): None},
     )
 
     convert_pose = DynamicSetBlackboard(
         name="Convert Pose",
+        namespace=NAMESPACE,
         key="torpedo_pose",
         update_key="torpedo_pose",
         overwrite=True,
@@ -119,6 +129,7 @@ def create_torpedo_root():
 
     align_to_target = goto_node.FromBlackboard(
         name="Align to Target",
+        namespace=NAMESPACE,
         pose_key="torpedo_pose",
     )
 
@@ -127,7 +138,7 @@ def create_torpedo_root():
 
     set_torp_actuation = py_trees.behaviours.SetBlackboardVariable(
         name="Set Torpedo Actuation",
-        variable_name="torpedo_actuation",
+        variable_name=fk("torpedo_actuation"),
         variable_value=2,
         overwrite=True,
     )
@@ -137,7 +148,7 @@ def create_torpedo_root():
         topic_name="/auv4/actuation/input",
         topic_type=UInt8,
         qos_profile=1,
-        blackboard_variable="torpedo_actuation",
+        blackboard_variable=fk("torpedo_actuation"),
     )
 
     launch_seq.add_children(

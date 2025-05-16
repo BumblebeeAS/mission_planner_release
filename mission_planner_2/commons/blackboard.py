@@ -1,4 +1,22 @@
+"""
+Common blackboard utilities for mission_planner_2.
+"""
+
 import py_trees
+
+
+def full_key(namespace, key):
+    """
+    Generate the absolute blackboard key based on tree namespace and key name.
+
+    Args:
+        namespace (str): The namespace prefix for the blackboard key
+        key (str): The key name
+
+    Returns:
+        str: The absolute blackboard key
+    """
+    return py_trees.blackboard.Blackboard.absolute_name(namespace, key)
 
 
 class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
@@ -18,6 +36,7 @@ class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
 
     Args:
         name (str): The name of the behaviour.
+        namespace (str): The namespace of the blackboard variable.
         key (str): The key of the blackboard variable to read from.
         update_key (str): The key of the blackboard variable to write to (using the same key will overwrite the variable in the blackboard).
         overwrite (bool): Whether to overwrite the existing value in the blackboard.
@@ -29,6 +48,7 @@ class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
     def __init__(
         self,
         name,
+        namespace,
         key,
         update_key,
         overwrite=True,
@@ -39,7 +59,10 @@ class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
         self.update_key = update_key
         self.func = func
         self.overwrite = overwrite
-        self.blackboard = self.attach_blackboard_client(name="updater")
+        self.namespace = namespace
+        self.blackboard = self.attach_blackboard_client(
+            name="updater", namespace=namespace
+        )
         self.blackboard.register_key(
             key=self.update_key,
             access=py_trees.common.Access.WRITE,
