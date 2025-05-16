@@ -3,7 +3,10 @@ from geometry_msgs.msg import PoseStamped
 from std_srvs.srv import SetBool
 
 from mission_planner_2.commons import service_clients
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard, full_key
+from mission_planner_2.commons.blackboard import (
+    DynamicSetBlackboard,
+    full_key_generator,
+)
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
@@ -11,13 +14,7 @@ from mission_planner_2.trees.auv.goto import goto_node
 # Define a main namespace for the test
 NAMESPACE = "/auv4/test_namespacing"
 NAMESPACE = generate_namespace()
-
-
-def fk(key):
-    """
-    Generate the absolute blackboard key based on tree namespace and key name.
-    """
-    return full_key(NAMESPACE, key)
+fk = full_key_generator(NAMESPACE)
 
 
 def _create_test_pose(x, y, z, yaw=0.0):

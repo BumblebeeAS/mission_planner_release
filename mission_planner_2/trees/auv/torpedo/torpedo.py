@@ -6,20 +6,17 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from std_msgs.msg import UInt8
 
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard, full_key
+from mission_planner_2.commons.blackboard import (
+    DynamicSetBlackboard,
+    full_key_generator,
+)
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.trees.auv.goto import goto_node
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
 
 # Generate namespace automatically from file path
 NAMESPACE = generate_namespace()
-
-
-def fk(key):
-    """
-    Generate the absolute blackboard key based on tree namespace and key name.
-    """
-    return full_key(NAMESPACE, key)
+fk = full_key_generator(NAMESPACE)
 
 
 def _gen_enable_req():
