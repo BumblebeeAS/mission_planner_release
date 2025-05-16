@@ -33,6 +33,7 @@ class FromBlackboard(py_trees.behaviour.Behaviour):
 
     Args:
         name: name of the behaviour
+        namespace: namespace of the blackboard variables
         service_type: specify type for the service
         service_name: where to find the service
         key_request: name of the key for the request on the blackboard
@@ -48,6 +49,7 @@ class FromBlackboard(py_trees.behaviour.Behaviour):
     def __init__(
         self,
         name: str,
+        namespace: str,
         service_type: typing.Any,
         service_name: str,
         key_request: str,
@@ -55,24 +57,29 @@ class FromBlackboard(py_trees.behaviour.Behaviour):
         wait_for_server_timeout_sec: float = -3.0,
     ):
         super().__init__(name)
+
         self.service_type = service_type
         self.service_name = service_name
         self.wait_for_server_timeout_sec = wait_for_server_timeout_sec
-        self.blackboard = self.attach_blackboard_client(name=self.name)
-        self.blackboard.register_key(
-            key="request",
-            access=py_trees.common.Access.READ,
-            # TODO: check if we want to update the use of namespace consistently in all our nodes like this
-            remap_to=py_trees.blackboard.Blackboard.absolute_name("/", key_request),
+
+        self.namespace = namespace
+        self.key_request = key_request
+
+        self.blackboard = self.attach_blackboard_client(
+            name=self.name, namespace=self.namespace
         )
+        self.blackboard.register_key(
+            key=self.key_request,
+            access=py_trees.common.Access.READ,
+        )
+
         self.write_response_to_blackboard = key_response is not None
         if self.write_response_to_blackboard:
+            self.key_response = key_response
+
             self.blackboard.register_key(
-                key="response",
+                key=self.key_response,
                 access=py_trees.common.Access.WRITE,
-                remap_to=py_trees.blackboard.Blackboard.absolute_name(
-                    "/", key_response
-                ),
             )
 
         self.node = None
@@ -149,7 +156,7 @@ class FromBlackboard(py_trees.behaviour.Behaviour):
         try:
             if self.service_client.service_is_ready():
                 self.service_future = self.service_client.call_async(
-                    self.blackboard.request
+                    self.blackboard.get(self.key_request)
                 )
         except (KeyError, TypeError):
             pass  # self.service_future resolves to None
@@ -172,7 +179,7 @@ class FromBlackboard(py_trees.behaviour.Behaviour):
             self.response = self.service_future.result()
             if self.write_response_to_blackboard:
                 if not self.blackboard.set(
-                    name="response",
+                    name=self.key_response,
                     value=self.response,
                     overwrite=True,
                 ):
@@ -212,6 +219,7 @@ class FromConstant(FromBlackboard):
     def __init__(
         self,
         name: str,
+        namespace: str,
         service_type: typing.Any,
         service_name: str,
         service_request: typing.Any,
@@ -221,11 +229,12 @@ class FromConstant(FromBlackboard):
         unique_id = uuid.uuid4()
         key_request = "/goal_" + str(unique_id)
         super().__init__(
+            name=name,
+            namespace=namespace,
             service_type=service_type,
             service_name=service_name,
             key_request=key_request,
             key_response=key_response,
-            name=name,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
         )
 
