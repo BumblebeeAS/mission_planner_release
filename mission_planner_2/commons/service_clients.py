@@ -227,7 +227,7 @@ class FromConstant(FromBlackboard):
         wait_for_server_timeout_sec: float = -3.0,
     ):
         unique_id = uuid.uuid4()
-        key_request = "/goal_" + str(unique_id)
+        key_request = "goal_" + str(unique_id)
         super().__init__(
             name=name,
             namespace=namespace,
