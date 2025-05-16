@@ -2,7 +2,27 @@
 Common blackboard utilities for mission_planner_2.
 """
 
+import re
+
 import py_trees
+
+
+def convert_to_safe_name(name):
+    """
+    Convert a string to a safe name for usage in namespaces.
+
+    This function transforms a given name to a safe format by:
+    1. Converting all characters to lowercase
+    2. Replacing spaces and any non-alphanumeric characters with underscores
+
+    Args:
+        name (str): The original name to be converted
+
+    Returns:
+        str: The converted name, containing only lowercase letters, numbers, and underscores
+    """
+    lowercase = name.lower()
+    return re.sub(r"[^a-z0-9]", "_", lowercase)
 
 
 def full_key(namespace, key):
