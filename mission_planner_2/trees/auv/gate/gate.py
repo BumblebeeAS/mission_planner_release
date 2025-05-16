@@ -5,10 +5,13 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 
 from mission_planner_2.commons import service_clients
 from mission_planner_2.commons.blackboard import full_key
+from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose, create_target_pose
+from mission_planner_2.commons.sleep_node import SleepBehaviour
 from mission_planner_2.trees.auv.goto import goto_node
 
-NAMESPACE = "/auv4/gate_task"
+# Generate namespace automatically from file path
+NAMESPACE = generate_namespace()
 
 
 def fk(key):
@@ -61,18 +64,20 @@ def create_gate_root():
 
     enable_detections = service_clients.FromConstant(
         name="Enable Detections",
+        namespace=NAMESPACE,
         service_name=TOGGLE_DETECTIONS_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_enable_req(),
-        key_response=fk("gate_enable_detections"),
+        key_response="gate_enable_detections",
     )
 
     disable_detections = service_clients.FromConstant(
         name="Disable Detections",
+        namespace=NAMESPACE,
         service_name=TOGGLE_DETECTIONS_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_disable_req(),
-        key_response=fk("gate_disable_detections"),
+        key_response="gate_disable_detections",
     )
 
     # check srv call succeeded from the BB
@@ -135,10 +140,22 @@ def create_gate_root():
     root.add_children(
         children=[
             move_towards_gate,
+            SleepBehaviour(
+                name="Wait for 5 seconds",
+                duration=0.5,
+            ),
             # enable_detections,
             # enable_detections_succeeded,
             move_to_gate_target,
+            SleepBehaviour(
+                name="Wait for 5 seconds",
+                duration=0.5,
+            ),
             pass_through_gate,
+            SleepBehaviour(
+                name="Wait for 5 seconds",
+                duration=0.5,
+            ),
             # disable_detections,
             # disable_detections_succeeded,
         ]

@@ -4,11 +4,13 @@ from std_srvs.srv import SetBool
 
 from mission_planner_2.commons import service_clients
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard, full_key
+from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
 
 # Define a main namespace for the test
-NAMESPACE = "/auv4/namespacing_test"
+NAMESPACE = "/auv4/test_namespacing"
+NAMESPACE = generate_namespace()
 
 
 def fk(key):
@@ -53,6 +55,7 @@ def create_namespacing_test_root():
 
     Uses only the root namespace defined at the top of the file.
     """
+    print(f"Test Namespacing: {NAMESPACE}")
     root = py_trees.composites.Sequence(
         name="Namespacing Test Root",
         memory=True,
