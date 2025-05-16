@@ -77,18 +77,20 @@ def create_torpedo_root():
 
     enable_detections = py_trees_ros.service_clients.FromConstant(
         name="Enable Detections",
+        namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_enable_req(),
-        key_response=fk("torpedo_enable_detections"),
+        key_response="torpedo_enable_detections",
     )
 
     disable_detections = py_trees_ros.service_clients.FromConstant(
         name="Disable Detections",
+        namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_disable_req(),
-        key_response=fk("torpedo_disable_detections"),
+        key_response="torpedo_disable_detections",
     )
 
     # check srv call succeeded from the BB
