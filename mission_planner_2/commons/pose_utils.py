@@ -2,13 +2,11 @@
 Common pose utilities for mission_planner_2.
 """
 
-import time
-
 import numpy as np
 import py_trees.console as console
 import rclpy
 from geometry_msgs.msg import PoseStamped
-from rclpy.time import Time as rclpy_time
+from rclpy.clock import Clock, ClockType
 from transforms3d.euler import euler2quat
 
 
@@ -28,16 +26,17 @@ def create_target_pose(frame):
     pose_stamped.header.frame_id = frame
 
     if rclpy.ok():
-        node_time = rclpy_time()
+        clock = Clock(clock_type=ClockType.ROS_TIME)
+        node_time = clock.now()
+        console.loginfo(f"rclpy time: {node_time}")
         pose_stamped.header.stamp.sec = node_time.seconds_nanoseconds()[0]
         pose_stamped.header.stamp.nanosec = node_time.seconds_nanoseconds()[1]
     else:
         console.logwarn("rclpy has not init, using system time instead of ros time")
-        current_time = time.time()
-        pose_stamped.header.stamp.sec = int(current_time)
-        pose_stamped.header.stamp.nanosec = int(
-            (current_time - int(current_time)) * 1e9
-        )
+        clock = Clock(clock_type=ClockType.SYSTEM_TIME)
+        node_time = clock.now()
+        pose_stamped.header.stamp.sec = node_time.seconds_nanoseconds()[0]
+        pose_stamped.header.stamp.nanosec = node_time.seconds_nanoseconds()[1]
 
     pose_stamped.pose.position.x = 0.0
     pose_stamped.pose.position.y = 0.0
@@ -80,17 +79,17 @@ def create_stamped_pose(
     pose_stamped.header.frame_id = frame_id
 
     if rclpy.ok():
-        node_time = rclpy_time()
+        clock = Clock(clock_type=ClockType.ROS_TIME)
+        node_time = clock.now()
         console.loginfo(f"rclpy time: {node_time}")
         pose_stamped.header.stamp.sec = node_time.seconds_nanoseconds()[0]
         pose_stamped.header.stamp.nanosec = node_time.seconds_nanoseconds()[1]
     else:
         console.logwarn("rclpy has not init, using system time instead of ros time")
-        current_time = time.time()
-        pose_stamped.header.stamp.sec = int(current_time)
-        pose_stamped.header.stamp.nanosec = int(
-            (current_time - int(current_time)) * 1e9
-        )
+        clock = Clock(clock_type=ClockType.SYSTEM_TIME)
+        node_time = clock.now()
+        pose_stamped.header.stamp.sec = node_time.seconds_nanoseconds()[0]
+        pose_stamped.header.stamp.nanosec = node_time.seconds_nanoseconds()[1]
 
     pose_stamped.pose.position.x = position_x
     pose_stamped.pose.position.y = position_y
