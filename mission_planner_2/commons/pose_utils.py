@@ -3,11 +3,12 @@ Common pose utilities for mission_planner_2.
 """
 
 import time
+
 import numpy as np
-import rclpy
-from rclpy.time import Time as rclpy_time
-from geometry_msgs.msg import PoseStamped
 import py_trees.console as console
+import rclpy
+from geometry_msgs.msg import PoseStamped
+from rclpy.time import Time as rclpy_time
 from transforms3d.euler import euler2quat
 
 
@@ -80,6 +81,7 @@ def create_stamped_pose(
 
     if rclpy.ok():
         node_time = rclpy_time()
+        console.loginfo(f"rclpy time: {node_time}")
         pose_stamped.header.stamp.sec = node_time.seconds_nanoseconds()[0]
         pose_stamped.header.stamp.nanosec = node_time.seconds_nanoseconds()[1]
     else:
