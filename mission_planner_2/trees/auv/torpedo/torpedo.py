@@ -14,7 +14,6 @@ from mission_planner_2.commons.blackboard import (
 )
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.commons.sleep_node import SleepBehaviour
 from mission_planner_2.trees.auv.goto import goto_node
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
 
@@ -120,9 +119,14 @@ def create_torpedo_root():
     #     "auv4/torpedo", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
     # )
 
-    # Unfiltered/clustered version
+    # Unfiltered version
+    # hole_pose = create_stamped_pose(
+    #     "Task04_Tagging_01_optical", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
+    # )
+
+    # Unfiltered version
     hole_pose = create_stamped_pose(
-        "Task04_Tagging_01_optical", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
+        "Task04_Tagging_01_optical/clustered", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
     )
 
     # For manual testing with dummy tfs (if you are too lazy to keep running image matching).
@@ -163,7 +167,7 @@ def create_torpedo_root():
         children=[
             enable_detections,
             enable_detections_succeeded,
-            SleepBehaviour("wait for match", duration=2),
+            py_trees.timers.Timer("wait for match", duration=5),
             align_to_target,
             set_torp_actuation,
             fire_torpedo,
@@ -175,7 +179,7 @@ def create_torpedo_root():
     root.add_children(
         children=[
             create_move_to_task_root(),
-            SleepBehaviour("stabilise before match", duration=2),
+            py_trees.timers.Timer("stabilise before match", duration=5),
             launch_seq,
         ]
     )
