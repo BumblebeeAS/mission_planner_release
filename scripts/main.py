@@ -4,12 +4,12 @@ import py_trees.console as console
 import py_trees_ros.trees
 import rclpy
 
-from mission_planner_2.trees.auv.gate.gate import create_gate_root
+from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
 
 def main():
     rclpy.init(args=None)
-    root = create_gate_root()
+    root = create_torpedo_root()
     py_trees.logging.level = py_trees.logging.Level.DEBUG
     tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
     try:
