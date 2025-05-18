@@ -135,9 +135,6 @@ def create_torpedo_root():
 
     # align_pose = create_target_pose("hole")
 
-    # TODO: if you don't do this, tf says you are trying to do a lookup into the future. should fix
-    hole_pose.header.stamp = Time(sec=0, nanosec=0)
-
     align_to_target = goto_node.FromConstant(
         name="Align to Target",
         parent_namespace=NAMESPACE,
