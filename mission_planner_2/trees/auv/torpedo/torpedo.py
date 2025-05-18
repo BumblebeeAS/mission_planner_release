@@ -3,14 +3,17 @@ import operator
 import py_trees
 import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
+from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 
+from mission_planner_2.commons import service_clients
 from mission_planner_2.commons.blackboard import (
-    DynamicSetBlackboard,
     full_key_generator,
 )
 from mission_planner_2.commons.namespace_utils import generate_namespace
+from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
 
@@ -74,7 +77,7 @@ def create_torpedo_root():
     # 3 - launch torpedo
     # 4 - disable detections
 
-    enable_detections = py_trees_ros.service_clients.FromConstant(
+    enable_detections = service_clients.FromConstant(
         name="Enable Detections",
         namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
@@ -83,7 +86,7 @@ def create_torpedo_root():
         key_response="torpedo_enable_detections",
     )
 
-    disable_detections = py_trees_ros.service_clients.FromConstant(
+    disable_detections = service_clients.FromConstant(
         name="Disable Detections",
         namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
@@ -106,32 +109,40 @@ def create_torpedo_root():
         name="Disable Detections Succeeded",
         check=py_trees.common.ComparisonExpression(
             variable=fk("torpedo_disable_detections"),
-            value=True,
+            value=False,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
     )
 
-    pose_sub = py_trees_ros.subscribers.ToBlackboard(
-        name="Pose Subscriber",
-        topic_name="/auv4/front_cam/image_matching/pose",
-        topic_type=PoseWithCovarianceStamped,
-        qos_profile=1,
-        blackboard_variables={fk("torpedo_pose"): None},
+    # UKF version
+    # hole_pose = create_stamped_pose(
+    #     "auv4/torpedo", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
+    # )
+
+    # Unfiltered version
+    # hole_pose = create_stamped_pose(
+    #     "Task04_Tagging_01_optical", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
+    # )
+
+    # Unfiltered version
+    hole_pose = create_stamped_pose(
+        "Task04_Tagging_01_optical/clustered", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
     )
 
-    convert_pose = DynamicSetBlackboard(
-        name="Convert Pose",
-        namespace=NAMESPACE,
-        key="torpedo_pose",
-        update_key="torpedo_pose",
-        overwrite=True,
-        func=_convert_pose,
-    )
+    # For manual testing with dummy tfs (if you are too lazy to keep running image matching).
+    # ros2 run tf2_ros static_transform_publisher -3.3 0 -0.9 0 0 1.57 world fake_det # usually the pose the detection gives
+    # ros2 run tf2_ros static_transform_publisher 0.3 0 0.6 0 1.57 1.57 fake_det hole
 
-    align_to_target = goto_node.FromBlackboard(
+    # align_pose = create_target_pose("hole")
+
+    # TODO: if you don't do this, tf says you are trying to do a lookup into the future. should fix
+    hole_pose.header.stamp = Time(sec=0, nanosec=0)
+
+    align_to_target = goto_node.FromConstant(
         name="Align to Target",
-        namespace=NAMESPACE,
-        pose_key="torpedo_pose",
+        parent_namespace=NAMESPACE,
+        pose=hole_pose,
+        # anchor_frame_name="auv4/front_cam_optical",
     )
 
     # TODO: for now this is only one torpedo
@@ -140,7 +151,7 @@ def create_torpedo_root():
     set_torp_actuation = py_trees.behaviours.SetBlackboardVariable(
         name="Set Torpedo Actuation",
         variable_name=fk("torpedo_actuation"),
-        variable_value=2,
+        variable_value=UInt8(data=2),
         overwrite=True,
     )
 
@@ -148,7 +159,7 @@ def create_torpedo_root():
         name="Fire Torpedo",
         topic_name="/auv4/actuation/input",
         topic_type=UInt8,
-        qos_profile=1,
+        qos_profile=qos_profile_system_default,
         blackboard_variable=fk("torpedo_actuation"),
     )
 
@@ -156,8 +167,7 @@ def create_torpedo_root():
         children=[
             enable_detections,
             enable_detections_succeeded,
-            pose_sub,
-            convert_pose,
+            py_trees.timers.Timer("wait for match", duration=5),
             align_to_target,
             set_torp_actuation,
             fire_torpedo,
@@ -169,6 +179,7 @@ def create_torpedo_root():
     root.add_children(
         children=[
             create_move_to_task_root(),
+            py_trees.timers.Timer("stabilise before match", duration=5),
             launch_seq,
         ]
     )

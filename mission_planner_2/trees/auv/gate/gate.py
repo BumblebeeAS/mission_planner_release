@@ -7,7 +7,6 @@ from mission_planner_2.commons import service_clients
 from mission_planner_2.commons.blackboard import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose, create_target_pose
-from mission_planner_2.commons.sleep_node import SleepBehaviour
 from mission_planner_2.trees.auv.goto import goto_node
 
 NAMESPACE = generate_namespace()
@@ -133,19 +132,19 @@ def create_gate_root():
     root.add_children(
         children=[
             move_towards_gate,
-            SleepBehaviour(
+            py_trees.timers.Timer(
                 name="Wait for 5 seconds",
                 duration=0.5,
             ),
             # enable_detections,
             # enable_detections_succeeded,
             move_to_gate_target,
-            SleepBehaviour(
+            py_trees.timers.Timer(
                 name="Wait for 5 seconds",
                 duration=0.5,
             ),
             pass_through_gate,
-            SleepBehaviour(
+            py_trees.timers.Timer(
                 name="Wait for 5 seconds",
                 duration=0.5,
             ),
