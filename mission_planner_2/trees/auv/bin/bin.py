@@ -25,6 +25,7 @@ def _gen_enable_req():
     req = IMPoseEstimatorToggleTemplate.Request()
     req.enabled = True
     req.template_name = "Task03_DropBRUVS.png"
+    req.camera_frame_id = "auv4/bot_cam_optical" 
     return req
 
 def _gen_disable_req():
