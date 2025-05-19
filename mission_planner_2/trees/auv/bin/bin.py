@@ -3,12 +3,13 @@ import operator
 import py_trees
 import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
-from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from std_msgs.msg import UInt8
 
+from mission_planner_2.commons import service_clients
 from mission_planner_2.commons.blackboard import (
-    full_key_generator,
+    DynamicSetBlackboard,
+    full_key_generator
 )
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.trees.auv.goto import goto_node
@@ -65,7 +66,7 @@ def create_bin_root():
     # 3 - drop into bin twice
     # 4 - disable detections
 
-    enable_detections = py_trees_ros.service_clients.FromConstant(
+    enable_detections = service_clients.FromConstant(
         name="Enable Detections",
         namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
@@ -74,7 +75,7 @@ def create_bin_root():
         key_response="bin_enable_detections",
     )
 
-    disable_detections = py_trees_ros.service_clients.FromConstant(
+    disable_detections = service_clients.FromConstant(
         name="Disable Detections",
         namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
@@ -121,7 +122,7 @@ def create_bin_root():
 
     align_to_target = goto_node.FromBlackboard(
         name="Align to Target",
-        namespace=NAMESPACE,
+        parent_namespace=NAMESPACE,
         pose_key="bin_pose",
     )
 
@@ -163,7 +164,6 @@ def create_bin_root():
             disable_detections_succeeded,
         ],
     )
-
 
     root.add_children(
         children=[
