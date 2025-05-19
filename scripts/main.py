@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
+
 import py_trees
 import py_trees.console as console
 import py_trees_ros.trees
 import rclpy
 
-from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
+from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root as tree_root
 
 
 def main():
     rclpy.init(args=None)
-    root = create_torpedo_root()
+    root = tree_root()
     py_trees.logging.level = py_trees.logging.Level.DEBUG
     tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
     try:
@@ -24,6 +25,7 @@ def main():
             console.loginfo(console.green + "completed one execution")
             tree.shutdown()
             rclpy.shutdown()
+            exit(0)
 
     tree.add_post_tick_handler(stop_on_success)
     tree.tick_tock(period_ms=100)
