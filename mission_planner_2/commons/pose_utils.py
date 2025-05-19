@@ -3,51 +3,8 @@ Common pose utilities for mission_planner_2.
 """
 
 import numpy as np
-import py_trees.console as console
-import rclpy
 from geometry_msgs.msg import PoseStamped
-from rclpy.clock import Clock, ClockType
 from transforms3d.euler import euler2quat
-
-
-def create_target_pose(frame):
-    """
-    Generate a PoseStamped message with all zeros for position and orientation,
-    the current time, and the specified frame as the frame_id.
-
-    Args:
-        frame (str): The frame ID to use for the PoseStamped message
-
-    Returns:
-        PoseStamped: A PoseStamped message with the specified parameters
-    """
-    pose_stamped = PoseStamped()
-
-    pose_stamped.header.frame_id = frame
-
-    if rclpy.ok():
-        clock = Clock(clock_type=ClockType.ROS_TIME)
-        node_time = clock.now()
-        console.loginfo(f"rclpy time: {node_time}")
-        pose_stamped.header.stamp.sec = node_time.seconds_nanoseconds()[0]
-        pose_stamped.header.stamp.nanosec = node_time.seconds_nanoseconds()[1]
-    else:
-        console.logwarn("rclpy has not init, using system time instead of ros time")
-        clock = Clock(clock_type=ClockType.SYSTEM_TIME)
-        node_time = clock.now()
-        pose_stamped.header.stamp.sec = node_time.seconds_nanoseconds()[0]
-        pose_stamped.header.stamp.nanosec = node_time.seconds_nanoseconds()[1]
-
-    pose_stamped.pose.position.x = 0.0
-    pose_stamped.pose.position.y = 0.0
-    pose_stamped.pose.position.z = 0.0
-
-    pose_stamped.pose.orientation.x = 0.0
-    pose_stamped.pose.orientation.y = 0.0
-    pose_stamped.pose.orientation.z = 0.0
-    pose_stamped.pose.orientation.w = 1.0
-
-    return pose_stamped
 
 
 def create_stamped_pose(

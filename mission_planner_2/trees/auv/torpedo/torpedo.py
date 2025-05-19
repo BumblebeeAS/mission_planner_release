@@ -116,7 +116,7 @@ def create_torpedo_root():
     # ros2 run tf2_ros static_transform_publisher -3.3 0 -0.9 0 0 1.57 world fake_det # usually the pose the detection gives
     # ros2 run tf2_ros static_transform_publisher 0.3 0 0.6 0 1.57 1.57 fake_det hole
 
-    # align_pose = create_target_pose("hole")
+    # align_pose = create_stamped_pose("hole")
 
     align_to_target = goto_node.FromConstant(
         name="Align to Target",
