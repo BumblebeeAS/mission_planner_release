@@ -4,10 +4,13 @@ import py_trees
 import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import UInt8
+from std_msgs.msg import String, UInt8
 
 from mission_planner_2.commons import service_clients
-from mission_planner_2.commons.blackboard import full_key_generator
+from mission_planner_2.commons.blackboard import (
+    DynamicSetBlackboard,
+    full_key_generator,
+)
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
@@ -17,12 +20,56 @@ from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
+# TODO: figure out the actual offset for the shark
+TEMPLATE_1_OFFSET_SHARK = {
+    "x": 0.3,
+    "y": 0.0,
+    "z": 0.6,
+    "roll": 90.0,
+    "pitch": 90.0,
+    "yaw": 0.0,
+}
+
+# TODO: figure out the actual offset for the fish should just be the translation xyz diff
+# now its the exact same as the shark confirm need to change
+TEMPLATE_1_OFFSET_FISH = {
+    "x": 0.3,
+    "y": 0.0,
+    "z": 0.6,
+    "roll": 90.0,
+    "pitch": 90.0,
+    "yaw": 0.0,
+}
+
+
+def _make_selection(choice: str):
+    """
+    Function to set the offset based on choice.
+    """
+    if choice == "shark":
+        offset = TEMPLATE_1_OFFSET_SHARK
+    else:  # fish
+        offset = TEMPLATE_1_OFFSET_FISH
+
+    return create_stamped_pose(
+        "Task04_Tagging_01_optical/clustered",
+        position_x=offset["x"],
+        position_y=offset["y"],
+        position_z=offset["z"],
+        roll=offset["roll"],
+        pitch=offset["pitch"],
+        yaw=offset["yaw"],
+    )
+
 
 def create_torpedo_root():
     """
     Create the root of the torpedo tree.
     """
     TOGGLE_TEMPLATE_TOPIC = "/auv4/image_matching/toggle_template"
+
+    # to handle the order of the torpedo we will choose one of the offsets to use before swapping
+    # for now we sub to choice topic: /auv4/choice but i think launch file is a better way to do it
 
     root = py_trees.composites.Sequence(
         name="Torpedo Root",
@@ -37,9 +84,10 @@ def create_torpedo_root():
     # contains the logic for launching the torpedo
 
     # 1 - move to task - in progress
-    # 2 - enable detections + align to target
-    # 3 - launch torpedo
-    # 4 - disable detections
+    # 2 - make choice
+    # 3- enable detections + align to target
+    # 4 - launch torpedo
+    # 5 - disable detections
 
     enable_detections = service_clients.FromConstant(
         name="Enable Detections",
@@ -80,6 +128,7 @@ def create_torpedo_root():
         ),
     )
 
+    # TODO: remove all these if the new logic for choice works
     # UKF version
     # hole_pose = create_stamped_pose(
     #     "auv4/torpedo", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
@@ -90,10 +139,10 @@ def create_torpedo_root():
     #     "Task04_Tagging_01_optical", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
     # )
 
-    # Unfiltered version
-    hole_pose = create_stamped_pose(
-        "Task04_Tagging_01_optical/clustered", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
-    )
+    # Unfiltered version clustered
+    # hole_pose = create_stamped_pose(
+    #     "Task04_Tagging_01_optical/clustered", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
+    # )
 
     # For manual testing with dummy tfs (if you are too lazy to keep running image matching).
     # ros2 run tf2_ros static_transform_publisher -3.3 0 -0.9 0 0 1.57 world fake_det # usually the pose the detection gives
@@ -101,12 +150,35 @@ def create_torpedo_root():
 
     # align_pose = create_stamped_pose("hole")
 
-    align_to_target = goto_node.FromConstant(
+    choice_sub = py_trees_ros.subscribers.ToBlackboard(
+        name="Choice Sub",
+        topic_name="/auv4/choice",
+        topic_type=String,
+        qos_profile=qos_profile_system_default,
+        blackboard_variables={fk("choice"): "data"},
+    )
+
+    set_choice = DynamicSetBlackboard(
+        name="Set Choice",
+        key=fk("choice"),
+        namespace=NAMESPACE,
+        update_key="hole",
+        overwrite=True,
+        func=_make_selection,
+    )
+
+    align_to_target = goto_node.FromBlackboard(
         name="Align to Target",
         parent_namespace=NAMESPACE,
-        pose=hole_pose,
-        # anchor_frame_name="auv4/front_cam_optical",
+        pose_key="hole",
     )
+
+    # align_to_target = goto_node.FromConstant(
+    #     name="Align to Target",
+    #     parent_namespace=NAMESPACE,
+    #     pose=hole_pose,
+    #     # anchor_frame_name="auv4/front_cam_optical",
+    # )
 
     # TODO: for now this is only one torpedo
     # later we will have to add the logic for more torpedoes
@@ -128,9 +200,11 @@ def create_torpedo_root():
 
     launch_seq.add_children(
         children=[
+            choice_sub,
+            set_choice,
             enable_detections,
             enable_detections_succeeded,
-            py_trees.timers.Timer("wait for match", duration=5),
+            py_trees.timers.Timer("Wait for Match", duration=5),
             align_to_target,
             set_torp_actuation,
             fire_torpedo,
@@ -142,7 +216,7 @@ def create_torpedo_root():
     root.add_children(
         children=[
             create_move_to_task_root(),
-            py_trees.timers.Timer("stabilise before match", duration=5),
+            py_trees.timers.Timer("Stabilise before Match", duration=5),
             launch_seq,
         ]
     )
