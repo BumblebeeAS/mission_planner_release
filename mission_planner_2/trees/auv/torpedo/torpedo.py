@@ -18,25 +18,6 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 
-def _gen_enable_req():
-    """
-    Generate the service for the torpedo tree.
-    """
-    req = IMPoseEstimatorToggleTemplate.Request()
-    req.enabled = True
-    req.template_name = "Task04_Tagging_01.png"
-    return req
-
-
-def _gen_disable_req():
-    """
-    Generate the service for the torpedo tree.
-    """
-    req = IMPoseEstimatorToggleTemplate.Request()
-    req.enabled = False
-    return req
-
-
 def create_torpedo_root():
     """
     Create the root of the torpedo tree.
@@ -65,7 +46,9 @@ def create_torpedo_root():
         namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
-        service_request=_gen_enable_req(),
+        service_request=IMPoseEstimatorToggleTemplate.Request(
+            enabled=True, template_name="Task04_Tagging_01.png"
+        ),
         key_response="torpedo_enable_detections",
     )
 
@@ -74,7 +57,7 @@ def create_torpedo_root():
         namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
-        service_request=_gen_disable_req(),
+        service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
         key_response="torpedo_disable_detections",
     )
 
