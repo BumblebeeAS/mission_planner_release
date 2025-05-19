@@ -160,7 +160,7 @@ def create_torpedo_root():
 
     set_choice = DynamicSetBlackboard(
         name="Set Choice",
-        key=fk("choice"),
+        key="choice",
         namespace=NAMESPACE,
         update_key="hole",
         overwrite=True,
