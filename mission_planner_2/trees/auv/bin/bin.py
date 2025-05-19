@@ -11,53 +11,54 @@ from mission_planner_2.commons.blackboard import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
-from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
+from mission_planner_2.trees.auv.bin.move_to_task import create_move_to_task_root
 
-# Generate namespace automatically from file path
+
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 
 def _gen_enable_req():
     """
-    Generate the service for the torpedo tree.
+    Generate the service for the bin tree
     """
     req = IMPoseEstimatorToggleTemplate.Request()
     req.enabled = True
-    req.template_name = "Task04_Tagging_01.png"
+    req.template_name = "Task03_DropBRUVS.png"
+    req.camera_frame_id = "auv4/bot_cam_optical" 
     return req
 
 
 def _gen_disable_req():
     """
-    Generate the service for the torpedo tree.
+    Generate disable image matching service
     """
     req = IMPoseEstimatorToggleTemplate.Request()
     req.enabled = False
     return req
 
 
-def create_torpedo_root():
+def create_bin_root():
     """
-    Create the root of the torpedo tree.
+    Create the root of the bin tree.
     """
     TOGGLE_TEMPLATE_TOPIC = "/auv4/image_matching/toggle_template"
 
     root = py_trees.composites.Sequence(
-        name="Torpedo Root",
+        name="Bin Root",
         memory=True,
     )
 
     launch_seq = py_trees.composites.Sequence(
-        name="Launch Torpedo",
+        name="Drop into Bin",
         memory=True,
     )
 
-    # contains the logic for launching the torpedo
+    # contains the logic for dropping BRUVS into the bin
 
     # 1 - move to task - in progress
     # 2 - enable detections + align to target
-    # 3 - launch torpedo
+    # 3 - drop into bin twice
     # 4 - disable detections
 
     enable_detections = service_clients.FromConstant(
@@ -66,7 +67,7 @@ def create_torpedo_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_enable_req(),
-        key_response="torpedo_enable_detections",
+        key_response="bin_enable_detections",
     )
 
     disable_detections = service_clients.FromConstant(
@@ -75,14 +76,14 @@ def create_torpedo_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_disable_req(),
-        key_response="torpedo_disable_detections",
+        key_response="bin_disable_detections",
     )
 
     # check srv call succeeded from the BB
     enable_detections_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Enable Detections Succeeded",
         check=py_trees.common.ComparisonExpression(
-            variable=fk("torpedo_enable_detections"),
+            variable=fk("bin_enable_detections"),
             value=True,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
@@ -91,66 +92,61 @@ def create_torpedo_root():
     disable_detections_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Disable Detections Succeeded",
         check=py_trees.common.ComparisonExpression(
-            variable=fk("torpedo_disable_detections"),
+            variable=fk("bin_disable_detections"),
             value=False,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
     )
 
-    # UKF version
-    # hole_pose = create_stamped_pose(
-    #     "auv4/torpedo", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
-    # )
-
-    # Unfiltered version
-    # hole_pose = create_stamped_pose(
-    #     "Task04_Tagging_01_optical", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
-    # )
-
-    # Unfiltered version
-    hole_pose = create_stamped_pose(
-        "Task04_Tagging_01_optical/clustered", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
-    )
-
-    # For manual testing with dummy tfs (if you are too lazy to keep running image matching).
-    # ros2 run tf2_ros static_transform_publisher -3.3 0 -0.9 0 0 1.57 world fake_det # usually the pose the detection gives
-    # ros2 run tf2_ros static_transform_publisher 0.3 0 0.6 0 1.57 1.57 fake_det hole
-
-    # align_pose = create_target_pose("hole")
-
-    align_to_target = goto_node.FromConstant(
+    align_to_target = goto_node.FromBlackboard(
         name="Align to Target",
         parent_namespace=NAMESPACE,
-        pose=hole_pose,
-        # anchor_frame_name="auv4/front_cam_optical",
+        pose_key="bin_pose",
     )
 
-    # TODO: for now this is only one torpedo
-    # later we will have to add the logic for more torpedoes
+    bin_pose = create_stamped_pose(
+        "Task03_DropBRUVS_optical/clustered",
+        0.0, # Temporary, please update
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+    )
 
     set_torp_actuation = py_trees.behaviours.SetBlackboardVariable(
-        name="Set Torpedo Actuation",
-        variable_name=fk("torpedo_actuation"),
-        variable_value=UInt8(data=2),
+        name="Set Drop Bin Actuation",
+        variable_name=fk("bin_actuation"),
+        variable_value=UInt8(data=6),
         overwrite=True,
     )
 
-    fire_torpedo = py_trees_ros.publishers.FromBlackboard(
-        name="Fire Torpedo",
+    fire_dropper_1 = py_trees_ros.publishers.FromBlackboard(
+        name="Drop the BRUV 1",
         topic_name="/auv4/actuation/input",
         topic_type=UInt8,
         qos_profile=qos_profile_system_default,
-        blackboard_variable=fk("torpedo_actuation"),
+        blackboard_variable=fk("bin_actuation"),
+    )
+
+    fire_dropper_2 = py_trees_ros.publishers.FromBlackboard(
+        name="Drop the BRUV 2",
+        topic_name="/auv4/actuation/input",
+        topic_type=UInt8,
+        qos_profile=qos_profile_system_default,
+        blackboard_variable=fk("bin_actuation"),
     )
 
     launch_seq.add_children(
         children=[
             enable_detections,
             enable_detections_succeeded,
-            py_trees.timers.Timer("wait for match", duration=5),
+            py_trees.timers.Timer("wait for match", duration=5.0),
             align_to_target,
             set_torp_actuation,
-            fire_torpedo,
+            fire_dropper_1,
+            py_trees.timers.Timer("delay between drops", duration=5.0),
+            fire_dropper_2,
             disable_detections,
             disable_detections_succeeded,
         ],
@@ -159,7 +155,7 @@ def create_torpedo_root():
     root.add_children(
         children=[
             create_move_to_task_root(),
-            py_trees.timers.Timer("stabilise before match", duration=5),
+            py_trees.timers.Timer("stabilise before match", duration=5.0),
             launch_seq,
         ]
     )
