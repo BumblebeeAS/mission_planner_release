@@ -3,17 +3,16 @@ import operator
 import py_trees
 import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 
 from mission_planner_2.commons import service_clients
-from mission_planner_2.commons.blackboard import (
-    DynamicSetBlackboard,
-    full_key_generator
-)
+from mission_planner_2.commons.blackboard import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
+from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
 from mission_planner_2.trees.auv.bin.move_to_task import create_move_to_task_root
+
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -29,6 +28,7 @@ def _gen_enable_req():
     req.camera_frame_id = "auv4/bot_cam_optical" 
     return req
 
+
 def _gen_disable_req():
     """
     Generate disable image matching service
@@ -37,11 +37,6 @@ def _gen_disable_req():
     req.enabled = False
     return req
 
-def _convert_pose(pose: PoseWithCovarianceStamped):
-    pose_stamped = PoseStamped()
-    pose_stamped.header = pose.header
-    pose_stamped.pose = pose.pose.pose
-    return pose_stamped
 
 def create_bin_root():
     """
@@ -98,26 +93,9 @@ def create_bin_root():
         name="Disable Detections Succeeded",
         check=py_trees.common.ComparisonExpression(
             variable=fk("bin_disable_detections"),
-            value=True,
+            value=False,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
-    )
-    
-    pose_sub = py_trees_ros.subscribers.ToBlackboard(
-        name="Pose Subscriber",
-        topic_name="/auv4/bot_cam/image_matching/pose",
-        topic_type=PoseWithCovarianceStamped,
-        qos_profile=1,
-        blackboard_variables={fk("bin_pose"): None},
-    )
-
-    convert_pose = DynamicSetBlackboard(
-        name="Convert Pose",
-        namespace=NAMESPACE,
-        key="bin_pose",
-        update_key="bin_pose",
-        overwrite=True,
-        func=_convert_pose,
     )
 
     align_to_target = goto_node.FromBlackboard(
@@ -126,10 +104,20 @@ def create_bin_root():
         pose_key="bin_pose",
     )
 
+    bin_pose = create_stamped_pose(
+        "Task03_DropBRUVS_optical/clustered",
+        0.0, # Temporary, please update
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+    )
+
     set_torp_actuation = py_trees.behaviours.SetBlackboardVariable(
         name="Set Drop Bin Actuation",
         variable_name=fk("bin_actuation"),
-        variable_value=6,
+        variable_value=UInt8(data=6),
         overwrite=True,
     )
 
@@ -137,7 +125,7 @@ def create_bin_root():
         name="Drop the BRUV 1",
         topic_name="/auv4/actuation/input",
         topic_type=UInt8,
-        qos_profile=1,
+        qos_profile=qos_profile_system_default,
         blackboard_variable=fk("bin_actuation"),
     )
 
@@ -145,7 +133,7 @@ def create_bin_root():
         name="Drop the BRUV 2",
         topic_name="/auv4/actuation/input",
         topic_type=UInt8,
-        qos_profile=1,
+        qos_profile=qos_profile_system_default,
         blackboard_variable=fk("bin_actuation"),
     )
 
@@ -153,12 +141,11 @@ def create_bin_root():
         children=[
             enable_detections,
             enable_detections_succeeded,
-            py_trees.timers.Timer("wait for match", duration = 5),
-            pose_sub,
-            convert_pose,
+            py_trees.timers.Timer("wait for match", duration=5.0),
             align_to_target,
             set_torp_actuation,
             fire_dropper_1,
+            py_trees.timers.Timer("delay between drops", duration=5.0),
             fire_dropper_2,
             disable_detections,
             disable_detections_succeeded,
@@ -168,7 +155,7 @@ def create_bin_root():
     root.add_children(
         children=[
             create_move_to_task_root(),
-            py_trees.timers.Timer("stabilise before match", duration=5),
+            py_trees.timers.Timer("stabilise before match", duration=5.0),
             launch_seq,
         ]
     )

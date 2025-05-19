@@ -3,15 +3,11 @@ import operator
 import py_trees
 import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
-from builtin_interfaces.msg import Time
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 
 from mission_planner_2.commons import service_clients
-from mission_planner_2.commons.blackboard import (
-    full_key_generator,
-)
+from mission_planner_2.commons.blackboard import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
@@ -39,19 +35,6 @@ def _gen_disable_req():
     req = IMPoseEstimatorToggleTemplate.Request()
     req.enabled = False
     return req
-
-
-def _convert_pose(pose: PoseWithCovarianceStamped):
-    """
-    Convert the PoseWithCovarianceStamped message to a PoseStamped message.
-    Adds the offset to the holes too.
-
-    TODO: figure out the offset calculation laze for now.
-    """
-    pose_stamped = PoseStamped()
-    pose_stamped.header = pose.header
-    pose_stamped.pose = pose.pose.pose
-    return pose_stamped
 
 
 def create_torpedo_root():
