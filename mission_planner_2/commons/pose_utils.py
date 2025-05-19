@@ -78,18 +78,9 @@ def create_stamped_pose(
 
     pose_stamped.header.frame_id = frame_id
 
-    if rclpy.ok():
-        clock = Clock(clock_type=ClockType.ROS_TIME)
-        node_time = clock.now()
-        console.loginfo(f"rclpy time: {node_time}")
-        pose_stamped.header.stamp.sec = node_time.seconds_nanoseconds()[0]
-        pose_stamped.header.stamp.nanosec = node_time.seconds_nanoseconds()[1]
-    else:
-        console.logwarn("rclpy has not init, using system time instead of ros time")
-        clock = Clock(clock_type=ClockType.SYSTEM_TIME)
-        node_time = clock.now()
-        pose_stamped.header.stamp.sec = node_time.seconds_nanoseconds()[0]
-        pose_stamped.header.stamp.nanosec = node_time.seconds_nanoseconds()[1]
+    # Transform lookups will yield latest transform
+    pose_stamped.header.stamp.sec = 0
+    pose_stamped.header.stamp.nanosec = 0
 
     pose_stamped.pose.position.x = position_x
     pose_stamped.pose.position.y = position_y
