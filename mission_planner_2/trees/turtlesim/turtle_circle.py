@@ -1,5 +1,5 @@
 import py_trees
-import py_trees_ros.trees
+import py_trees_ros
 
 from rclpy.node import Node
 
