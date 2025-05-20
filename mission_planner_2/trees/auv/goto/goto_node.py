@@ -38,7 +38,8 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
 
     Example usage:
     ```python
-    from mission_planner_2.trees.auv.goto import goto_mine
+    from mission_planner_2.trees.auv.goto import goto_node
+    from mission_planner_2.commons.blackboard import create_stamped_pose
 
     NAMESPACE = "/auv4/mission_1"
 
@@ -50,13 +51,18 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
             py_trees.behaviours.SetBlackboardVariable(
                 name="set_goto_1",
                 variable_name=full_key,
-                variable_value=_create_pose(0, 0, 0),
+                variable_value=create_stamped_pose("your_frame"),
                 overwrite=True,
             ),
-            goto_mine.FromBlackboard(
+            goto_node.FromBlackboard(
                 name="goto",
                 parent_namespace=NAMESPACE,
                 pose_key=pose_key,
+            ),
+            goto_node.FromConstant(
+                name="goto_2",
+                parent_namespace=NAMESPACE,
+                pose=create_stamped_pose("your_frame"),
             ),
         ]
     )

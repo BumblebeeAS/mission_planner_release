@@ -6,7 +6,7 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from mission_planner_2.commons import service_clients
 from mission_planner_2.commons.blackboard import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
-from mission_planner_2.commons.pose_utils import create_stamped_pose, create_target_pose
+from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
 
 NAMESPACE = generate_namespace()
@@ -101,7 +101,7 @@ def create_gate_root():
         yaw=-90.0,
     )
 
-    gate_target_pose = create_target_pose("auv4/gate")
+    gate_target_pose = create_stamped_pose("auv4/gate")
     # Publish the following tf to mock the gate detection
     # ros2 run tf2_ros static_transform_publisher 7 0 1.5 -1.57 0 0 world_ned auv4/gate
 
@@ -115,9 +115,7 @@ def create_gate_root():
         yaw=0.0,
     )
 
-    move_towards_gate = goto_node.FromConstant(
-        "move_towards_gate", NAMESPACE, gate_init_pose
-    )
+    move_towards_gate = goto_node.FromConstant("move_towards_gate", NAMESPACE, gate_init_pose)
 
     move_to_gate_target = goto_node.FromConstant(
         "move_to_gate_target",
