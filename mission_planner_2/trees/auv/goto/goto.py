@@ -375,11 +375,11 @@ class FromConstant(FromBlackboard):
 
     Example usage:
     ```python
-    from mission_planner_2.trees.auv.goto import goto_mine
+    from mission_planner_2.trees.auv.goto import goto
 
     root.add_children(
         [
-            goto_mine.FromConstant(
+            goto.FromConstant(
                 name="goto_point",
                 parent_namespace="/auv4/mission_1",
                 pose=_create_pose(0, 0, 0)
