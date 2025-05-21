@@ -1,19 +1,37 @@
 import py_trees
-from geometry_msgs.msg import PoseStamped
 
+from mission_planner_2.commons.namespace_utils import generate_namespace
+from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
-from mission_planner_2.trees.auv.goto.goto import create_goto_root
 
 
-def create_move_to_task_root() -> py_trees.behaviour.Behaviour:
+def create_move_to_bin_task_root() -> py_trees.behaviour.Behaviour:
     """
     Create the root of the bin tree.
     """
     root = py_trees.composites.Sequence(
-        name="Move to Task Root",
+        name="Move to Bin Task Root",
         memory=True,
     )
 
-    # TODO: figure out the move to board subtree
+    bin_init_pose = create_stamped_pose(
+        "world_ned",
+        position_x=0.0,
+        position_y=0.0,
+        position_z=0.0,
+        yaw=0.0
+    )
+
+    move_to_bin = goto_node.FromConstant(
+        "move to bin",
+        generate_namespace(),
+        bin_init_pose
+    )
+
+    root.add_children(
+        [
+            move_to_bin,
+        ]
+    )
 
     return root

@@ -10,31 +10,11 @@ from mission_planner_2.commons.blackboard import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto_node
-from mission_planner_2.trees.auv.bin.move_to_task import create_move_to_task_root
+from mission_planner_2.trees.auv.bin.move_to_task import create_move_to_bin_task_root
 
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
-
-
-def _gen_enable_req():
-    """
-    Generate the service for the bin tree
-    """
-    req = IMPoseEstimatorToggleTemplate.Request()
-    req.enabled = True
-    req.template_name = "Task03_DropBRUVS.png"
-    req.camera_frame_id = "auv4/bot_cam_optical" 
-    return req
-
-
-def _gen_disable_req():
-    """
-    Generate disable image matching service
-    """
-    req = IMPoseEstimatorToggleTemplate.Request()
-    req.enabled = False
-    return req
 
 
 def create_bin_root():
@@ -64,7 +44,11 @@ def create_bin_root():
         name="Enable Detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
-        service_request=_gen_enable_req(),
+        service_request=IMPoseEstimatorToggleTemplate.Request(
+            enabled=True,
+            template_name="Task03_DropBRUVS.png",
+            camera_frame_id="auv4/bot_cam_optical"
+        ),
         key_response=fk("bin_enable_detections"),
     )
 
@@ -72,7 +56,7 @@ def create_bin_root():
         name="Disable Detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
-        service_request=_gen_disable_req(),
+        service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
         key_response=fk("bin_disable_detections"),
     )
 
@@ -111,7 +95,13 @@ def create_bin_root():
         0.0
     )
 
-    set_torp_actuation = py_trees.behaviours.SetBlackboardVariable(
+    align_to_target_const = goto_node.FromConstant(
+        name="Align to Target",
+        parent_namespace=NAMESPACE,
+        pose=bin_pose
+    )
+
+    set_dropper_actuation = py_trees.behaviours.SetBlackboardVariable(
         name="Set Drop Bin Actuation",
         variable_name=fk("bin_actuation"),
         variable_value=UInt8(data=6),
@@ -138,9 +128,10 @@ def create_bin_root():
         children=[
             enable_detections,
             enable_detections_succeeded,
-            py_trees.timers.Timer("wait for match", duration=5.0),
-            align_to_target,
-            set_torp_actuation,
+            py_trees.timers.Timer("wait for match", duration=10.0),
+            align_to_target_const,
+            py_trees.timers.Timer("wait to stabilize", duration=5.0),
+            set_dropper_actuation,
             fire_dropper_1,
             py_trees.timers.Timer("delay between drops", duration=5.0),
             fire_dropper_2,
@@ -151,8 +142,8 @@ def create_bin_root():
 
     root.add_children(
         children=[
-            create_move_to_task_root(),
-            py_trees.timers.Timer("stabilise before match", duration=5.0),
+            create_move_to_bin_task_root(),
+            py_trees.timers.Timer("stabilise before match", duration=10.0),
             launch_seq,
         ]
     )

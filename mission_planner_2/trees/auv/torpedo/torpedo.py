@@ -93,7 +93,7 @@ def create_torpedo_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True, template_name="Task04_Tagging_01.png"
+            enabled=True, template_name="Task04_Tagging_02.png"
         ),
         key_response=fk("torpedo_enable_detections"),
     )
@@ -137,9 +137,9 @@ def create_torpedo_root():
     # )
 
     # Unfiltered version clustered
-    # hole_pose = create_stamped_pose(
-    #     "Task04_Tagging_01_optical/clustered", 0.3, 0.0, 0.6, 90.0, 90.0, 0.0
-    # )
+    hole_pose = create_stamped_pose(
+        "advay_please_remove_this", 0.44, 0.0, 0.5, 90.0, 94.0, 0.0
+    )
 
     # For manual testing with dummy tfs (if you are too lazy to keep running image matching).
     # ros2 run tf2_ros static_transform_publisher -3.3 0 -0.9 0 0 1.57 world fake_det # usually the pose the detection gives
@@ -164,21 +164,18 @@ def create_torpedo_root():
         func=_make_selection,
     )
 
+    # temp for pool test use
+    align_to_target_const = goto_node.FromConstant(
+        name="Align to Target",
+        parent_namespace=NAMESPACE,
+        pose=hole_pose,
+    )
+
     align_to_target = goto_node.FromBlackboard(
         name="Align to Target",
         parent_namespace=NAMESPACE,
         pose_key="hole",
     )
-
-    # align_to_target = goto_node.FromConstant(
-    #     name="Align to Target",
-    #     parent_namespace=NAMESPACE,
-    #     pose=hole_pose,
-    #     # anchor_frame_name="auv4/front_cam_optical",
-    # )
-
-    # TODO: for now this is only one torpedo
-    # later we will have to add the logic for more torpedoes
 
     set_torp_actuation = py_trees.behaviours.SetBlackboardVariable(
         name="Set Torpedo Actuation",
@@ -197,14 +194,17 @@ def create_torpedo_root():
 
     launch_seq.add_children(
         children=[
-            choice_sub,
-            set_choice,
+            # choice_sub,
+            # set_choice,
             enable_detections,
             enable_detections_succeeded,
-            py_trees.timers.Timer("Wait for Match", duration=5),
-            align_to_target,
-            set_torp_actuation,
-            fire_torpedo,
+            py_trees.timers.Timer("Wait for Match", duration=20.0),
+            align_to_target_const,
+            # align_to_target,
+            # set_torp_actuation,
+            # fire_torpedo,
+            # py_trees.timers.Timer("Wait between Firings", duration=5),
+            # fire_torpedo,
             disable_detections,
             disable_detections_succeeded,
         ],
@@ -213,7 +213,7 @@ def create_torpedo_root():
     root.add_children(
         children=[
             create_move_to_task_root(),
-            py_trees.timers.Timer("Stabilise before Match", duration=5),
+            py_trees.timers.Timer("Stabilise before Match", duration=10.0),
             launch_seq,
         ]
     )
