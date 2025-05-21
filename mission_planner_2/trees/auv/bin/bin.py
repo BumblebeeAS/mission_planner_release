@@ -6,7 +6,6 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 
-from mission_planner_2.commons import service_clients
 from mission_planner_2.commons.blackboard import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
@@ -61,22 +60,20 @@ def create_bin_root():
     # 3 - drop into bin twice
     # 4 - disable detections
 
-    enable_detections = service_clients.FromConstant(
+    enable_detections = py_trees_ros.service_clients.FromConstant(
         name="Enable Detections",
-        namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_enable_req(),
-        key_response="bin_enable_detections",
+        key_response=fk("bin_enable_detections"),
     )
 
-    disable_detections = service_clients.FromConstant(
+    disable_detections = py_trees_ros.service_clients.FromConstant(
         name="Disable Detections",
-        namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=_gen_disable_req(),
-        key_response="bin_disable_detections",
+        key_response=fk("bin_disable_detections"),
     )
 
     # check srv call succeeded from the BB

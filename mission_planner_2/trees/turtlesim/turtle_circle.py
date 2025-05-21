@@ -7,8 +7,6 @@ from geometry_msgs.msg import Twist, Vector3
 from std_srvs.srv import Empty
 from turtlesim.msg import Pose
 
-import mission_planner_2
-
 
 class TurtleMove(py_trees.behaviour.Behaviour):
 
@@ -74,7 +72,7 @@ def create_turtle_circle_root() -> py_trees.behaviour.Behaviour:
         num_success=1000
     )
     stop = TurtleMove(name="stop", x_vel=0.0, z_vel=0.0)
-    reset = mission_planner_2.service_clients.FromConstant(
+    reset = py_trees_ros.service_clients.FromConstant(
         name="reset",
         service_type=Empty,
         service_name="/reset",

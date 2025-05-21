@@ -6,7 +6,6 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import String, UInt8
 
-from mission_planner_2.commons import service_clients
 from mission_planner_2.commons.blackboard import (
     DynamicSetBlackboard,
     full_key_generator,
@@ -89,24 +88,22 @@ def create_torpedo_root():
     # 4 - launch torpedo
     # 5 - disable detections
 
-    enable_detections = service_clients.FromConstant(
+    enable_detections = py_trees_ros.service_clients.FromConstant(
         name="Enable Detections",
-        namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(
             enabled=True, template_name="Task04_Tagging_01.png"
         ),
-        key_response="torpedo_enable_detections",
+        key_response=fk("torpedo_enable_detections"),
     )
 
-    disable_detections = service_clients.FromConstant(
+    disable_detections = py_trees_ros.service_clients.FromConstant(
         name="Disable Detections",
-        namespace=NAMESPACE,
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
-        key_response="torpedo_disable_detections",
+        key_response=fk("torpedo_disable_detections"),
     )
 
     # check srv call succeeded from the BB
