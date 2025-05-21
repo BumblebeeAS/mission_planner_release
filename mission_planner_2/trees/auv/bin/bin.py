@@ -9,7 +9,7 @@ from std_msgs.msg import UInt8
 from mission_planner_2.commons.blackboard import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.bin.move_to_task import create_move_to_bin_task_root
 
 
@@ -79,7 +79,7 @@ def create_bin_root():
         ),
     )
 
-    align_to_target = goto_node.FromBlackboard(
+    align_to_target = goto.FromBlackboard(
         name="Align to Target",
         parent_namespace=NAMESPACE,
         pose_key="bin_pose",
@@ -95,7 +95,7 @@ def create_bin_root():
         0.0
     )
 
-    align_to_target_const = goto_node.FromConstant(
+    align_to_target_const = goto.FromConstant(
         name="Align to Target",
         parent_namespace=NAMESPACE,
         pose=bin_pose

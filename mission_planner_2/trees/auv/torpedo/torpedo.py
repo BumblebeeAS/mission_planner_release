@@ -12,7 +12,7 @@ from mission_planner_2.commons.blackboard import (
 )
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
 
 # Generate namespace automatically from file path
@@ -165,13 +165,13 @@ def create_torpedo_root():
     )
 
     # temp for pool test use
-    align_to_target_const = goto_node.FromConstant(
+    align_to_target_const = goto.FromConstant(
         name="Align to Target",
         parent_namespace=NAMESPACE,
         pose=hole_pose,
     )
 
-    align_to_target = goto_node.FromBlackboard(
+    align_to_target = goto.FromBlackboard(
         name="Align to Target",
         parent_namespace=NAMESPACE,
         pose_key="hole",
