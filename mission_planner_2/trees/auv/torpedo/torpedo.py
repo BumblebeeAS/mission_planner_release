@@ -8,9 +8,8 @@ from std_msgs.msg import String, UInt8
 
 from mission_planner_2.commons.blackboard import (
     DynamicSetBlackboard,
-    full_key_generator,
 )
-from mission_planner_2.commons.namespace_utils import generate_namespace
+from mission_planner_2.commons.namespace_utils import full_key_generator, generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root

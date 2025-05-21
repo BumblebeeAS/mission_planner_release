@@ -4,7 +4,7 @@ import py_trees
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 
 from mission_planner_2.commons import service_clients
-from mission_planner_2.commons.blackboard import full_key_generator
+from mission_planner_2.commons.namespace_utils import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto

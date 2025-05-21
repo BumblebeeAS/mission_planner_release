@@ -1,6 +1,6 @@
 import py_trees
 
-from mission_planner_2.commons.blackboard import (
+from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
 )
 from mission_planner_2.commons.namespace_utils import generate_namespace
