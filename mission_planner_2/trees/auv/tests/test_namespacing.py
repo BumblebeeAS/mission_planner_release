@@ -70,7 +70,7 @@ def create_namespacing_test_root():
     )
 
     # Test 2: Using goto_node with namespace
-    goto = goto.FromBlackboard(
+    goto_ = goto.FromBlackboard(
         name="Goto",
         parent_namespace=NAMESPACE,
         pose_key="test_pose",
@@ -153,7 +153,7 @@ def create_namespacing_test_root():
     root.add_children(
         [
             set_pose,
-            goto,
+            goto_,
             service,
             set_req,
             service_from_bb,
