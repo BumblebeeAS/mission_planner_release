@@ -5,11 +5,10 @@ from std_srvs.srv import SetBool
 from mission_planner_2.commons import service_clients
 from mission_planner_2.commons.blackboard import (
     DynamicSetBlackboard,
-    full_key_generator,
 )
-from mission_planner_2.commons.namespace_utils import generate_namespace
+from mission_planner_2.commons.namespace_utils import full_key_generator, generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 
 # Define a main namespace for the test
 NAMESPACE = "/auv4/test_namespacing"
@@ -70,7 +69,7 @@ def create_namespacing_test_root():
     )
 
     # Test 2: Using goto_node with namespace
-    goto = goto_node.FromBlackboard(
+    goto_ = goto.FromBlackboard(
         name="Goto",
         parent_namespace=NAMESPACE,
         pose_key="test_pose",
@@ -120,7 +119,7 @@ def create_namespacing_test_root():
     )
 
     # Test 5: Check if FromConstant goto works with namespacing
-    goto_const = goto_node.FromConstant(
+    goto_const = goto.FromConstant(
         name="Goto Constant",
         parent_namespace=NAMESPACE,
         pose=_create_test_pose(5.0, 5.0, 2.5, 0.0),
@@ -143,7 +142,7 @@ def create_namespacing_test_root():
     )
 
     # Final test: Use the transformed pose for goto operation
-    goto_transformed = goto_node.FromBlackboard(
+    goto_transformed = goto.FromBlackboard(
         name="Goto Transformed",
         parent_namespace=NAMESPACE,
         pose_key="transformed_pose",
@@ -153,7 +152,7 @@ def create_namespacing_test_root():
     root.add_children(
         [
             set_pose,
-            goto,
+            goto_,
             service,
             set_req,
             service_from_bb,

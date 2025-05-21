@@ -1,7 +1,7 @@
 import py_trees
 from geometry_msgs.msg import PoseStamped
 
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.goto.goto import create_goto_root
 
 test_pose: PoseStamped = PoseStamped()
@@ -52,7 +52,7 @@ def create_goto_test() -> py_trees.common.Status:
     root.add_children(
         [
             set_pose_in_bb,
-            goto_node.FromBlackboard(
+            goto.FromBlackboard(
                 name="goto",
                 pose_key="input_pose_to_goto",
             ),

@@ -3,7 +3,7 @@ from nav_msgs.msg import Odometry
 from py_trees_ros import subscribers
 
 from mission_planner_2.commons import is_within_threshold
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.goto.stationkeep import create_stationkeep_root
 
 
@@ -44,7 +44,7 @@ def create_goto_with_threshold_root():
         key_threshold=threshold_key,
     )
 
-    goton = goto_node.FromBlackboard(
+    goton = goto.FromBlackboard(
         name="goto_node",
         pose_key=input_pose_to_goto,
     )
