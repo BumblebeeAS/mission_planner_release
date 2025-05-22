@@ -3,7 +3,7 @@ import py_trees
 
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 
 # Generate namespace automatically from file path
 NAMESPACE = generate_namespace()
@@ -46,25 +46,25 @@ def create_test_convert_service_root():
     )
 
     # Create goto behaviors
-    goto_start = goto_node.FromConstant(
+    goto_start = goto.FromConstant(
         name="Goto Start Position (0, 0, 1) in world_ned",
         parent_namespace=NAMESPACE,
         pose=start_pose,
     )
 
-    goto_test_frame = goto_node.FromConstant(
+    goto_test_frame = goto.FromConstant(
         name="Goto (0, 0, 0) in test_frame",
         parent_namespace=NAMESPACE,
         pose=test_frame_pose,
     )
 
-    goto_start_again = goto_node.FromConstant(
+    goto_start_again = goto.FromConstant(
         name="Return to Start Position (0, 0, 1) in world_ned",
         parent_namespace=NAMESPACE,
         pose=start_pose,
     )
 
-    goto_test_frame_with_anchor = goto_node.FromConstant(
+    goto_test_frame_with_anchor = goto.FromConstant(
         name="Goto (0, 0, 0) in test_frame with anchor frame",
         parent_namespace=NAMESPACE,
         pose=test_frame_pose,
