@@ -6,12 +6,13 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 
-from mission_planner_2.commons.namespace_utils import full_key_generator
-from mission_planner_2.commons.namespace_utils import generate_namespace
+from mission_planner_2.commons.namespace_utils import (
+    full_key_generator,
+    generate_namespace,
+)
 from mission_planner_2.commons.pose_utils import create_stamped_pose
+from mission_planner_2.trees.auv.bins.move_to_task import create_move_to_bin_task_root
 from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.bin.move_to_task import create_move_to_bin_task_root
-
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -47,7 +48,7 @@ def create_bin_root():
         service_request=IMPoseEstimatorToggleTemplate.Request(
             enabled=True,
             template_name="Task03_DropBRUVS.png",
-            camera_frame_id="auv4/bot_cam_optical"
+            camera_frame_id="auv4/bot_cam_optical",
         ),
         key_response=fk("bin_enable_detections"),
     )
@@ -87,18 +88,16 @@ def create_bin_root():
 
     bin_pose = create_stamped_pose(
         "Task03_DropBRUVS_optical/clustered",
-        0.0, # Temporary, please update
+        0.0,  # Temporary, please update
         0.0,
         0.0,
         0.0,
         0.0,
-        0.0
+        0.0,
     )
 
     align_to_target_const = goto.FromConstant(
-        name="Align to Target",
-        parent_namespace=NAMESPACE,
-        pose=bin_pose
+        name="Align to Target", parent_namespace=NAMESPACE, pose=bin_pose
     )
 
     set_dropper_actuation = py_trees.behaviours.SetBlackboardVariable(
