@@ -85,6 +85,28 @@ def create_bin_root():
         pose_key="bin_pose",
     )
 
+    # For Yosie
+
+    # subscriber --> yaw (NED)
+
+    # rotation_pose = create_stamped_pose(
+    #     "auv4/base_link_ned",
+    #     0.0,  # Temporary, please update
+    #     0.0,
+    #     0.0,
+    #     0.0,
+    #     0.0,
+    #     yaw,
+    # )
+
+    # goto to rotation pose
+
+    # service call to /auv4/choice std_srvs::Trigger (py_trees API tells you how to do this)
+
+    # choose between offsets based on choice (see how torpedo does it)
+
+    # goto that offset
+
     bin_pose = create_stamped_pose(
         "Task03_DropBRUVS_optical/clustered",
         0.0, # Temporary, please update
