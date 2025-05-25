@@ -42,6 +42,22 @@ def create_gate_root():
         memory=True
     )
 
+    pictures_pose = create_stamped_pose(
+        "advay_please_remove_this",
+        1.5,
+        0.0,
+        2.0,
+        90.0,
+        90.0,
+        0.0
+    )
+
+    move_to_see_pictures = goto.FromConstant(
+        "Move to pictures",
+        NAMESPACE,
+        pictures_pose
+    )
+
     # it's a bit weird but its to simulate the possibility of service call
     # returning a ROS bool message rather than having a primitive bool
     set_gate_side = py_trees.behaviours.SetBlackboardVariable(
@@ -70,7 +86,7 @@ def create_gate_root():
         "world_ned",
         0.0,
         0.0,
-        0.0,
+        0.75,
         0.0,
         0.0,
         0.0
@@ -82,28 +98,28 @@ def create_gate_root():
     # TODO: determine left and right offsets
 
     gate_before_left_pose = create_stamped_pose(
-        "auv4/gate",
+        "advay_please_remove_this",
+        0.75,
         0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
+        0.5,
+        90.0,
+        90.0,
         0.0
     )
 
     gate_before_right_pose = create_stamped_pose(
-        "auv4/gate",
+        "advay_please_remove_this",
+        2.25,
         0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
+        0.5,
+        90.0,
+        90.0,
         0.0
     )
 
     forward_pose = create_stamped_pose(
         "auv4/base_link_ned",
-        1.0,
+        1.5,
         0.0,
         0.0,
         0.0,
@@ -152,6 +168,8 @@ def create_gate_root():
     root.add_children(
         children=[
             move_towards_gate,
+            py_trees.timers.Timer("Wait to stabilize", 5.0),
+            move_to_see_pictures,
             py_trees.timers.Timer("Wait to stabilize", 5.0),
             set_gate_side,
             select_gate_side,
