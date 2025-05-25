@@ -12,6 +12,9 @@
 
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
+  <depend>tf2_ros</depend>
+  <depend>launch_ros</depend>
+  <depend>launch</depend>
 
   <depend>std_srvs</depend>
 

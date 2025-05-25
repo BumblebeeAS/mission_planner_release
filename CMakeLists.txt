@@ -39,4 +39,14 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(FILES
+  launch/main.launch.py
+  DESTINATION share/${PROJECT_NAME}/launch
+)
+
+install(FILES
+  cfg/cfg.yaml
+  DESTINATION share/${PROJECT_NAME}/cfg
+)
+
 ament_package()

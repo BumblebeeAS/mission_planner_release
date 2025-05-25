@@ -4,7 +4,7 @@ import py_trees
 import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import String, UInt8
+from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 from transforms3d.euler import quat2euler
 
@@ -17,52 +17,37 @@ from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
 
-# Generate namespace automatically from file path
+# Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
-# TODO: figure out the actual offset for the shark
-TEMPLATE_1_OFFSET_SHARK = {
-    "x": 0.44 - 0.08,
-    "y": 0.0 + 0.07,
-    "z": 0.5,
-    "roll": 90.0,
-    "pitch": 94.0,
-    "yaw": 0.0,
+# empty so that when break can tell global wrong DONT set manually
+DETECTION_FRAME = ""
+
+######################### UPDATE CONSTANTS HERE #########################
+DETECTION_FRAME_MAP = {  # TODO: set the actual frame ids here reference cfg/cfg.yaml
+    ("shark", True): "shark_hole",
+    ("shark", False): "fish_hole",
+    ("fish", True): "fish_hole",
+    ("fish", False): "shark_hole",
 }
 
-# TODO: figure out the actual offset for the fish should just be the translation xyz diff
-TEMPLATE_1_OFFSET_FISH = {
-    "x": 0.3,
-    "y": 0.0,
-    "z": 0.6,
-    "roll": 90.0,
-    "pitch": 94.0,
-    "yaw": 0.0,
-}
+TOGGLE_TEMPLATE_TOPIC = "/auv4/image_matching/toggle_template"
 
-# alternative is advay_please_remove_this
-# TODO: publish static tf for this frame take the offset values above
-DETECTION_FRAME = "hole"
+TOP_TORP_UINT = UInt8(data=2)
+BTM_TORP_UINT = UInt8(data=4)
+#########################################################################
 
 
-def _make_selection(choice: Trigger.Response):
+def _make_selection(choice: Trigger.Response, isFirst=True):
     """
     Function to set the offset based on choice.
     """
-    if choice.message == "shark":  # can use success too
-        offset = TEMPLATE_1_OFFSET_SHARK
-    else:  # fish
-        offset = TEMPLATE_1_OFFSET_FISH
+    global DETECTION_FRAME
 
+    DETECTION_FRAME = DETECTION_FRAME_MAP[(choice.message, isFirst)]
     return create_stamped_pose(
         frame_id=DETECTION_FRAME,
-        position_x=offset["x"],
-        position_y=offset["y"],
-        position_z=offset["z"],
-        roll=offset["roll"],
-        pitch=offset["pitch"],
-        yaw=offset["yaw"],
     )
 
 
@@ -95,9 +80,6 @@ def create_torpedo_root():
     """
     Create the root of the torpedo tree.
     """
-    TOGGLE_TEMPLATE_TOPIC = "/auv4/image_matching/toggle_template"
-    TOP_TORP_UINT = UInt8(data=2)
-    BTM_TORP_UINT = UInt8(data=4)
 
     root = py_trees.composites.Sequence(
         name="Torpedo Root",
@@ -182,12 +164,12 @@ def create_torpedo_root():
     )
 
     set_choice1 = DynamicSetBlackboard(
-        name="Set Choice",
+        name="Set Choice 1",
         key="choice",
         namespace=NAMESPACE,
-        update_key="hole",
+        update_key="hole",  # arbitrary key to set the hole pose
         overwrite=True,
-        func=_make_selection,
+        func=lambda x: _make_selection(x, isFirst=True),
     )
 
     # temp for pool test use
@@ -200,7 +182,7 @@ def create_torpedo_root():
     save_tf = py_trees_ros.transforms.ToBlackboard(
         name="Save TF",
         variable_name=fk("reset_tf"),
-        target_frame=DETECTION_FRAME,
+        target_frame=DETECTION_FRAME,  # TODO: check if the global will actually update here
         source_frame="auv4/base_link_ned",
         qos_profile=qos_profile_system_default,
     )
@@ -227,12 +209,12 @@ def create_torpedo_root():
     )
 
     set_choice2 = DynamicSetBlackboard(
-        name="Set Choice",
+        name="Set Choice 2",
         key="choice",
         namespace=NAMESPACE,
         update_key="hole",
         overwrite=True,
-        func=_make_selection,
+        func=lambda x: _make_selection(x, isFirst=False),
     )
 
     align_to_target2 = goto.FromBlackboard(
@@ -242,14 +224,14 @@ def create_torpedo_root():
     )
 
     set_torp_actuation_top = py_trees.behaviours.SetBlackboardVariable(
-        name="Set Torpedo Actuation",
+        name="Set Torpedo Actuation top",
         variable_name=fk("torpedo_actuation"),
         variable_value=TOP_TORP_UINT,
         overwrite=True,
     )
 
     set_torp_actuation_btm = py_trees.behaviours.SetBlackboardVariable(
-        name="Set Torpedo Actuation",
+        name="Set Torpedo Actuation btm",
         variable_name=fk("torpedo_actuation"),
         variable_value=BTM_TORP_UINT,
         overwrite=True,
@@ -292,7 +274,6 @@ def create_torpedo_root():
             fire_torpedo2,
             disable_detections,
             disable_detections_succeeded,
-            # test_frame,
         ],
     )
 
