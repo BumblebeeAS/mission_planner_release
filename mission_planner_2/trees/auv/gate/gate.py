@@ -1,7 +1,12 @@
 import operator
 
 import py_trees
-from std_msgs.msg import Bool
+import py_trees_ros
+from std_msgs.msg import (
+    Bool,
+    String,
+)
+from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -24,10 +29,14 @@ def create_gate_root():
     )
 
     select_gate_side = py_trees.composites.Selector(
-        name="Select gate side", memory=True
+        name="Select gate side",
+        memory=True
     )
 
-    try_left_side = py_trees.composites.Sequence(name="Try left side", memory=True)
+    try_left_side = py_trees.composites.Sequence(
+        name="Try left side",
+        memory=True
+    )
 
     pictures_pose = create_stamped_pose(
         "advay_please_remove_this",
@@ -40,25 +49,41 @@ def create_gate_root():
     )
 
     move_to_see_pictures = goto.FromConstant(
-        "Move to pictures", NAMESPACE, pictures_pose
+        "Move to pictures",
+        NAMESPACE,
+        pictures_pose
     )
 
-    # it's a bit weird but its to simulate the possibility of service call
-    # returning a ROS bool message rather than having a primitive bool
-    set_gate_side = py_trees.behaviours.SetBlackboardVariable(
-        name="Set gate side",
-        variable_name=fk("is_left"),
-        variable_value=Bool(data=False),
-        overwrite=True,
+    get_is_fish = py_trees_ros.service_clients.FromConstant(
+        name="Get is fish",
+        service_type=Trigger,
+        service_name="/auv4/choice/is_fish",
+        service_request=Trigger.Request(),
+        key_response=fk("is_fish")
     )
 
-    check_is_left = py_trees.behaviours.CheckBlackboardVariableValue(
+    get_gate_orientation = py_trees.behaviours.SetBlackboardVariable(
+        name="Get gate orientation",
+        variable_name=fk("gate_orientation"),
+        variable_value=String(data="fish_shark"),
+        overwrite=True
+    )
+
+    check_is_left = py_trees.behaviours.CheckBlackboardVariableValues(
         name="Is left?",
-        check=py_trees.common.ComparisonExpression(
-            variable=fk("is_left"),
-            value=True,
-            operator=lambda x, y: operator.eq(x.data, y),
-        ),
+        checks=[
+            py_trees.common.ComparisonExpression(
+                variable=fk("is_fish"),
+                value=True,
+                operator=lambda x, y: operator.__eq__(x.data, y)
+            ),
+            py_trees.common.ComparisonExpression(
+                variable=fk("gate_orientation"),
+                value="fish_shark",
+                operator=lambda x, y: operator.__eq__(x.data, y)
+            )
+        ],
+        operator=operator.__eq__,
     )
 
     ##
@@ -85,22 +110,42 @@ def create_gate_root():
     )
 
     move_towards_gate = goto.FromConstant(
-        "Move towards gate", NAMESPACE, gate_init_pose
+        "Move towards gate",
+        NAMESPACE,
+        gate_init_pose
     )
 
     move_to_gate_before_left = goto.FromConstant(
-        "Move to before left side", NAMESPACE, gate_before_left_pose
+        "Move to before left side",
+        NAMESPACE,
+        gate_before_left_pose
     )
 
     move_to_gate_before_right = goto.FromConstant(
-        "Move to before right side", NAMESPACE, gate_before_right_pose
+        "Move to before right side",
+        NAMESPACE,
+        gate_before_right_pose
     )
 
-    move_pass_gate = goto.FromConstant("Pass through gate", NAMESPACE, forward_pose)
+    move_pass_gate = goto.FromConstant(
+        "Pass through gate",
+        NAMESPACE,
+        forward_pose
+    )
 
-    try_left_side.add_children(children=[check_is_left, move_to_gate_before_left])
+    try_left_side.add_children(
+        children=[
+            check_is_left,
+            move_to_gate_before_left
+        ]
+    )
 
-    select_gate_side.add_children(children=[try_left_side, move_to_gate_before_right])
+    select_gate_side.add_children(
+        children=[
+            try_left_side,
+            move_to_gate_before_right
+        ]
+    )
 
     root.add_children(
         children=[
@@ -108,7 +153,8 @@ def create_gate_root():
             py_trees.timers.Timer("Wait to stabilize", 10.0),
             move_to_see_pictures,
             py_trees.timers.Timer("Wait to stabilize", 10.0),
-            set_gate_side,
+            get_is_fish,
+            get_gate_orientation,
             select_gate_side,
             py_trees.timers.Timer("Wait to stabilize", 10.0),
             move_pass_gate,
