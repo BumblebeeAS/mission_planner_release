@@ -15,18 +15,7 @@ fk = full_key_generator(NAMESPACE)
 
 
 def create_gate_root():
-    """
-    Create the root of the gate tree.
 
-    Execution Flow:
-    1. Move closer to the gate
-    2. Enable detections
-    3. Check if enable succeeded
-    4. Move to gate pose
-    5. Pass through gate
-    6. Disable detections
-    7. Disable detections succeeded
-    """
     DEPTH = 0.75
 
     root = py_trees.composites.Sequence(
@@ -45,9 +34,6 @@ def create_gate_root():
         1.5,
         -DEPTH,
         2.0,
-        # 0.0,
-        # 0.0,
-        # 0.0,
         90.0,
         90.0,
         0.0,
@@ -85,8 +71,6 @@ def create_gate_root():
 
     # Publish the following tf to mock the gate detection
     # ros2 run tf2_ros static_transform_publisher 7 0 1.5 -1.57 0 0 world_ned auv4/gate
-
-    # TODO: determine left and right offsets
 
     gate_before_left_pose = create_stamped_pose(
         "advay_please_remove_this", 0.75, -DEPTH, 1.0, 90.0, 90.0, 0.0
