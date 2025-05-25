@@ -4,10 +4,10 @@ import py_trees
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 
 from mission_planner_2.commons import service_clients
-from mission_planner_2.commons.blackboard import full_key_generator
+from mission_planner_2.commons.namespace_utils import full_key_generator
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -115,15 +115,15 @@ def create_gate_root():
         yaw=0.0,
     )
 
-    move_towards_gate = goto_node.FromConstant("move_towards_gate", NAMESPACE, gate_init_pose)
+    move_towards_gate = goto.FromConstant("move_towards_gate", NAMESPACE, gate_init_pose)
 
-    move_to_gate_target = goto_node.FromConstant(
+    move_to_gate_target = goto.FromConstant(
         "move_to_gate_target",
         NAMESPACE,
         gate_target_pose,
     )
 
-    pass_through_gate = goto_node.FromConstant(
+    pass_through_gate = goto.FromConstant(
         "pass_through_gate", NAMESPACE, gate_passthrough_pose
     )
 

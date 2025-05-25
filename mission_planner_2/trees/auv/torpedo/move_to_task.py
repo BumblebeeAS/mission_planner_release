@@ -1,11 +1,11 @@
 import py_trees
 
-from mission_planner_2.commons.blackboard import (
+from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
 )
 from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 
 # Generate namespace automatically from file path
 NAMESPACE = generate_namespace()
@@ -25,7 +25,7 @@ def create_move_to_task_root():
         "world_ned", position_x=0.2, position_y=0.0, position_z=1.05, yaw=0.0
     )
 
-    move_to_torp = goto_node.FromConstant(
+    move_to_torp = goto.FromConstant(
         "move to torpedo",
         NAMESPACE,
         torpedo_init_pose,

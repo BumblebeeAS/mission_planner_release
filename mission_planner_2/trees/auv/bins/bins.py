@@ -113,7 +113,7 @@ def create_bin_root():
         service_request=IMPoseEstimatorToggleTemplate.Request(
             enabled=True,
             template_name="Task03_DropBRUVS.png",
-            camera_frame_id="auv4/bot_cam_optical"
+            camera_frame_id="auv4/bot_cam_optical",
         ),
         key_response=fk("bin_enable_detections"),
     )
@@ -170,18 +170,16 @@ def create_bin_root():
 
     bin_pose = create_stamped_pose(
         "Task03_DropBRUVS_optical/clustered",
-        0.0, # Temporary, please update
+        0.0,  # Temporary, please update
         0.0,
         0.0,
         0.0,
         0.0,
-        0.0
+        0.0,
     )
 
-    align_to_target_const = goto_node.FromConstant(
-        name="Align to Target",
-        parent_namespace=NAMESPACE,
-        pose=bin_pose
+    align_to_target_const = goto.FromConstant(
+        name="Align to Target", parent_namespace=NAMESPACE, pose=bin_pose
     )
 
     set_dropper_actuation = py_trees.behaviours.SetBlackboardVariable(

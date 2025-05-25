@@ -1,6 +1,6 @@
 import py_trees
 
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.goto.stationkeep import create_stationkeep_root
 
 
@@ -35,7 +35,7 @@ def create_cancel_goal_test() -> py_trees.common.Status:
 
     stationkeep = create_stationkeep_root()
 
-    goto = goto_node.FromBlackboard(name="goto", pose_key="input_pose_to_goto")
+    goto = goto.FromBlackboard(name="goto", pose_key="input_pose_to_goto")
 
     cancel_seq.add_children([timer, stationkeep])
     move_seq.add_children([set_pose_in_bb, goto])
