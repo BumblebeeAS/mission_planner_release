@@ -23,8 +23,8 @@ fk = full_key_generator(NAMESPACE)
 
 # TODO: figure out the actual offset for the shark
 TEMPLATE_1_OFFSET_SHARK = {
-    "x": 0.44,
-    "y": 0.0,
+    "x": 0.44 - 0.08,
+    "y": 0.0 + 0.07,
     "z": 0.5,
     "roll": 90.0,
     "pitch": 94.0,
@@ -41,6 +41,7 @@ TEMPLATE_1_OFFSET_FISH = {
     "yaw": 0.0,
 }
 
+# alternative is advay_please_remove_this
 DETECTION_FRAME = "Task04_Tagging_01_optical/clustered"
 
 
@@ -157,7 +158,25 @@ def create_torpedo_root():
 
     # Unfiltered version clustered
     hole_pose = create_stamped_pose(
-        "advay_please_remove_this", 0.44, 0.0, 0.5, 90.0, 94.0, 0.0
+        # "advay_please_remove_this", 0.44 - 0.10, 0.00 + 0.15, 0.5, 90.0, 90.0, 0.0
+        "advay_please_remove_this",
+        0.44 - 0.08,
+        0.00 + 0.07,
+        0.4,
+        90.0,
+        90.0,
+        0.0,
+    )
+
+    torp_pose = create_stamped_pose(
+        # "auv4/front_cam_optical", 0.5, 0.0, 0.0, -90.0, 0.0, -90.0
+        "test",
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
     )
 
     # For manual testing with dummy tfs (if you are too lazy to keep running image matching).
@@ -172,7 +191,7 @@ def create_torpedo_root():
         key_response=fk("choice"),
     )
 
-    set_choice = DynamicSetBlackboard(
+    set_choice1 = DynamicSetBlackboard(
         name="Set Choice",
         key="choice",
         namespace=NAMESPACE,
@@ -211,8 +230,23 @@ def create_torpedo_root():
         pose_key="reset_pose",
     )
 
-    align_to_target = goto.FromBlackboard(
-        name="Align to Target",
+    align_to_target1 = goto.FromBlackboard(
+        name="Align to Target1",
+        parent_namespace=NAMESPACE,
+        pose_key="hole",
+    )
+
+    set_choice2 = DynamicSetBlackboard(
+        name="Set Choice",
+        key="choice",
+        namespace=NAMESPACE,
+        update_key="hole",
+        overwrite=True,
+        func=_make_selection,
+    )
+
+    align_to_target2 = goto.FromBlackboard(
+        name="Align to Target2",
         parent_namespace=NAMESPACE,
         pose_key="hole",
     )
@@ -250,22 +284,25 @@ def create_torpedo_root():
     launch_seq.add_children(
         children=[
             get_choice,
-            set_choice,
+            set_choice1,
             enable_detections,
             enable_detections_succeeded,
             py_trees.timers.Timer("Wait for Match", duration=20.0),
             # align_to_target_const,
             save_tf,
-            align_to_target,
+            align_to_target1,
             set_torp_actuation_top,
             fire_torpedo1,
             py_trees.timers.Timer("Wait between Firings", duration=5),
             reconstruct_pose,
             reset_saved_tf,
+            set_choice2,
+            align_to_target2,
             set_torp_actuation_btm,
             fire_torpedo2,
             disable_detections,
             disable_detections_succeeded,
+            # test_frame,
         ],
     )
 
