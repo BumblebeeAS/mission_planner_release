@@ -2,8 +2,8 @@ import py_trees
 
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
+    generate_namespace,
 )
-from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 
@@ -22,7 +22,7 @@ def create_move_to_task_root():
     )
 
     torpedo_init_pose = create_stamped_pose(
-        "world_ned", position_x=0.2, position_y=0.0, position_z=1.05, yaw=0.0
+        "world_ned", position_x=0.0, position_y=0.0, position_z=1.1, yaw=0.0
     )
 
     move_to_torp = goto.FromConstant(
