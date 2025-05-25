@@ -42,7 +42,8 @@ TEMPLATE_1_OFFSET_FISH = {
 }
 
 # alternative is advay_please_remove_this
-DETECTION_FRAME = "Task04_Tagging_01_optical/clustered"
+# TODO: publish static tf for this frame take the offset values above
+DETECTION_FRAME = "hole"
 
 
 def _make_selection(choice: Trigger.Response):
@@ -168,17 +169,6 @@ def create_torpedo_root():
         0.0,
     )
 
-    torp_pose = create_stamped_pose(
-        # "auv4/front_cam_optical", 0.5, 0.0, 0.0, -90.0, 0.0, -90.0
-        "test",
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    )
-
     # For manual testing with dummy tfs (if you are too lazy to keep running image matching).
     # ros2 run tf2_ros static_transform_publisher -3.3 0 -0.9 0 0 1.57 world fake_det # usually the pose the detection gives
     # ros2 run tf2_ros static_transform_publisher 0.3 0 0.6 0 1.57 1.57 fake_det hole
@@ -210,8 +200,8 @@ def create_torpedo_root():
     save_tf = py_trees_ros.transforms.ToBlackboard(
         name="Save TF",
         variable_name=fk("reset_tf"),
-        target_frame="auv4/base_link_ned",
-        source_frame=DETECTION_FRAME,
+        target_frame=DETECTION_FRAME,
+        source_frame="auv4/base_link_ned",
         qos_profile=qos_profile_system_default,
     )
 
