@@ -14,7 +14,7 @@ public:
                 this,
                 std::placeholders::_1,
                 std::placeholders::_2));
-        
+
         get_is_fish_srv_ = this->create_service<std_srvs::srv::Trigger>(
             "choice/get_is_fish",
             std::bind(
