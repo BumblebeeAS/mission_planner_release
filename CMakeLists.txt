@@ -16,6 +16,12 @@ find_package(rclpy REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
+add_executable(choice_server src/choice_server.cpp)
+ament_target_dependencies(choice_server rclcpp std_srvs)
+
+install(TARGETS
+  choice_server 
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
