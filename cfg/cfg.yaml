@@ -1,48 +1,48 @@
-static_transform_shark:
-  ros__parameters:
-    # Translation (x, y, z in meters)
-    x: 0.36
-    y: 0.07
-    z: 0.5
-
-    roll: 90.0          # in degrees
-    pitch: 94.0         # in degrees
-    yaw: 0.0           # in degrees
-
-    # Frame IDs
-    parent_frame_id: "hole" # TODO: change these idk all the names now
-    child_frame_id: "auv4/base_link_ned" # the tf will be for parent -> child if not just swap
-
 static_transform_fish:
   ros__parameters:
     # Translation (x, y, z in meters)
-    x: 1.0
-    y: 0.5
-    z: 0.2
+    x: 0.429
+    y: -0.084
+    z: 0.5
 
     roll: 90.0          # in degrees
-    pitch: 94.0      # in degrees
+    pitch: 90.0      # in degrees
     yaw: 0.0        # in degrees
 
     # Frame IDs
-    parent_frame_id: "hole2" # TODO: change these idk all the names now
-    child_frame_id: "auv4/base_link_ned" # the tf will be for parent -> child if not just swap
+    parent_frame_id: "advay_please_remove_this"
+    child_frame_id: "auv4/torpedo/fish_hole"
+
+static_transform_shark:
+  ros__parameters:
+    # Translation (x, y, z in meters)
+    x: 0.319
+    y: -0.336
+    z: 0.5
+
+    roll: 90.0          # in degrees
+    pitch: 90.0         # in degrees
+    yaw: 0.0           # in degrees
+
+    # Frame IDs
+    parent_frame_id: "advay_please_remove_this"
+    child_frame_id: "auv4/torpedo/shark_hole"
 
 # Service node configuration
 # TODO: add the srv node here
-service_node:
-  ros__parameters:
-    # Service node package and executable info
-    package: "mission_planner_2"
-    executable: "your_service_node"
-    name: "my_service_node"
-
-    # Your service-specific parameters
-    service_name: "/my_service"
-    timeout_ms: 5000
-    queue_size: 10
-
-    # Example service parameters (customize as needed)
-    max_requests_per_second: 100.0
-    enable_logging: true
-    log_level: "INFO"
+# service_node:
+#   ros__parameters:
+#     # Service node package and executable info
+#     package: "mission_planner_2"
+#     executable: "your_service_node"
+#     name: "my_service_node"
+#
+#     # Your service-specific parameters
+#     service_name: "/my_service"
+#     timeout_ms: 5000
+#     queue_size: 10
+#
+#     # Example service parameters (customize as needed)
+#     max_requests_per_second: 100.0
+#     enable_logging: true
+#     log_level: "INFO"

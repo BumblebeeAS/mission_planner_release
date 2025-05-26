@@ -46,6 +46,7 @@ install(PROGRAMS
 )
 
 install(FILES
+  launch/choice.launch.py
   launch/main.launch.py
   DESTINATION share/${PROJECT_NAME}/launch
 )
