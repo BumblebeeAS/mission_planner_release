@@ -5,8 +5,7 @@ import py_trees.console as console
 import py_trees_ros.trees
 import rclpy
 
-# from mission_planner_2.trees.auv.gate.gate import create_gate_root as tree_root
-from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root as tree_root
+from mission_planner_2.trees.turtlesim.turtle_circle import create_turtle_circle_root as tree_root
 
 
 def main():
@@ -17,23 +16,34 @@ def main():
     try:
         tree.setup(timeout=15.0)
     except:
-        console.logerror(console.red + "failed to setup the tree")
+        console.logerror(
+            console.red + "failed to setup the tree" + console.reset
+        )
         tree.shutdown()
         rclpy.shutdown()
 
-    def stop_on_success(tree):
+    def stop_on_success_or_failure(tree):
         if tree.root.status == py_trees.common.Status.SUCCESS:
-            console.loginfo(console.green + "completed one execution")
-            tree.shutdown()
-            rclpy.shutdown()
-            exit(0)
+            console.loginfo(
+                console.green + "completed one execution" + console.reset
+            )
+            raise KeyboardInterrupt
+        elif tree.root.status == py_trees.common.Status.FAILURE:
+            console.loginfo(
+                console.red + "stopped on failure" + console.reset
+            )
+            raise KeyboardInterrupt
 
-    tree.add_post_tick_handler(stop_on_success)
+    tree.add_post_tick_handler(stop_on_success_or_failure)
     tree.tick_tock(period_ms=100)
     try:
         rclpy.spin(tree.node)
-    except KeyboardInterrupt:
-        pass
+    except:
+        console.loginfo("stopping")
+    finally:
+        console.loginfo(console.reset)
+        tree.shutdown()
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
