@@ -5,24 +5,88 @@ import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
+import std_srvs
+import goto
 
-from mission_planner_2.commons.namespace_utils import (
-    full_key_generator,
-    generate_namespace,
+from mission_planner_2.commons.blackboard import (
+    DynamicSetBlackboard,
+    full_key_generator
 )
+from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
+from mission_planner_2.trees.auv.goto import goto_node
 from mission_planner_2.trees.auv.bins.move_to_task import create_move_to_bin_task_root
-from mission_planner_2.trees.auv.goto import goto
+
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
+# For Yosie
+
+    # subscriber --> yaw (NED)
+
+    # rotation_pose = create_stamped_pose(
+    #     "auv4/base_link_ned",
+    #     0.0,  # Temporary, please update
+    #     0.0,
+    #     0.0,
+    #     0.0,
+    #     0.0,
+    #     yaw,
+    # )
+
+    # goto to rotation pose
+
+    # service call to /auv4/choice std_srvs::Trigger (py_trees API tells you how to do this)
+
+    # choose between offsets based on choice (see how torpedo does it)
+
+    # goto that offset
+    
+     # Figure out the offset
+
+TEMPLATE_3_OFFSET_SHARK = {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0,
+    "roll": 0.0,
+    "pitch": 0.0,
+    "yaw": 0.0,
+}
+
+TEMPLATE_3_OFFSET_FISH = {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0,
+    "roll": 0.0,
+    "pitch": 0.0,
+    "yaw": 0.0,
+}
+
+def _make_selection(choice: bool):
+    """
+    Function to set the offset based on choice.
+    """
+    if choice == True:
+        offset = TEMPLATE_3_OFFSET_SHARK
+    else:  # fish
+        offset = TEMPLATE_3_OFFSET_FISH
+
+    return create_stamped_pose(
+        "Task03_DropBRUVS_optical/clustered",
+        position_x=offset["x"],
+        position_y=offset["y"],
+        position_z=offset["z"],
+        roll=offset["roll"],
+        pitch=offset["pitch"],
+        yaw=offset["yaw"],
+    )
 
 def create_bin_root():
     """
     Create the root of the bin tree.
     """
-    TOGGLE_TEMPLATE_TOPIC = "/auv4/image_matching/toggle_template"
+    TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
 
     root = py_trees.composites.Sequence(
         name="Bin Root",
@@ -36,10 +100,28 @@ def create_bin_root():
 
     # contains the logic for dropping BRUVS into the bin
 
-    # 1 - move to task - in progress
-    # 2 - enable detections + align to target
-    # 3 - drop into bin twice
-    # 4 - disable detections
+    # 1 - move to task
+    # 2 - enable detections 
+    # 3 - service call to obtain choice
+    # 4 - align to target
+    # 5 - drop into bin twice
+    # 6 - disable detections
+    
+    bin_pose = create_stamped_pose(
+        "advay_please_remove_this",
+        0.0, 
+        0.0, 
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    )
+
+    go_to_bin = goto.FromConstant(
+        "Go to bin",
+        NAMESPACE,
+        bin_pose
+    )
 
     enable_detections = py_trees_ros.service_clients.FromConstant(
         name="Enable Detections",
@@ -80,24 +162,27 @@ def create_bin_root():
         ),
     )
 
-    align_to_target = goto.FromBlackboard(
+    choose_fish = py_trees_ros.actions.Service(
+        name = "Find out choice",
+        service_name = "/auv4/choice/is_fish",
+        service_type=std_srvs.srv.Trigger,
+        request=std_srvs.srv.TriggerRequest(),
+        blackboard_key=fk("choice"),
+    )
+
+    set_choice = DynamicSetBlackboard(
+        name="Set Choice",
+        key="choice.success",
+        namespace=NAMESPACE,
+        update_key="position",
+        overwrite=True,
+        func=_make_selection,
+    )
+
+    align_to_target = goto_node.FromBlackboard(
         name="Align to Target",
         parent_namespace=NAMESPACE,
-        pose_key="bin_pose",
-    )
-
-    bin_pose = create_stamped_pose(
-        "Task03_DropBRUVS_optical/clustered",
-        0.0,  # Temporary, please update
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    )
-
-    align_to_target_const = goto.FromConstant(
-        name="Align to Target", parent_namespace=NAMESPACE, pose=bin_pose
+        pose_key="position",
     )
 
     set_dropper_actuation = py_trees.behaviours.SetBlackboardVariable(
@@ -125,10 +210,13 @@ def create_bin_root():
 
     launch_seq.add_children(
         children=[
+            go_to_bin,
             enable_detections,
             enable_detections_succeeded,
             py_trees.timers.Timer("wait for match", duration=10.0),
-            align_to_target_const,
+            choose_fish,
+            set_choice,
+            align_to_target,
             py_trees.timers.Timer("wait to stabilize", duration=5.0),
             set_dropper_actuation,
             fire_dropper_1,
