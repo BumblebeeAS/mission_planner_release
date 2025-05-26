@@ -3,6 +3,7 @@ import operator
 import py_trees
 import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
+from py_trees import console
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
@@ -21,18 +22,15 @@ from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
-# empty so that when break can tell global wrong DONT set manually
-DETECTION_FRAME = ""
-
 ######################### UPDATE CONSTANTS HERE #########################
 DETECTION_FRAME_MAP = {  # TODO: set the actual frame ids here reference cfg/cfg.yaml
-    ("shark", True): "shark_hole",
-    ("shark", False): "fish_hole",
-    ("fish", True): "fish_hole",
-    ("fish", False): "shark_hole",
+    ("shark", True): "auv4/torpedo/shark_hole",
+    ("shark", False): "auv4/torpedo/fish_hole",
+    ("fish", True): "auv4/torpedo/fish_hole",
+    ("fish", False): "auv4/torpedo/shark_hole",
 }
 
-TOGGLE_TEMPLATE_TOPIC = "/auv4/image_matching/toggle_template"
+TOGGLE_TEMPLATE_TOPIC = "/auv4/front_cam/image_matching/toggle_template"
 
 TOP_TORP_UINT = UInt8(data=2)
 BTM_TORP_UINT = UInt8(data=4)
@@ -43,12 +41,19 @@ def _make_selection(choice: Trigger.Response, isFirst=True):
     """
     Function to set the offset based on choice.
     """
-    global DETECTION_FRAME
 
-    DETECTION_FRAME = DETECTION_FRAME_MAP[(choice.message, isFirst)]
+    detection_frame = DETECTION_FRAME_MAP[(choice.message, isFirst)]
     return create_stamped_pose(
-        frame_id=DETECTION_FRAME,
+        frame_id=detection_frame,
     )
+
+
+def _set_detection_frame(choice: Trigger.Response, isFirst=True):
+    """
+    Function to set the detection_frame based on choice.
+    """
+
+    return DETECTION_FRAME_MAP[(choice.message, isFirst)]
 
 
 def _tf_to_stamped_pose(tf):
@@ -157,7 +162,7 @@ def create_torpedo_root():
 
     get_choice = py_trees_ros.service_clients.FromConstant(
         name="Get Choice",
-        service_name="/auv4/choice",
+        service_name="/auv4/choice/get_is_fish",
         service_type=Trigger,
         service_request=Trigger.Request(),
         key_response=fk("choice"),
@@ -172,6 +177,17 @@ def create_torpedo_root():
         func=lambda x: _make_selection(x, isFirst=True),
     )
 
+    set_detection_frame = DynamicSetBlackboard(
+        name="Set detection frame 1",
+        key="choice",
+        namespace=NAMESPACE,
+        update_key="detection_choice",
+        overwrite=True,
+        func=lambda x: _set_detection_frame(x, isFirst=True),
+    )
+
+    detection_frame = py_trees.blackboard.Blackboard.get(fk("detection_choice"))
+
     # temp for pool test use
     align_to_target_const = goto.FromConstant(
         name="Align to Target",
@@ -179,11 +195,14 @@ def create_torpedo_root():
         pose=hole_pose,
     )
 
+    console.loginfo(f"detection frame: {DETECTION_FRAME}")
+
     save_tf = py_trees_ros.transforms.ToBlackboard(
         name="Save TF",
         variable_name=fk("reset_tf"),
-        target_frame=DETECTION_FRAME,  # TODO: check if the global will actually update here
         source_frame="auv4/base_link_ned",
+        # target_frame=DETECTION_FRAME,  # TODO: check if the global will actually update here
+        target_frame="auv4/torpedo/fish_hole",  # TODO: check if the global will actually update here
         qos_profile=qos_profile_system_default,
     )
 
@@ -259,19 +278,22 @@ def create_torpedo_root():
             set_choice1,
             enable_detections,
             enable_detections_succeeded,
-            py_trees.timers.Timer("Wait for Match", duration=20.0),
+            py_trees.timers.Timer("Wait for match", duration=20.0),
             # align_to_target_const,
             save_tf,
             align_to_target1,
+            py_trees.timers.Timer("Align before shoot", duration=5.0),
             set_torp_actuation_top,
-            fire_torpedo1,
+            # fire_torpedo1,
             py_trees.timers.Timer("Wait between Firings", duration=5),
             reconstruct_pose,
             reset_saved_tf,
+            py_trees.timers.Timer("Wait for match", duration=20.0),
             set_choice2,
             align_to_target2,
+            py_trees.timers.Timer("Align before shoot", duration=5.0),
             set_torp_actuation_btm,
-            fire_torpedo2,
+            # fire_torpedo2,
             disable_detections,
             disable_detections_succeeded,
         ],
@@ -280,7 +302,7 @@ def create_torpedo_root():
     root.add_children(
         children=[
             create_move_to_task_root(),
-            py_trees.timers.Timer("Stabilise before Match", duration=10.0),
+            py_trees.timers.Timer("Stabilise before task", duration=10.0),
             launch_seq,
         ]
     )
