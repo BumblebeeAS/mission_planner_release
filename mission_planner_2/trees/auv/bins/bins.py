@@ -6,6 +6,7 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 import std_srvs
+import goto
 
 from mission_planner_2.commons.blackboard import (
     DynamicSetBlackboard,
@@ -85,7 +86,7 @@ def create_bin_root():
     """
     Create the root of the bin tree.
     """
-    TOGGLE_TEMPLATE_TOPIC = "/auv4/image_matching/toggle_template"
+    TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
 
     root = py_trees.composites.Sequence(
         name="Bin Root",
@@ -99,12 +100,28 @@ def create_bin_root():
 
     # contains the logic for dropping BRUVS into the bin
 
-    # 1 - move to task - in progress
+    # 1 - move to task
     # 2 - enable detections 
     # 3 - service call to obtain choice
     # 4 - align to target
     # 5 - drop into bin twice
     # 6 - disable detections
+    
+    bin_pose = create_stamped_pose(
+        "advay_please_remove_this",
+        0.0, 
+        0.0, 
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    )
+
+    go_to_bin = goto.FromConstant(
+        "Go to bin",
+        NAMESPACE,
+        bin_pose
+    )
 
     enable_detections = py_trees_ros.service_clients.FromConstant(
         name="Enable Detections",
@@ -147,7 +164,7 @@ def create_bin_root():
 
     choose_fish = py_trees_ros.actions.Service(
         name = "Find out choice",
-        service_name = "/auv4/choice",
+        service_name = "/auv4/choice/is_fish",
         service_type=std_srvs.srv.Trigger,
         request=std_srvs.srv.TriggerRequest(),
         blackboard_key=fk("choice"),
@@ -166,20 +183,6 @@ def create_bin_root():
         name="Align to Target",
         parent_namespace=NAMESPACE,
         pose_key="position",
-    )
-
-    bin_pose = create_stamped_pose(
-        "Task03_DropBRUVS_optical/clustered",
-        0.0,  # Temporary, please update
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    )
-
-    align_to_target_const = goto.FromConstant(
-        name="Align to Target", parent_namespace=NAMESPACE, pose=bin_pose
     )
 
     set_dropper_actuation = py_trees.behaviours.SetBlackboardVariable(
@@ -207,6 +210,7 @@ def create_bin_root():
 
     launch_seq.add_children(
         children=[
+            go_to_bin,
             enable_detections,
             enable_detections_succeeded,
             py_trees.timers.Timer("wait for match", duration=10.0),
