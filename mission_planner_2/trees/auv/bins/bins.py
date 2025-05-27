@@ -6,15 +6,13 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 import std_srvs
-import goto
 
-from mission_planner_2.commons.blackboard import (
-    DynamicSetBlackboard,
-    full_key_generator
+from mission_planner_2.commons.namespace_utils import (
+    full_key_generator,
+    generate_namespace,
 )
-from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto, goto_node
 from mission_planner_2.trees.auv.bins.move_to_task import create_move_to_bin_task_root
 
 
