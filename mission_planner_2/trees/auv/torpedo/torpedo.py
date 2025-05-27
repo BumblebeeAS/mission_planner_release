@@ -23,7 +23,8 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-TOGGLE_TEMPLATE_TOPIC = "/auv4/image_matching/toggle_template"
+TOGGLE_TEMPLATE_TOPIC = "/auv4/front_cam/image_matching/toggle_template"
+TEMPLATE_NAME = "Task04_Tagging_01.png"
 
 TOP_TORP_UINT = UInt8(data=2)
 BTM_TORP_UINT = UInt8(data=4)
@@ -91,7 +92,7 @@ def create_torpedo_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True, template_name="Task04_Tagging_02.png"
+            enabled=True, template_name=TEMPLATE_NAME
         ),
         key_response=fk("torpedo_enable_detections"),
     )
@@ -152,7 +153,7 @@ def create_torpedo_root():
 
     reconstruct_pose = DynamicSetBlackboard(
         name="Reconstruct Pose",
-        key=POSE_KEY,
+        key=RESET_TF_KEY,
         namespace=NAMESPACE,
         update_key="reset_pose",
         overwrite=True,
