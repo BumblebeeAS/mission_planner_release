@@ -6,15 +6,14 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 import std_srvs
-import goto
 
-from mission_planner_2.commons.blackboard import (
-    DynamicSetBlackboard,
-    full_key_generator
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
+from mission_planner_2.commons.namespace_utils import (
+    full_key_generator,
+    generate_namespace,
 )
-from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto_node
+from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.bins.move_to_task import create_move_to_bin_task_root
 
 
@@ -162,24 +161,24 @@ def create_bin_root():
         ),
     )
 
-    choose_fish = py_trees_ros.actions.Service(
-        name = "Find out choice",
-        service_name = "/auv4/choice/is_fish",
+    choose_fish = py_trees_ros.service_clients.FromConstant(
+        name="Get Choice",
+        service_name="/auv4/choice/get_is_fish",
         service_type=std_srvs.srv.Trigger,
-        request=std_srvs.srv.TriggerRequest(),
-        blackboard_key=fk("choice"),
+        service_request=std_srvs.srv.Trigger.Request(),
+        key_response=fk("choice"),
     )
 
     set_choice = DynamicSetBlackboard(
         name="Set Choice",
-        key="choice.success",
+        key="choice",
         namespace=NAMESPACE,
         update_key="position",
         overwrite=True,
         func=_make_selection,
     )
 
-    align_to_target = goto_node.FromBlackboard(
+    align_to_target = goto.FromBlackboard(
         name="Align to Target",
         parent_namespace=NAMESPACE,
         pose_key="position",
