@@ -5,9 +5,8 @@ import py_trees_ros
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
-from transforms3d.euler import quat2euler
 
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard
+from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -18,36 +17,8 @@ from mission_planner_2.trees.auv.goto import goto
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
-# TF save keys
-GATE_LEFT_TF_KEY = "gate_left_tf"
-GATE_RIGHT_TF_KEY = "gate_right_tf"
 GATE_LEFT_POSE_KEY = "gate_left_pose"
 GATE_RIGHT_POSE_KEY = "gate_right_pose"
-
-
-def _tf_to_stamped_pose(tf):
-    """
-    Convert a TF to a StampedPose.
-    """
-    # convert quat to roll, pitch, yaw
-    roll, pitch, yaw = quat2euler(
-        [
-            tf.transform.rotation.x,
-            tf.transform.rotation.y,
-            tf.transform.rotation.z,
-            tf.transform.rotation.w,
-        ],
-    )
-
-    return create_stamped_pose(
-        frame_id=tf.header.frame_id,
-        position_x=-tf.transform.translation.x,
-        position_y=-tf.transform.translation.y,
-        position_z=-tf.transform.translation.z,
-        roll=roll,
-        pitch=pitch,
-        yaw=yaw,
-    )
 
 
 def create_gate_root():
@@ -62,40 +33,20 @@ def create_gate_root():
         policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
     )
 
-    # Save transforms from base_link to gate left/right positions
-    save_tf_left = py_trees_ros.transforms.ToBlackboard(
+    save_tf_left = cache_tf.ToBlackboard(
         name="Save TF Left",
-        variable_name=fk(GATE_LEFT_TF_KEY),
-        target_frame="auv4/gate/left",
-        source_frame="auv4/base_link_ned",
+        variable_name=fk(GATE_LEFT_POSE_KEY),
+        start_frame="auv4/gate/centre",
+        end_frame="auv4/gate/left",
         qos_profile=qos_profile_system_default,
     )
 
-    save_tf_right = py_trees_ros.transforms.ToBlackboard(
+    save_tf_right = cache_tf.ToBlackboard(
         name="Save TF Right",
-        variable_name=fk(GATE_RIGHT_TF_KEY),
-        target_frame="auv4/gate/right",
-        source_frame="auv4/base_link_ned",
+        variable_name=fk(GATE_RIGHT_POSE_KEY),
+        start_frame="auv4/gate/centre",
+        end_frame="auv4/gate/right",
         qos_profile=qos_profile_system_default,
-    )
-
-    # Convert saved TFs to poses
-    reconstruct_left_pose = DynamicSetBlackboard(
-        name="Reconstruct Left Pose",
-        key=GATE_LEFT_TF_KEY,
-        namespace=NAMESPACE,
-        update_key=GATE_LEFT_POSE_KEY,
-        overwrite=True,
-        func=_tf_to_stamped_pose,
-    )
-
-    reconstruct_right_pose = DynamicSetBlackboard(
-        name="Reconstruct Right Pose",
-        key=GATE_RIGHT_TF_KEY,
-        namespace=NAMESPACE,
-        update_key=GATE_RIGHT_POSE_KEY,
-        overwrite=True,
-        func=_tf_to_stamped_pose,
     )
 
     save_gate_tfs.add_children([save_tf_left, save_tf_right])
@@ -138,10 +89,18 @@ def create_gate_root():
         operator=operator.__eq__,
     )
 
-    gate_init_pose = create_stamped_pose("world_ned", 0.0, 0.0, 0.4, 0.0, 0.0, 0.0)
+    """
+    For sim.
 
-    # Publish the following tf to mock the gate detection
-    # ros2 run tf2_ros static_transform_publisher 7 0 1.5 -1.57 0 0 world_ned auv4/gate
+    gate_init_pose = create_stamped_pose("world_ned", 5.98, 2.48, 1.16, 0.0, 0.0, -90)
+
+    Publish the following tf to mock the gate detection:
+    ros2 run tf2_ros static_transform_publisher 7 0 1.5 -1.57 0 0 world_ned auv4/gate
+    """
+
+    # TODO: move out into separate file; see torpedo.
+    gate_init_pose = create_stamped_pose("world_ned", position_z=1.15)
+
     move_towards_gate = goto.FromConstant(
         "Move towards gate", NAMESPACE, gate_init_pose
     )
@@ -163,7 +122,7 @@ def create_gate_root():
         pose_key=GATE_RIGHT_POSE_KEY,
     )
 
-    forward_pose = create_stamped_pose("auv4/base_link_ned", position_x=1.0)
+    forward_pose = create_stamped_pose("auv4/base_link_ned", position_x=2.0)
     move_pass_gate = goto.FromConstant("Pass through gate", NAMESPACE, forward_pose)
 
     try_left_side.add_children(children=[check_is_left, move_to_gate_before_left])
@@ -175,12 +134,10 @@ def create_gate_root():
             py_trees.timers.Timer("Wait to stabilize", 30.0),
             save_gate_tfs,  # Save TFs before moving to see pictures
             move_to_see_pictures,
-            py_trees.timers.Timer("Wait to stabilize", 10.0),
+            py_trees.timers.Timer("Wait to stabilize", 20.0),
             get_is_fish,
             get_gate_orientation,
-            reconstruct_left_pose,
-            reconstruct_right_pose,
-            select_gate_side,  # Now uses saved poses
+            select_gate_side,
             py_trees.timers.Timer("Wait to stabilize", 10.0),
             move_pass_gate,
         ]
