@@ -7,6 +7,7 @@ from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 import std_srvs
 
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
