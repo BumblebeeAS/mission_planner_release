@@ -97,3 +97,26 @@ tfs:
     # frame ids
     parent_frame_id: "advay_please_remove_this"
     child_frame_id: "auv4/gate/right"
+######################### BIN TFS #########################
+  - name: bin_fish
+    # translation (x, y, z in meters)
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    roll: 0.0          # in degrees
+    pitch: 0.0         # in degrees
+    yaw: 0.0           # in degrees
+    # frame ids
+    parent_frame_id: "advay_please_remove_this"
+    child_frame_id: "auv4/bin/fish"
+  - name: bin_shark
+    # translation (x, y, z in meters)
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    roll: 0.0          # in degrees
+    pitch: 0.0         # in degrees
+    yaw: 0.0           # in degrees
+    # frame ids
+    parent_frame_id: "advay_please_remove_this"
+    child_frame_id: "auv4/bin/shark"
