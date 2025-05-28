@@ -17,7 +17,7 @@ def create_move_to_task_root():
     Create the root of the torpedo tree.
     """
     root = py_trees.composites.Sequence(
-        name="Move to Task Root",
+        name="Move to torpedo task",
         memory=True,
     )
 
@@ -26,7 +26,7 @@ def create_move_to_task_root():
     )
 
     move_to_torp = goto.FromConstant(
-        "move to torpedo",
+        "Move to torpedo",
         NAMESPACE,
         torpedo_init_pose,
     )

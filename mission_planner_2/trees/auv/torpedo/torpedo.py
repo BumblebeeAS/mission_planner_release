@@ -6,14 +6,11 @@ from bb_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
-from transforms3d.euler import quat2euler
 
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
 from mission_planner_2.trees.auv.torpedo.tf_selector import create_tf_selector_root
@@ -24,7 +21,7 @@ fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
 TOGGLE_TEMPLATE_TOPIC = "/auv4/front_cam/image_matching/toggle_template"
-TEMPLATE_NAME = "Task04_Tagging_01.png"
+TEMPLATE_NAME = "Task04_Tagging_02.png"
 
 TOP_TORP_UINT = UInt8(data=2)
 BTM_TORP_UINT = UInt8(data=4)
@@ -32,33 +29,8 @@ BTM_TORP_UINT = UInt8(data=4)
 # dont init with fk() since some use fk some use NAMESPACE
 CHOICE_KEY = "choice"
 POSE_KEY = "pose"
-RESET_TF_KEY = "reset_tf"
+GO_BACK_POSE_KEY = "go_back_pose"
 #########################################################################
-
-
-def _tf_to_stamped_pose(tf):
-    """
-    Convert a TF to a StampedPose.
-    """
-    # convert quat to roll, pitch, yaw
-    roll, pitch, yaw = quat2euler(
-        [
-            tf.transform.rotation.x,
-            tf.transform.rotation.y,
-            tf.transform.rotation.z,
-            tf.transform.rotation.w,
-        ],
-    )
-
-    return create_stamped_pose(
-        frame_id=tf.header.frame_id,
-        position_x=tf.transform.translation.x,
-        position_y=tf.transform.translation.y,
-        position_z=tf.transform.translation.z,
-        roll=roll,
-        pitch=pitch,
-        yaw=yaw,
-    )
 
 
 def create_torpedo_root():
@@ -139,31 +111,22 @@ def create_torpedo_root():
     # we call fk(<key>) here to capture the ns of this file
     first_selector = create_tf_selector_root(
         choice_key=fk(CHOICE_KEY),
-        reset_tf_key=fk(RESET_TF_KEY),
         pose_key=fk(POSE_KEY),
-        isFirst=True,
+        go_back_pose_key=fk(GO_BACK_POSE_KEY),
+        is_first=True,
     )
 
     second_selector = create_tf_selector_root(
         choice_key=fk(CHOICE_KEY),
-        reset_tf_key=fk(RESET_TF_KEY),
         pose_key=fk(POSE_KEY),
-        isFirst=False,
+        go_back_pose_key=fk(GO_BACK_POSE_KEY),
+        is_first=False,
     )
 
-    reconstruct_pose = DynamicSetBlackboard(
-        name="Reconstruct Pose",
-        key=RESET_TF_KEY,
-        namespace=NAMESPACE,
-        update_key="reset_pose",
-        overwrite=True,
-        func=_tf_to_stamped_pose,
-    )
-
-    reset_saved_tf = goto.FromBlackboard(
-        name="Reset to Saved TF",
+    goto_back_to_centre = goto.FromBlackboard(
+        name="Go back to centre pose",
         parent_namespace=NAMESPACE,
-        pose_key="reset_pose",
+        pose_key=GO_BACK_POSE_KEY,
     )
 
     align_to_target1 = goto.FromBlackboard(
@@ -219,11 +182,10 @@ def create_torpedo_root():
             align_to_target1,
             fire_torpedo1,
             py_trees.timers.Timer("Wait between Firings", duration=5),
-            reconstruct_pose,  # use previously saved tf to reset position
-            reset_saved_tf,
+            goto_back_to_centre,
             set_torp_actuation_btm,
             py_trees.timers.Timer("Wait for Match", duration=20.0),
-            second_selector,  # the saved tf here wont be used in this case just the pose for target
+            second_selector,
             align_to_target2,
             fire_torpedo2,
             disable_detections,

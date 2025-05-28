@@ -1,20 +1,19 @@
 import operator
 
 import py_trees
-import py_trees_ros
-from rclpy.qos import qos_profile_system_default
 
+from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 
-FISH_HOLE = "auv4/torpedo/fish_hole"  # reference the cfg.yaml to set
-SHARK_HOLE = "auv4/torpedo/shark_hole"
+FISH_HOLE = "auv4/torpedo_2/fish"
+SHARK_HOLE = "auv4/torpedo_2/shark"
 
 
 def create_tf_selector_root(
     choice_key: str = "choice",
     pose_key: str = "pose",
-    reset_tf_key: str = "reset_tf",
-    isFirst: bool = True,
+    go_back_pose_key: str = "go_back_pose",
+    is_first: bool = True,
 ) -> py_trees.composites.Selector:
     """
     Create the root node of the TF selector tree.
@@ -22,8 +21,8 @@ def create_tf_selector_root(
     Args:
         choice_key (str, optional): The full key for the choice blackboard variable. Defaults to "choice".
         pose_key (str, optional): The full key for the pose to fire at blackboard variable. Defaults to "pose".
-        reset_tf_key (str, optional): The full key for the reset TF blackboard variable. Defaults to "reset_tf".
-        isFirst (bool, optional): Whether this is the first time the selector is being used. Defaults to True.
+        go_back_pose_key (str, optional): The full key for the go back pose blackboard variable. Defaults to "go_back_pose".
+        is_first (bool, optional): Whether this is the first time the selector is being used. Defaults to True.
 
     Returns:
         py_trees.composites.Selector: The root node of the TF selector tree.
@@ -51,24 +50,22 @@ def create_tf_selector_root(
         check=py_trees.common.ComparisonExpression(
             variable=choice_key,
             value=False,
-            operator=lambda x, y: operator.eq(x.success ^ isFirst, y),
+            operator=lambda x, y: operator.eq(x.success ^ is_first, y),
         ),
     )
 
-    save_tf_fish = py_trees_ros.transforms.ToBlackboard(
+    save_tf_fish = cache_tf.ToBlackboard(
         name="Save TF fish",
-        variable_name=reset_tf_key,
-        target_frame=FISH_HOLE,
-        source_frame="auv4/base_link_ned",
-        qos_profile=qos_profile_system_default,
+        variable_name=go_back_pose_key,
+        start_frame="auv4/torpedo_2/fish",
+        end_frame="auv4/base_link_ned",
     )
 
-    save_tf_shark = py_trees_ros.transforms.ToBlackboard(
-        name="Save TF shark",
-        variable_name=reset_tf_key,
-        target_frame=SHARK_HOLE,
-        source_frame="auv4/base_link_ned",
-        qos_profile=qos_profile_system_default,
+    save_tf_shark = cache_tf.ToBlackboard(
+        name="Save TF Shark",
+        variable_name=go_back_pose_key,
+        start_frame="auv4/torpedo_2/shark",
+        end_frame="auv4/base_link_ned",
     )
 
     set_pose_fish = py_trees.behaviours.SetBlackboardVariable(
