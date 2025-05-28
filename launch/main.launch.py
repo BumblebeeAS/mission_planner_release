@@ -11,18 +11,39 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 
-def _get_tf_params(config, key):
-    tf_params = config.get(key, {}).get("ros__parameters", {})
-    return (
-        tf_params.get("x", 0.0),
-        tf_params.get("y", 0.0),
-        tf_params.get("z", 0.0),
-        tf_params.get("roll", 0.0),
-        tf_params.get("pitch", 0.0),
-        tf_params.get("yaw", 0.0),
-        tf_params.get("parent_frame_id", "base_link"),
-        tf_params.get("child_frame_id", "sensor_frame"),
+def _create_tf_node_from_config(tf_config):
+    """Create a static transform publisher node from tf configuration."""
+    # Convert degrees to radians
+    roll_rad = math.radians(tf_config.get("roll", 0.0))
+    pitch_rad = math.radians(tf_config.get("pitch", 0.0))
+    yaw_rad = math.radians(tf_config.get("yaw", 0.0))
+
+    # Extract position and frame information
+    x = tf_config.get("x", 0.0)
+    y = tf_config.get("y", 0.0)
+    z = tf_config.get("z", 0.0)
+    parent_frame = tf_config.get("parent_frame_id", "base_link")
+    child_frame = tf_config.get("child_frame_id", "sensor_frame")
+    tf_name = tf_config.get("name", "static_transform")
+
+    # Create the static transform publisher node
+    tf_node = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name=f"static_transform_{tf_name}",
+        arguments=[
+            str(x),
+            str(y),
+            str(z),
+            str(yaw_rad),
+            str(pitch_rad),
+            str(roll_rad),
+            parent_frame,
+            child_frame,
+        ],
     )
+
+    return tf_node
 
 
 def launch_setup(context, *args, **kwargs):
@@ -31,87 +52,27 @@ def launch_setup(context, *args, **kwargs):
     with open(config_file_path, "r") as file:
         config = yaml.safe_load(file)
 
-    # service_params = config.get("choice_srv", {}).get("ros__parameters", {})
+    # Get all transform configurations from the 'tfs' list
+    tfs_config = config.get("tfs", [])
 
-    (
-        x_shark,
-        y_shark,
-        z_shark,
-        roll_deg_shark,
-        pitch_deg_shark,
-        yaw_deg_shark,
-        parent_frame_shark,
-        child_frame_shark,
-    ) = _get_tf_params(config, "static_transform_shark")
+    # Create transform nodes for all configured transforms
+    tf_nodes = []
+    for tf_config in tfs_config:
+        tf_node = _create_tf_node_from_config(tf_config)
+        tf_nodes.append(tf_node)
 
-    (
-        x_fish,
-        y_fish,
-        z_fish,
-        roll_deg_fish,
-        pitch_deg_fish,
-        yaw_deg_fish,
-        parent_frame_fish,
-        child_frame_fish,
-    ) = _get_tf_params(config, "static_transform_fish")
-
-    # Get service node parameters
-    # TODO:
-    # service_package = service_params.get("package", "your_cpp_package_name")
-    # service_executable = service_params.get("executable", "your_service_node")
-    # service_name = service_params.get("name", "service_node")
-
-    roll_rad_shark = math.radians(roll_deg_shark)
-    pitch_rad_shark = math.radians(pitch_deg_shark)
-    yaw_rad_shark = math.radians(yaw_deg_shark)
-    roll_rad_fish = math.radians(roll_deg_fish)
-    pitch_rad_fish = math.radians(pitch_deg_fish)
-    yaw_rad_fish = math.radians(yaw_deg_fish)
-
-    # Create the static transform publisher node
-    shark_tf_node = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="static_transform_shark",
-        arguments=[
-            str(x_shark),
-            str(y_shark),
-            str(z_shark),
-            str(yaw_rad_shark),
-            str(pitch_rad_shark),
-            str(roll_rad_shark),
-            parent_frame_shark,
-            child_frame_shark,
-        ],
-    )
-    fish_tf_node = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="static_transform_fish",
-        arguments=[
-            str(x_fish),
-            str(y_fish),
-            str(z_fish),
-            str(yaw_rad_fish),
-            str(pitch_rad_fish),
-            str(roll_rad_fish),
-            parent_frame_fish,
-            child_frame_fish,
-        ],
+    # Create the service node
+    service_node = Node(
+        package="mission_planner_2",
+        executable="choice_server",
+        name="rs25_choice_server",
+        namespace="auv4",
+        output="screen",
     )
 
-    # TODO: Create the service node
-    # service_node = Node(
-    #     package=service_package,
-    #     executable=service_executable,
-    #     name=service_name,
-    #     parameters=[
-    #         config_file_path
-    #     ],  # Pass the entire config file to the service node
-    #     output="screen",
-    # )
+    tf_nodes.append(service_node)
 
-    return [shark_tf_node, fish_tf_node]
+    return tf_nodes
 
 
 def generate_launch_description():

@@ -1,48 +1,99 @@
-static_transform_fish:
-  ros__parameters:
+# =============================================================================
+# STATIC TRANSFORM CONFIGURATION
+# =============================================================================
+# This file defines static transforms for AUV4 competition tasks.
+# This config is loaded by main.launch.py which launches a static_transform_publisher
+# node for each transform defined here.
+#
+# COORDINATE CONVENTIONS:
+# - parent_frame_id: Reference frame
+# - child_frame_id: Target frame
+# - Translation: x, y, z in meters
+# - Rotation: roll, pitch, yaw in degrees
+#
+# CURRENT CONVENTION:
+# - The current convention of frames that are outputted by our pose estimators is as follows.
+# - While FACING the object,
+# - origin is at the top left corner of the object;
+# - +x is to the right;
+# - +y is upwards;
+# - +z is pointing out of the object plane towards the camera (or apply the right hand rule).
+# - To make any child frames defined with respect to this estimator frame align with base_link_ned of the AUV,
+#   we need to apply a rotation of roll = 90, pitch = 90, yaw = 0 degrees.
+#
+# USAGE:
+# 1. Create a new comment header for each task.
+# 2. Define the transforms in the format below.
+# 3. Visually verify the frames in foxglove (we might not be handling extrinsic/intrinsic rotations correctly).
+#
+# =============================================================================
+# A NOTE ON TRANSFORMS:
+# Note that for a transform from frame A to frame B defined here, the inputted rotation R
+# and the translation vector t here in fact define the INVERSE transform f^-1: B -> A. To see
+# this, note that given a point x in frame A, to get the corresponding point in frame B, we
+# translate back to the origin by -t and reverse the rotation by R^T. Thus f: A -> B is defined by
+# f(x) = R^T(x - t). But then inverting this map gives us f^-1: B -> A defined by exactly
+# f^-1(x) = Rx + t, as desired.
+#
+# Moral of the story: if you want to retrieve the numbers in this file, you need to query the transform
+# from the parent frame to the child frame, not the other way around.
+# =============================================================================
+
+tfs:
+######################### TORPEDO TFS #########################
+  - name: torpedo_shark
     # Translation (x, y, z in meters)
     x: 0.429
     y: -0.084
     z: 0.5
-
     roll: 90.0          # in degrees
     pitch: 90.0      # in degrees
     yaw: 0.0        # in degrees
-
     # Frame IDs
     parent_frame_id: "advay_please_remove_this"
     child_frame_id: "auv4/torpedo/fish_hole"
-
-static_transform_shark:
-  ros__parameters:
+  - name: torpedo_fish
     # Translation (x, y, z in meters)
     x: 0.319
     y: -0.336
     z: 0.5
-
     roll: 90.0          # in degrees
     pitch: 90.0         # in degrees
     yaw: 0.0           # in degrees
-
     # Frame IDs
     parent_frame_id: "advay_please_remove_this"
     child_frame_id: "auv4/torpedo/shark_hole"
-
-# Service node configuration
-# TODO: add the srv node here
-# service_node:
-#   ros__parameters:
-#     # Service node package and executable info
-#     package: "mission_planner_2"
-#     executable: "your_service_node"
-#     name: "my_service_node"
-#
-#     # Your service-specific parameters
-#     service_name: "/my_service"
-#     timeout_ms: 5000
-#     queue_size: 10
-#
-#     # Example service parameters (customize as needed)
-#     max_requests_per_second: 100.0
-#     enable_logging: true
-#     log_level: "INFO"
+######################### GATE TFS #########################
+  - name: gate_centre
+    # Translation (x, y, z in meters)
+    x: 1.5
+    y: -0.5
+    z: 2.0
+    roll: 90.0          # in degrees
+    pitch: 90.0         # in degrees
+    yaw: 0.0           # in degrees
+    # Frame IDs
+    parent_frame_id: "advay_please_remove_this"
+    child_frame_id: "auv4/gate/centre"
+  - name: gate_left
+    # translation (x, y, z in meters)
+    x: 0.75
+    y: -0.5
+    z: 1.0
+    roll: 90.0          # in degrees
+    pitch: 90.0         # in degrees
+    yaw: 0.0           # in degrees
+    # frame ids
+    parent_frame_id: "advay_please_remove_this"
+    child_frame_id: "auv4/gate/left"
+  - name: gate_right
+    # translation (x, y, z in meters)
+    x: 2.25
+    y: -0.5
+    z: 1.0
+    roll: 90.0          # in degrees
+    pitch: 90.0         # in degrees
+    yaw: 0.0           # in degrees
+    # frame ids
+    parent_frame_id: "advay_please_remove_this"
+    child_frame_id: "auv4/gate/right"

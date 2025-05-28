@@ -3,7 +3,6 @@ import operator
 import py_trees
 import py_trees_ros
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
-from py_trees import console
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
@@ -17,43 +16,24 @@ from mission_planner_2.commons.namespace_utils import (
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
+from mission_planner_2.trees.auv.torpedo.tf_selector import create_tf_selector_root
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-DETECTION_FRAME_MAP = {  # TODO: set the actual frame ids here reference cfg/cfg.yaml
-    ("shark", True): "auv4/torpedo/shark_hole",
-    ("shark", False): "auv4/torpedo/fish_hole",
-    ("fish", True): "auv4/torpedo/fish_hole",
-    ("fish", False): "auv4/torpedo/shark_hole",
-}
-
 TOGGLE_TEMPLATE_TOPIC = "/auv4/front_cam/image_matching/toggle_template"
+TEMPLATE_NAME = "Task04_Tagging_01.png"
 
 TOP_TORP_UINT = UInt8(data=2)
 BTM_TORP_UINT = UInt8(data=4)
+
+# dont init with fk() since some use fk some use NAMESPACE
+CHOICE_KEY = "choice"
+POSE_KEY = "pose"
+RESET_TF_KEY = "reset_tf"
 #########################################################################
-
-
-def _make_selection(choice: Trigger.Response, isFirst=True):
-    """
-    Function to set the offset based on choice.
-    """
-
-    detection_frame = DETECTION_FRAME_MAP[(choice.message, isFirst)]
-    return create_stamped_pose(
-        frame_id=detection_frame,
-    )
-
-
-def _set_detection_frame(choice: Trigger.Response, isFirst=True):
-    """
-    Function to set the detection_frame based on choice.
-    """
-
-    return DETECTION_FRAME_MAP[(choice.message, isFirst)]
 
 
 def _tf_to_stamped_pose(tf):
@@ -112,7 +92,7 @@ def create_torpedo_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True, template_name="Task04_Tagging_02.png"
+            enabled=True, template_name=TEMPLATE_NAME
         ),
         key_response=fk("torpedo_enable_detections"),
     )
@@ -144,18 +124,6 @@ def create_torpedo_root():
         ),
     )
 
-    # Unfiltered version clustered
-    hole_pose = create_stamped_pose(
-        # "advay_please_remove_this", 0.44 - 0.10, 0.00 + 0.15, 0.5, 90.0, 90.0, 0.0
-        "advay_please_remove_this",
-        0.44 - 0.08,
-        0.00 + 0.07,
-        0.4,
-        90.0,
-        90.0,
-        0.0,
-    )
-
     # For manual testing with dummy tfs (if you are too lazy to keep running image matching).
     # ros2 run tf2_ros static_transform_publisher -3.3 0 -0.9 0 0 1.57 world fake_det # usually the pose the detection gives
     # ros2 run tf2_ros static_transform_publisher 0.3 0 0.6 0 1.57 1.57 fake_det hole
@@ -165,50 +133,27 @@ def create_torpedo_root():
         service_name="/auv4/choice/get_is_fish",
         service_type=Trigger,
         service_request=Trigger.Request(),
-        key_response=fk("choice"),
+        key_response=fk(CHOICE_KEY),
     )
 
-    set_choice1 = DynamicSetBlackboard(
-        name="Set Choice 1",
-        key="choice",
-        namespace=NAMESPACE,
-        update_key="hole",  # arbitrary key to set the hole pose
-        overwrite=True,
-        func=lambda x: _make_selection(x, isFirst=True),
+    # we call fk(<key>) here to capture the ns of this file
+    first_selector = create_tf_selector_root(
+        choice_key=fk(CHOICE_KEY),
+        reset_tf_key=fk(RESET_TF_KEY),
+        pose_key=fk(POSE_KEY),
+        isFirst=True,
     )
 
-    set_detection_frame = DynamicSetBlackboard(
-        name="Set detection frame 1",
-        key="choice",
-        namespace=NAMESPACE,
-        update_key="detection_choice",
-        overwrite=True,
-        func=lambda x: _set_detection_frame(x, isFirst=True),
-    )
-
-    detection_frame = py_trees.blackboard.Blackboard.get(fk("detection_choice"))
-
-    # temp for pool test use
-    align_to_target_const = goto.FromConstant(
-        name="Align to Target",
-        parent_namespace=NAMESPACE,
-        pose=hole_pose,
-    )
-
-    console.loginfo(f"detection frame: {DETECTION_FRAME}")
-
-    save_tf = py_trees_ros.transforms.ToBlackboard(
-        name="Save TF",
-        variable_name=fk("reset_tf"),
-        source_frame="auv4/base_link_ned",
-        # target_frame=DETECTION_FRAME,  # TODO: check if the global will actually update here
-        target_frame="auv4/torpedo/fish_hole",  # TODO: check if the global will actually update here
-        qos_profile=qos_profile_system_default,
+    second_selector = create_tf_selector_root(
+        choice_key=fk(CHOICE_KEY),
+        reset_tf_key=fk(RESET_TF_KEY),
+        pose_key=fk(POSE_KEY),
+        isFirst=False,
     )
 
     reconstruct_pose = DynamicSetBlackboard(
         name="Reconstruct Pose",
-        key="reset_tf",
+        key=RESET_TF_KEY,
         namespace=NAMESPACE,
         update_key="reset_pose",
         overwrite=True,
@@ -224,22 +169,13 @@ def create_torpedo_root():
     align_to_target1 = goto.FromBlackboard(
         name="Align to Target1",
         parent_namespace=NAMESPACE,
-        pose_key="hole",
-    )
-
-    set_choice2 = DynamicSetBlackboard(
-        name="Set Choice 2",
-        key="choice",
-        namespace=NAMESPACE,
-        update_key="hole",
-        overwrite=True,
-        func=lambda x: _make_selection(x, isFirst=False),
+        pose_key=POSE_KEY,
     )
 
     align_to_target2 = goto.FromBlackboard(
         name="Align to Target2",
         parent_namespace=NAMESPACE,
-        pose_key="hole",
+        pose_key=POSE_KEY,
     )
 
     set_torp_actuation_top = py_trees.behaviours.SetBlackboardVariable(
@@ -275,25 +211,21 @@ def create_torpedo_root():
     launch_seq.add_children(
         children=[
             get_choice,
-            set_choice1,
             enable_detections,
             enable_detections_succeeded,
-            py_trees.timers.Timer("Wait for match", duration=20.0),
-            # align_to_target_const,
-            save_tf,
-            align_to_target1,
-            py_trees.timers.Timer("Align before shoot", duration=5.0),
             set_torp_actuation_top,
-            # fire_torpedo1,
+            py_trees.timers.Timer("Wait for Match", duration=20.0),
+            first_selector,
+            align_to_target1,
+            fire_torpedo1,
             py_trees.timers.Timer("Wait between Firings", duration=5),
-            reconstruct_pose,
+            reconstruct_pose,  # use previously saved tf to reset position
             reset_saved_tf,
-            py_trees.timers.Timer("Wait for match", duration=20.0),
-            set_choice2,
-            align_to_target2,
-            py_trees.timers.Timer("Align before shoot", duration=5.0),
             set_torp_actuation_btm,
-            # fire_torpedo2,
+            py_trees.timers.Timer("Wait for Match", duration=20.0),
+            second_selector,  # the saved tf here wont be used in this case just the pose for target
+            align_to_target2,
+            fire_torpedo2,
             disable_detections,
             disable_detections_succeeded,
         ],
