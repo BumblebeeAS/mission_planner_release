@@ -40,7 +40,7 @@
 # =============================================================================
 
 tfs:
-######################### TORPEDO TFS #########################
+######################### TORPEDO 2 TFS #########################
   - name: torpedo_shark
     # Translation (x, y, z in meters)
     x: 0.429
@@ -51,7 +51,7 @@ tfs:
     yaw: 0.0        # in degrees
     # Frame IDs
     parent_frame_id: "advay_please_remove_this"
-    child_frame_id: "auv4/torpedo/fish_hole"
+    child_frame_id: "auv4/torpedo_2/fish"
   - name: torpedo_fish
     # Translation (x, y, z in meters)
     x: 0.319
@@ -62,7 +62,7 @@ tfs:
     yaw: 0.0           # in degrees
     # Frame IDs
     parent_frame_id: "advay_please_remove_this"
-    child_frame_id: "auv4/torpedo/shark_hole"
+    child_frame_id: "auv4/torpedo_2/shark"
 ######################### GATE TFS #########################
   - name: gate_centre
     # Translation (x, y, z in meters)
