@@ -7,7 +7,6 @@ from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 import std_srvs
 
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -15,7 +14,7 @@ from mission_planner_2.commons.namespace_utils import (
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.bins.move_to_task import create_move_to_bin_task_root
-
+from mission_planner_2.trees.auv.bins.bin_selector import create_bin_selector_root
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -44,48 +43,20 @@ fk = full_key_generator(NAMESPACE)
     
      # Figure out the offset
 
-TEMPLATE_3_OFFSET_SHARK = {
-    "x": 0.0,
-    "y": 0.0,
-    "z": 0.0,
-    "roll": 0.0,
-    "pitch": 0.0,
-    "yaw": 0.0,
-}
-
-TEMPLATE_3_OFFSET_FISH = {
-    "x": 0.0,
-    "y": 0.0,
-    "z": 0.0,
-    "roll": 0.0,
-    "pitch": 0.0,
-    "yaw": 0.0,
-}
-
-def _make_selection(choice: bool):
-    """
-    Function to set the offset based on choice.
-    """
-    if choice == True:
-        offset = TEMPLATE_3_OFFSET_SHARK
-    else:  # fish
-        offset = TEMPLATE_3_OFFSET_FISH
-
-    return create_stamped_pose(
-        "Task03_DropBRUVS_optical/clustered",
-        position_x=offset["x"],
-        position_y=offset["y"],
-        position_z=offset["z"],
-        roll=offset["roll"],
-        pitch=offset["pitch"],
-        yaw=offset["yaw"],
-    )
-
+######################### UPDATE CONSTANTS HERE #########################
+# Note that vision related nodes for bottom camera are not yet implemented
+TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
+TEMPLATE_NAME = "Task03_DropBRUVS.png"
+CHOICE_KEY = "choice"
+POSE_KEY = "pose"
+# To update the transforms when we figure them out in cfg.yaml
+FISH_BIN_FRAME = "auv4/bin/fish"
+SHARK_BIN_FRAME = "auv4/bin/shark"
+#########################################################################
 def create_bin_root():
     """
     Create the root of the bin tree.
     """
-    TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
 
     root = py_trees.composites.Sequence(
         name="Bin Root",
@@ -98,29 +69,13 @@ def create_bin_root():
     )
 
     # contains the logic for dropping BRUVS into the bin
-
     # 1 - move to task
     # 2 - enable detections 
     # 3 - service call to obtain choice
-    # 4 - align to target
+    # 4 - update desired pose based on choice
+    # 4 - align to target/desired pose
     # 5 - drop into bin twice
     # 6 - disable detections
-    
-    bin_pose = create_stamped_pose(
-        "advay_please_remove_this",
-        0.0, 
-        0.0, 
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    )
-
-    go_to_bin = goto.FromConstant(
-        "Go to bin",
-        NAMESPACE,
-        bin_pose
-    )
 
     enable_detections = py_trees_ros.service_clients.FromConstant(
         name="Enable Detections",
@@ -128,8 +83,7 @@ def create_bin_root():
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(
             enabled=True,
-            template_name="Task03_DropBRUVS.png",
-            camera_frame_id="auv4/bot_cam_optical",
+            template_name=TEMPLATE_NAME,
         ),
         key_response=fk("bin_enable_detections"),
     )
@@ -166,22 +120,19 @@ def create_bin_root():
         service_name="/auv4/choice/get_is_fish",
         service_type=std_srvs.srv.Trigger,
         service_request=std_srvs.srv.Trigger.Request(),
-        key_response=fk("choice"),
+        key_response=fk(CHOICE_KEY),
     )
 
-    set_choice = DynamicSetBlackboard(
-        name="Set Choice",
-        key="choice",
-        namespace=NAMESPACE,
-        update_key="position",
-        overwrite=True,
-        func=_make_selection,
+    # Populate the desired pose based on choice
+    bin_selection = create_bin_selector_root(
+        choice_key=fk(CHOICE_KEY),
+        pose_key=fk(POSE_KEY)
     )
 
     align_to_target = goto.FromBlackboard(
         name="Align to Target",
         parent_namespace=NAMESPACE,
-        pose_key="position",
+        pose_key=POSE_KEY,
     )
 
     set_dropper_actuation = py_trees.behaviours.SetBlackboardVariable(
@@ -209,12 +160,11 @@ def create_bin_root():
 
     launch_seq.add_children(
         children=[
-            go_to_bin,
             enable_detections,
             enable_detections_succeeded,
             py_trees.timers.Timer("wait for match", duration=10.0),
             choose_fish,
-            set_choice,
+            bin_selection,
             align_to_target,
             py_trees.timers.Timer("wait to stabilize", duration=5.0),
             set_dropper_actuation,
