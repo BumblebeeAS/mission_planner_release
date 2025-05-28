@@ -28,6 +28,7 @@ Adapted from: https://github.com/splintered-reality/py_trees_ros/blob/devel/py_t
 import py_trees
 import rclpy.qos
 import tf2_ros
+from rclpy.qos import qos_profile_system_default
 from transforms3d.euler import quat2euler
 
 from mission_planner_2.commons.pose_utils import create_stamped_pose
@@ -118,8 +119,8 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
         variable_name,
         start_frame: str,
         end_frame: str,
-        qos_profile: rclpy.qos.QoSProfile,
-        static_qos_profile: rclpy.qos.QoSProfile = None,
+        qos_profile: rclpy.qos.QoSProfile = qos_profile_system_default,
+        static_qos_profile: rclpy.qos.QoSProfile | None = None,
         clearing_policy: py_trees.common.ClearingPolicy = py_trees.common.ClearingPolicy.ON_INITIALISE,
     ):
         super().__init__(name=name)
