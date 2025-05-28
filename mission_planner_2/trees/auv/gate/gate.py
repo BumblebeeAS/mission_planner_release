@@ -36,16 +36,16 @@ def create_gate_root():
     save_tf_left = cache_tf.ToBlackboard(
         name="Save TF Left",
         variable_name=fk(GATE_LEFT_POSE_KEY),
-        start_frame="auv4/gate/centre",
-        end_frame="auv4/gate/left",
+        start="auv4/gate/centre",
+        end="auv4/gate/left",
         qos_profile=qos_profile_system_default,
     )
 
     save_tf_right = cache_tf.ToBlackboard(
         name="Save TF Right",
         variable_name=fk(GATE_RIGHT_POSE_KEY),
-        start_frame="auv4/gate/centre",
-        end_frame="auv4/gate/right",
+        start="auv4/gate/centre",
+        end="auv4/gate/right",
         qos_profile=qos_profile_system_default,
     )
 
@@ -99,7 +99,7 @@ def create_gate_root():
     """
 
     # TODO: move out into separate file; see torpedo.
-    gate_init_pose = create_stamped_pose("world_ned", position_z=1.15)
+    gate_init_pose = create_stamped_pose("world_ned", position_z=0.75)
 
     move_towards_gate = goto.FromConstant(
         "Move towards gate", NAMESPACE, gate_init_pose

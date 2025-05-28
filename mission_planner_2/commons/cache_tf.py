@@ -53,8 +53,8 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
 
     **Transform Convention:**
 
-    * **start_frame**: Target frame where robot's base_link will initially align (origin)
-    * **end_frame**: Destination frame where robot's base_link should eventually align (origin)
+    * **start**: Target frame where robot's base_link will initially align (origin)
+    * **end**: Destination frame where robot's base_link should eventually align (origin)
     * The behavior captures the end_frame to start_frame transform relationship
     * When stored in base_link coordinates, this represents the navigation vector to reach end_frame
 
@@ -78,8 +78,8 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
     Args:
         name: name of the behavior
         variable_name: blackboard key where the cached pose will be stored
-        start_frame: trajectory start frame (where base_link initially aligns)
-        end_frame: trajectory end frame (where base_link should eventually align)
+        start: trajectory start frame name (where base_link initially aligns)
+        end: trajectory end frame name (where base_link should eventually align)
         qos_profile: QoS profile for the dynamic transform subscriber
         static_qos_profile: QoS profile for static transforms (default: tf2_ros defaults)
         clearing_policy: when to clear the cached result from blackboard
@@ -95,8 +95,8 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
         save_gate_left_pose = ToBlackboard(
             name="Save Gate Left Pose",
             variable_name=fk("gate_left_pose"),
-            start_frame="auv4/gate/centre",
-            end_frame="auv4/gate/left",
+            start="auv4/gate/centre",
+            end="auv4/gate/left",
             qos_profile=qos_profile
         )
         ```
@@ -117,8 +117,8 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
         self,
         name: str,
         variable_name,
-        start_frame: str,
-        end_frame: str,
+        start: str,
+        end: str,
         qos_profile: rclpy.qos.QoSProfile = qos_profile_system_default,
         static_qos_profile: rclpy.qos.QoSProfile | None = None,
         clearing_policy: py_trees.common.ClearingPolicy = py_trees.common.ClearingPolicy.ON_INITIALISE,
@@ -129,8 +129,11 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
         self.blackboard.register_key(
             key=self.variable_name, access=py_trees.common.Access.WRITE
         )
-        self.target_frame = start_frame
-        self.source_frame = end_frame
+
+        # flipped to look up the correct transform, see note in cfg.yaml for more details.
+        self.target_frame = start
+        self.source_frame = end
+
         self.qos_profile = qos_profile
         self.static_qos_profile = static_qos_profile
         self.clearing_policy = clearing_policy
