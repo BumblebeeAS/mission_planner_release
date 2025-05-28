@@ -38,13 +38,13 @@ def create_torpedo_root():
     Create the root of the torpedo tree.
     """
 
-    root = py_trees.composites.Sequence(
-        name="Torpedo Root",
+    seq_torpedo_root = py_trees.composites.Sequence(
+        name="Torpedo root",
         memory=True,
     )
 
-    launch_seq = py_trees.composites.Sequence(
-        name="Launch Torpedo",
+    seq_launch_torpedo = py_trees.composites.Sequence(
+        name="Launch torpedo",
         memory=True,
     )
 
@@ -59,8 +59,8 @@ def create_torpedo_root():
     # 8 - launch torpedo2
     # 9 - disable detections
 
-    enable_detections = py_trees_ros.service_clients.FromConstant(
-        name="Enable Detections",
+    srv_enable_detections = py_trees_ros.service_clients.FromConstant(
+        name="Enable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(
@@ -69,8 +69,8 @@ def create_torpedo_root():
         key_response=fk("torpedo_enable_detections"),
     )
 
-    disable_detections = py_trees_ros.service_clients.FromConstant(
-        name="Disable Detections",
+    srv_disable_detections = py_trees_ros.service_clients.FromConstant(
+        name="Disable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
@@ -78,8 +78,8 @@ def create_torpedo_root():
     )
 
     # check srv call succeeded from the BB
-    enable_detections_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Enable Detections Succeeded",
+    check_enable_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check enable succeeded",
         check=py_trees.common.ComparisonExpression(
             variable=fk("torpedo_enable_detections"),
             value=True,
@@ -87,8 +87,8 @@ def create_torpedo_root():
         ),
     )
 
-    disable_detections_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Disable Detections Succeeded",
+    check_disable_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check disable succeeded",
         check=py_trees.common.ComparisonExpression(
             variable=fk("torpedo_disable_detections"),
             value=False,
@@ -100,8 +100,8 @@ def create_torpedo_root():
     # ros2 run tf2_ros static_transform_publisher -3.3 0 -0.9 0 0 1.57 world fake_det # usually the pose the detection gives
     # ros2 run tf2_ros static_transform_publisher 0.3 0 0.6 0 1.57 1.57 fake_det hole
 
-    get_choice = py_trees_ros.service_clients.FromConstant(
-        name="Get Choice",
+    srv_get_choice = py_trees_ros.service_clients.FromConstant(
+        name="Get choice",
         service_name="/auv4/choice/get_is_fish",
         service_type=Trigger,
         service_request=Trigger.Request(),
@@ -109,96 +109,96 @@ def create_torpedo_root():
     )
 
     # we call fk(<key>) here to capture the ns of this file
-    first_selector = create_tf_selector_root(
+    sel_tf_first = create_tf_selector_root(
         choice_key=fk(CHOICE_KEY),
         pose_key=fk(POSE_KEY),
         go_back_pose_key=fk(GO_BACK_POSE_KEY),
         is_first=True,
     )
 
-    second_selector = create_tf_selector_root(
+    sel_tf_second = create_tf_selector_root(
         choice_key=fk(CHOICE_KEY),
         pose_key=fk(POSE_KEY),
         go_back_pose_key=fk(GO_BACK_POSE_KEY),
         is_first=False,
     )
 
-    goto_back_to_centre = goto.FromBlackboard(
-        name="Go back to centre pose",
+    goto_back_centre = goto.FromBlackboard(
+        name="Go back to centre",
         parent_namespace=NAMESPACE,
         pose_key=GO_BACK_POSE_KEY,
     )
 
-    align_to_target1 = goto.FromBlackboard(
-        name="Align to Target1",
+    goto_target_first = goto.FromBlackboard(
+        name="Go to first target",
         parent_namespace=NAMESPACE,
         pose_key=POSE_KEY,
     )
 
-    align_to_target2 = goto.FromBlackboard(
-        name="Align to Target2",
+    goto_target_second = goto.FromBlackboard(
+        name="Go to second target",
         parent_namespace=NAMESPACE,
         pose_key=POSE_KEY,
     )
 
-    set_torp_actuation_top = py_trees.behaviours.SetBlackboardVariable(
-        name="Set Torpedo Actuation top",
+    set_torp_top = py_trees.behaviours.SetBlackboardVariable(
+        name="Set top torpedo actuation",
         variable_name=fk("torpedo_actuation"),
         variable_value=TOP_TORP_UINT,
         overwrite=True,
     )
 
-    set_torp_actuation_btm = py_trees.behaviours.SetBlackboardVariable(
-        name="Set Torpedo Actuation btm",
+    set_torp_bottom = py_trees.behaviours.SetBlackboardVariable(
+        name="Set bottom torpedo actuation",
         variable_name=fk("torpedo_actuation"),
         variable_value=BTM_TORP_UINT,
         overwrite=True,
     )
 
-    fire_torpedo1 = py_trees_ros.publishers.FromBlackboard(
-        name="Fire Torpedo 1",
+    pub_fire_first = py_trees_ros.publishers.FromBlackboard(
+        name="Fire first torpedo",
         topic_name="/auv4/actuation/input",
         topic_type=UInt8,
         qos_profile=qos_profile_system_default,
         blackboard_variable=fk("torpedo_actuation"),
     )
 
-    fire_torpedo2 = py_trees_ros.publishers.FromBlackboard(
-        name="Fire Torpedo 2",
+    pub_fire_second = py_trees_ros.publishers.FromBlackboard(
+        name="Fire second torpedo",
         topic_name="/auv4/actuation/input",
         topic_type=UInt8,
         qos_profile=qos_profile_system_default,
         blackboard_variable=fk("torpedo_actuation"),
     )
 
-    launch_seq.add_children(
+    seq_launch_torpedo.add_children(
         children=[
-            get_choice,
-            enable_detections,
-            enable_detections_succeeded,
-            set_torp_actuation_top,
-            py_trees.timers.Timer("Wait for Match", duration=20.0),
-            first_selector,
-            align_to_target1,
-            fire_torpedo1,
-            py_trees.timers.Timer("Wait between Firings", duration=5),
-            goto_back_to_centre,
-            set_torp_actuation_btm,
-            py_trees.timers.Timer("Wait for Match", duration=20.0),
-            second_selector,
-            align_to_target2,
-            fire_torpedo2,
-            disable_detections,
-            disable_detections_succeeded,
+            srv_get_choice,
+            srv_enable_detections,
+            check_enable_succeeded,
+            set_torp_top,
+            py_trees.timers.Timer("Wait for match", duration=20.0),
+            sel_tf_first,
+            goto_target_first,
+            pub_fire_first,
+            py_trees.timers.Timer("Wait between firings", duration=5),
+            goto_back_centre,
+            set_torp_bottom,
+            py_trees.timers.Timer("Wait for match", duration=20.0),
+            sel_tf_second,
+            goto_target_second,
+            pub_fire_second,
+            srv_disable_detections,
+            check_disable_succeeded,
         ],
     )
 
-    root.add_children(
+    seq_torpedo_root.add_children(
         children=[
             create_move_to_task_root(),
             py_trees.timers.Timer("Stabilise before task", duration=10.0),
-            launch_seq,
+            seq_launch_torpedo,
         ]
     )
 
-    return root
+    return seq_torpedo_root
