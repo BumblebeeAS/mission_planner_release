@@ -67,7 +67,7 @@ tfs:
   - name: gate_centre
     # Translation (x, y, z in meters)
     x: 1.5
-    y: -0.5
+    y: -1.0
     z: 2.0
     roll: 90.0          # in degrees
     pitch: 90.0         # in degrees
@@ -78,7 +78,7 @@ tfs:
   - name: gate_left
     # translation (x, y, z in meters)
     x: 0.75
-    y: -0.5
+    y: -1.0
     z: 1.0
     roll: 90.0          # in degrees
     pitch: 90.0         # in degrees
@@ -89,7 +89,7 @@ tfs:
   - name: gate_right
     # translation (x, y, z in meters)
     x: 2.25
-    y: -0.5
+    y: -1.0
     z: 1.0
     roll: 90.0          # in degrees
     pitch: 90.0         # in degrees

@@ -3,6 +3,7 @@ Common pose utilities for mission_planner_2.
 """
 
 import numpy as np
+from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped
 from transforms3d.euler import euler2quat
 
@@ -36,8 +37,7 @@ def create_stamped_pose(
     pose_stamped.header.frame_id = frame_id
 
     # Transform lookups will yield latest transform
-    pose_stamped.header.stamp.sec = 0
-    pose_stamped.header.stamp.nanosec = 0
+    pose_stamped.header.stamp = Time()
 
     pose_stamped.pose.position.x = position_x
     pose_stamped.pose.position.y = position_y

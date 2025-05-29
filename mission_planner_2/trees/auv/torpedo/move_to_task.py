@@ -22,7 +22,7 @@ def create_move_to_task_root():
     )
 
     torpedo_init_pose = create_stamped_pose(
-        "world_ned", position_x=0.0, position_y=0.0, position_z=1.0, yaw=0.0
+        "world_ned", position_x=0.0, position_y=0.0, position_z=0.1, yaw=0.0
     )
 
     move_to_torp = goto.FromConstant(

@@ -123,16 +123,16 @@ def create_torpedo_root():
         is_first=False,
     )
 
-    goto_back_centre = goto.FromBlackboard(
-        name="Go back to centre",
-        parent_namespace=NAMESPACE,
-        pose_key=GO_BACK_POSE_KEY,
-    )
-
     goto_target_first = goto.FromBlackboard(
         name="Go to first target",
         parent_namespace=NAMESPACE,
         pose_key=POSE_KEY,
+    )
+
+    goto_back_centre = goto.FromBlackboard(
+        name="Go back to centre",
+        parent_namespace=NAMESPACE,
+        pose_key=GO_BACK_POSE_KEY,
     )
 
     goto_target_second = goto.FromBlackboard(

@@ -28,6 +28,7 @@ Adapted from: https://github.com/splintered-reality/py_trees_ros/blob/devel/py_t
 import py_trees
 import rclpy.qos
 import tf2_ros
+from builtin_interfaces.msg import Time
 from rclpy.qos import qos_profile_system_default
 from transforms3d.euler import quat2euler
 
@@ -197,13 +198,13 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
         if self.buffer.can_transform(
             target_frame=self.target_frame,
             source_frame=self.source_frame,
-            time=get_latest(),
-            # timeout=rclpy.duration.Duration(seconds=5)  # don't block
+            time=Time(),
+            # timeout=rclpy.duration.Duration(seconds=5),  # don't block
         ):
             stamped_transform = self.buffer.lookup_transform(
                 target_frame=self.target_frame,
                 source_frame=self.source_frame,
-                time=get_latest(),
+                time=Time(),
                 # timeout=rclpy.duration.Duration(seconds=5)  # don't block
             )
 
