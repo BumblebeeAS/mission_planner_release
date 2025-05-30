@@ -73,7 +73,7 @@ class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
         self.overwrite = overwrite
         self.namespace = namespace
         self.keys = self._process_keys(key)
-        self._register_keys(key, update_key)
+        self._register_keys(self.keys, update_key)
 
     def update(self) -> py_trees.common.Status:
         if self.blackboard.set(
@@ -103,12 +103,10 @@ class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
             keys (list[str]): list of keys to read from.
             update_key (str): key to write to.
         """
-        register = lambda k: self.blackboard.register_key(
-            key=k,
-            access=py_trees.common.Access.READ,
-        )
 
-        map(register, keys)
+        for k in keys:
+            self.blackboard.register_key(key=k, access=py_trees.common.Access.READ)
+
         self.blackboard.register_key(
             key=update_key,
             access=py_trees.common.Access.WRITE,
@@ -116,6 +114,6 @@ class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
 
     def _apply(self) -> any:
         """Apply the function to the current blackboard values."""
-        args = map(self.blackboard.get, self.keys)
+        args = [self.blackboard.get(k) for k in self.keys]
         out = self.func(*args)
         return out
