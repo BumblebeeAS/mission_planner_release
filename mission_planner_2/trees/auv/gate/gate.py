@@ -2,6 +2,7 @@ import operator
 
 import py_trees
 import py_trees_ros
+from bb_perception_msgs.action import ClusterTf
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -19,6 +20,18 @@ fk = full_key_generator(NAMESPACE)
 
 GATE_LEFT_POSE_KEY = "gate_left_pose"
 GATE_RIGHT_POSE_KEY = "gate_right_pose"
+
+
+def create_cluster_goal():
+    goal = ClusterTf.Goal()
+    goal.input_parent_frame_id = "auv4/front_cam_optical"
+    goal.input_child_frame_id = "auv4/gate"
+    goal.output_parent_frame_id = "auv4/front_cam_optical"
+    goal.output_child_frame_id = "auv4/gate/clustered"
+    goal.clustering_duration = 30
+    goal.use_cache = False
+
+    return goal
 
 
 def create_gate_root():
@@ -65,11 +78,12 @@ def create_gate_root():
         key_response=fk("is_fish"),
     )
 
-    get_gate_orientation = py_trees.behaviours.SetBlackboardVariable(
+    get_gate_orientation = py_trees_ros.subscribers.ToBlackboard(
         name="Get gate orientation",
-        variable_name=fk("gate_orientation"),
-        variable_value=String(data="fish_shark"),
-        overwrite=True,
+        topic_name="/auv4/gate/shark_fish",
+        topic_type=String,
+        qos_profile=qos_profile_system_default,
+        blackboard_variables={fk("gate_orientation"): None},
     )
 
     check_is_left = py_trees.behaviours.CheckBlackboardVariableValues(
@@ -99,7 +113,7 @@ def create_gate_root():
     """
 
     # TODO: move out into separate file; see torpedo.
-    gate_init_pose = create_stamped_pose("world_ned", position_z=0.75)
+    gate_init_pose = create_stamped_pose("world_ned", position_z=0.40)
 
     move_towards_gate = goto.FromConstant(
         "Move towards gate", NAMESPACE, gate_init_pose
@@ -122,16 +136,23 @@ def create_gate_root():
         pose_key=GATE_RIGHT_POSE_KEY,
     )
 
-    forward_pose = create_stamped_pose("auv4/base_link_ned", position_x=2.0)
+    forward_pose = create_stamped_pose("auv4/base_link_ned", position_x=3.0)
     move_pass_gate = goto.FromConstant("Pass through gate", NAMESPACE, forward_pose)
 
     try_left_side.add_children(children=[check_is_left, move_to_gate_before_left])
     select_gate_side.add_children(children=[try_left_side, move_to_gate_before_right])
 
+    cluster = py_trees_ros.action_clients.FromConstant(
+        name="cluster_action",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_cluster_goal(),
+    )
+
     root.add_children(
         children=[
             move_towards_gate,
-            py_trees.timers.Timer("Wait to stabilize", 30.0),
+            cluster,
             save_gate_tfs,  # Save TFs before moving to see pictures
             move_to_see_pictures,
             py_trees.timers.Timer("Wait to stabilize", 20.0),
