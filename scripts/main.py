@@ -35,7 +35,10 @@ def main():
     tree.tick_tock(period_ms=100)
     try:
         rclpy.spin(tree.node)
-    except:
+    except Exception as e:
+        console.logerror(
+            console.red + "exception occurred: {}".format(e) + console.reset
+        )
         console.loginfo("stopping")
     finally:
         console.loginfo(console.reset)
