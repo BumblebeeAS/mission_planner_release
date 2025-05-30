@@ -16,10 +16,10 @@
 # - While FACING the object,
 # - origin is at the top left corner of the object;
 # - +x is to the right;
-# - +y is upwards;
-# - +z is pointing out of the object plane towards the camera (or apply the right hand rule).
+# - +y is downwards;
+# - +z is pointing into the object plane away from the camera (or apply the right hand rule).
 # - To make any child frames defined with respect to this estimator frame align with base_link_ned of the AUV,
-#   we need to apply a rotation of roll = 90, pitch = 90, yaw = 0 degrees.
+#   we need to apply a rotation of roll = -90, pitch = -90, yaw = 0 degrees.
 #
 # USAGE:
 # 1. Create a new comment header for each task.
@@ -44,58 +44,58 @@ tfs:
   - name: torpedo_shark
     # Translation (x, y, z in meters)
     x: 0.429
-    y: -0.084
-    z: 0.5
-    roll: 90.0          # in degrees
-    pitch: 90.0      # in degrees
+    y: 0.084
+    z: -0.5
+    roll: -90.0          # in degrees
+    pitch: -90.0      # in degrees
     yaw: 0.0        # in degrees
     # Frame IDs
-    parent_frame_id: "advay_please_remove_this"
+    parent_frame_id: "auv4/torpedo_2/clustered"
     child_frame_id: "auv4/torpedo_2/fish"
   - name: torpedo_fish
     # Translation (x, y, z in meters)
     x: 0.319
-    y: -0.336
-    z: 0.5
-    roll: 90.0          # in degrees
-    pitch: 90.0         # in degrees
+    y: 0.336
+    z: -0.5
+    roll: -90.0          # in degrees
+    pitch: -90.0         # in degrees
     yaw: 0.0           # in degrees
     # Frame IDs
-    parent_frame_id: "advay_please_remove_this"
+    parent_frame_id: "auv4/torpedo_2/clustered"
     child_frame_id: "auv4/torpedo_2/shark"
 ######################### GATE TFS #########################
   - name: gate_centre
     # Translation (x, y, z in meters)
     x: 1.5
-    y: -1.0
-    z: 2.0
-    roll: 90.0          # in degrees
-    pitch: 90.0         # in degrees
+    y: 1.0
+    z: -2.0
+    roll: -90.0          # in degrees
+    pitch: -90.0         # in degrees
     yaw: 0.0           # in degrees
     # Frame IDs
-    parent_frame_id: "advay_please_remove_this"
+    parent_frame_id: "auv4/gate/clustered"
     child_frame_id: "auv4/gate/centre"
   - name: gate_left
     # translation (x, y, z in meters)
     x: 0.75
-    y: -1.0
-    z: 1.0
-    roll: 90.0          # in degrees
-    pitch: 90.0         # in degrees
+    y: 1.0
+    z: -1.0
+    roll: -90.0          # in degrees
+    pitch: -90.0         # in degrees
     yaw: 0.0           # in degrees
     # frame ids
-    parent_frame_id: "advay_please_remove_this"
+    parent_frame_id: "auv4/gate/clustered"
     child_frame_id: "auv4/gate/left"
   - name: gate_right
     # translation (x, y, z in meters)
     x: 2.25
-    y: -1.0
-    z: 1.0
-    roll: 90.0          # in degrees
-    pitch: 90.0         # in degrees
+    y: 1.0
+    z: -1.0
+    roll: -90.0          # in degrees
+    pitch: -90.0         # in degrees
     yaw: 0.0           # in degrees
     # frame ids
-    parent_frame_id: "advay_please_remove_this"
+    parent_frame_id: "auv4/gate/clustered"
     child_frame_id: "auv4/gate/right"
 ######################### BIN TFS #########################
   - name: bin_fish
@@ -107,7 +107,7 @@ tfs:
     pitch: 0.0         # in degrees
     yaw: 0.0           # in degrees
     # frame ids
-    parent_frame_id: "advay_please_remove_this"
+    parent_frame_id: "auv4/bin/clustered"
     child_frame_id: "auv4/bin/fish"
   - name: bin_shark
     # translation (x, y, z in meters)
@@ -118,5 +118,5 @@ tfs:
     pitch: 0.0         # in degrees
     yaw: 0.0           # in degrees
     # frame ids
-    parent_frame_id: "advay_please_remove_this"
+    parent_frame_id: "auv4/bin/clustered"
     child_frame_id: "auv4/bin/shark"
