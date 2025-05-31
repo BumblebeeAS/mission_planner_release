@@ -41,7 +41,7 @@
 
 tfs:
 ######################### TORPEDO 2 TFS #########################
-  - name: torpedo_shark
+  - name: torpedo_fish
     # Translation (x, y, z in meters)
     x: 0.429
     y: 0.084
@@ -52,7 +52,7 @@ tfs:
     # Frame IDs
     parent_frame_id: "auv4/torpedo_2/clustered"
     child_frame_id: "auv4/torpedo_2/fish"
-  - name: torpedo_fish
+  - name: torpedo_shark
     # Translation (x, y, z in meters)
     x: 0.319
     y: 0.336
@@ -111,23 +111,23 @@ tfs:
     child_frame_id: "auv4/bin/centre"
   - name: bin_fish
     # translation (x, y, z in meters)
-    x: 0.0
-    y: 0.0
-    z: 0.0
+    x: 0.152
+    y: 0.458
+    z: -0.5
     roll: 0.0          # in degrees
     pitch: 0.0         # in degrees
-    yaw: 0.0           # in degrees
+    yaw: -90.0           # in degrees
     # frame ids
     parent_frame_id: "auv4/bin/clustered"
     child_frame_id: "auv4/bin/fish"
   - name: bin_shark
     # translation (x, y, z in meters)
-    x: 0.0
-    y: 0.0
+    x: 0.152
+    y: 0.152
     z: 0.0
     roll: 0.0          # in degrees
     pitch: 0.0         # in degrees
-    yaw: 0.0           # in degrees
+    yaw: -90.0           # in degrees
     # frame ids
     parent_frame_id: "auv4/bin/clustered"
     child_frame_id: "auv4/bin/shark"
