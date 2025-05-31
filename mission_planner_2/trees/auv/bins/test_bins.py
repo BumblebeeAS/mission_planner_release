@@ -24,6 +24,12 @@ TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
 def create_test_tree_root():
     root = py_trees.composites.Sequence(name="root", memory=True)
 
+    goto_center = goto.FromConstant(
+        name = "Goto the center of the bin",
+        parent_namespace=NAMESPACE,
+        pose=create_stamped_pose('auv4/bin/centre')
+    )
+
     srv_enable_detections = py_trees_ros.service_clients.FromConstant(
         name="Enable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
@@ -33,7 +39,7 @@ def create_test_tree_root():
             camera_frame_id="auv4/bot_cam_optical",
             template_name=TEMPLATE_NAME,
         ),
-        key_response=fk("torpedo_enable_detections"),
+        key_response=fk("bin_enable_detections"),
     )
 
     sub_1 = py_trees_ros.subscribers.ToBlackboard(
@@ -41,7 +47,7 @@ def create_test_tree_root():
         topic_name=POINT_CORRESPONDENCES_TOPIC,
         topic_type=PointCorrespondencesStamped,
         qos_profile=qos_profile_system_default,
-        blackboard_variables={fk("num_points_1"): "object_points"},
+        blackboard_variables={fk("points_1"): "object_points"},
     )
 
     goto_second = goto.FromConstant(
@@ -55,13 +61,13 @@ def create_test_tree_root():
         topic_name=POINT_CORRESPONDENCES_TOPIC,
         topic_type=PointCorrespondencesStamped,
         qos_profile=qos_profile_system_default,
-        blackboard_variables={fk("num_points_2"): "object_points"},
+        blackboard_variables={fk("points_2"): "object_points"},
     )
 
     do_check = DynamicSetBlackboard(
         name="check",
         namespace=NAMESPACE,
-        key=["num_points_1", "num_points_2"],
+        key=["points_1", "points_2"],
         update_key="final",
         func=lambda x, y: create_stamped_pose("auv4/base_link_ned", yaw=180.0)
         if len(x.data) > len(y.data)
