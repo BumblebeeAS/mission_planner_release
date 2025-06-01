@@ -12,7 +12,10 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_stamped_pose
+from mission_planner_2.commons.pose_utils import (
+    create_clustering_goal,
+    create_stamped_pose,
+)
 from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
@@ -20,18 +23,6 @@ fk = full_key_generator(NAMESPACE)
 
 GATE_LEFT_POSE_KEY = "gate_left_pose"
 GATE_RIGHT_POSE_KEY = "gate_right_pose"
-
-
-def create_cluster_goal():
-    goal = ClusterTf.Goal()
-    goal.input_parent_frame_id = "auv4/front_cam_optical"
-    goal.input_child_frame_id = "auv4/gate"
-    goal.output_parent_frame_id = "auv4/front_cam_optical"
-    goal.output_child_frame_id = "auv4/gate/clustered"
-    goal.clustering_duration = 30
-    goal.use_cache = False
-
-    return goal
 
 
 def create_gate_root():
@@ -146,7 +137,13 @@ def create_gate_root():
         name="cluster_action",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_cluster_goal(),
+        action_goal=create_clustering_goal(
+            in_parent="auv4/front_cam_optical",
+            in_child="gate",
+            out_child="gate/clustered",
+            duration=30,
+            use_cache=False,
+        ),
     )
 
     root.add_children(
