@@ -38,6 +38,7 @@ POSE_KEY = "pose"
 GO_BACK_POSE_KEY = "go_back_pose"
 
 CLUSTER_DURATION = 30
+STABILIZE_DURATION = 10
 #########################################################################
 
 
@@ -126,17 +127,18 @@ def create_torpedo_root():
         is_first=True,
     )
 
-    sel_tf_second = create_tf_selector_root(
-        choice_key=fk(CHOICE_KEY),
-        pose_key=fk(POSE_KEY),
-        go_back_pose_key=fk(GO_BACK_POSE_KEY),
-        is_first=False,
-    )
-
     goto_target_first = goto.FromBlackboard(
         name="Go to first target",
         parent_namespace=NAMESPACE,
         pose_key=POSE_KEY,
+    )
+
+    pub_fire_first = py_trees_ros.publishers.FromBlackboard(
+        name="Fire first torpedo",
+        topic_name="/auv4/actuation/input",
+        topic_type=UInt8,
+        qos_profile=qos_profile_system_default,
+        blackboard_variable=fk("torpedo_actuation"),
     )
 
     goto_back_centre = goto.FromBlackboard(
@@ -145,10 +147,11 @@ def create_torpedo_root():
         pose_key=GO_BACK_POSE_KEY,
     )
 
-    goto_target_second = goto.FromBlackboard(
-        name="Go to second target",
-        parent_namespace=NAMESPACE,
-        pose_key=POSE_KEY,
+    set_torp_bottom = py_trees.behaviours.SetBlackboardVariable(
+        name="Set bottom torpedo actuation",
+        variable_name=fk("torpedo_actuation"),
+        variable_value=BTM_TORP_UINT,
+        overwrite=True,
     )
 
     cluster_second = py_trees_ros.action_clients.FromConstant(
@@ -164,19 +167,17 @@ def create_torpedo_root():
         ),
     )
 
-    set_torp_bottom = py_trees.behaviours.SetBlackboardVariable(
-        name="Set bottom torpedo actuation",
-        variable_name=fk("torpedo_actuation"),
-        variable_value=BTM_TORP_UINT,
-        overwrite=True,
+    sel_tf_second = create_tf_selector_root(
+        choice_key=fk(CHOICE_KEY),
+        pose_key=fk(POSE_KEY),
+        go_back_pose_key=fk(GO_BACK_POSE_KEY),
+        is_first=False,
     )
 
-    pub_fire_first = py_trees_ros.publishers.FromBlackboard(
-        name="Fire first torpedo",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable=fk("torpedo_actuation"),
+    goto_target_second = goto.FromBlackboard(
+        name="Go to second target",
+        parent_namespace=NAMESPACE,
+        pose_key=POSE_KEY,
     )
 
     pub_fire_second = py_trees_ros.publishers.FromBlackboard(
@@ -214,7 +215,7 @@ def create_torpedo_root():
             sel_tf_first,
             goto_target_first,
             pub_fire_first,
-            py_trees.timers.Timer("Wait between firings", duration=5),
+            py_trees.timers.Timer("Wait between firings", duration=STABILIZE_DURATION),
             goto_back_centre,
             set_torp_bottom,
             cluster_second,
@@ -229,7 +230,7 @@ def create_torpedo_root():
     seq_torpedo_root.add_children(
         children=[
             create_move_to_task_root(),
-            py_trees.timers.Timer("Stabilise before task", duration=10.0),
+            py_trees.timers.Timer("Stabilise before task", duration=STABILIZE_DURATION),
             seq_launch_torpedo,
         ]
     )
