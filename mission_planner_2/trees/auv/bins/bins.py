@@ -42,6 +42,7 @@ CHOICE_KEY = "choice"
 POSE_KEY = "pose"
 
 CLUSTERING_DURATION = 30
+STABILIZE_DURATION = 5.0
 #########################################################################
 
 
@@ -132,7 +133,7 @@ def create_bin_root():
     # Step 6c: Wait for stabilisation
     timer_wait_points = py_trees.timers.Timer(
         "Wait for second points",
-        duration=5.0,
+        duration=STABILIZE_DURATION,
     )
 
     # Step 6d: Get second set of point correspondences
