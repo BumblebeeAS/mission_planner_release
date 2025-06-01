@@ -2,60 +2,43 @@ import operator
 
 import py_trees
 import py_trees_ros
+import std_srvs
 from bb_msgs.srv import IMPoseEstimatorToggleTemplate
+from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
-import std_srvs
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.bins.move_to_task import create_move_to_bin_task_root
+from mission_planner_2.commons.pose_utils import (
+    create_clustering_goal,
+    create_stamped_pose,
+)
 from mission_planner_2.trees.auv.bins.bin_selector import create_bin_selector_root
+from mission_planner_2.trees.auv.bins.move_to_task import create_move_to_bin_task_root
+from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
-
-# For Yosie
-
-    # subscriber --> yaw (NED)
-
-    # rotation_pose = create_stamped_pose(
-    #     "auv4/base_link_ned",
-    #     0.0,  # Temporary, please update
-    #     0.0,
-    #     0.0,
-    #     0.0,
-    #     0.0,
-    #     yaw,
-    # )
-
-    # goto to rotation pose
-
-    # service call to /auv4/choice std_srvs::Trigger (py_trees API tells you how to do this)
-
-    # choose between offsets based on choice (see how torpedo does it)
-
-    # goto that offset
-    
-     # Figure out the offset
 
 ######################### UPDATE CONSTANTS HERE #########################
 # Note that vision related nodes for bottom camera are not yet implemented
 TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
 POINT_CORRESPONDENCES_TOPIC = "/auv4/bot_cam/image_matching/point_correspondences"
 TEMPLATE_NAME = "Task03_DropBRUVS.png"
+TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_optical"
 CHOICE_KEY = "choice"
 POSE_KEY = "pose"
 
 # To update the transforms when we figure them out in cfg.yaml
 FISH_BIN_FRAME = "auv4/bin/fish"
 SHARK_BIN_FRAME = "auv4/bin/shark"
+
+
 #########################################################################
 def create_bin_root():
     """
@@ -79,7 +62,7 @@ def create_bin_root():
 
     # contains the logic for dropping BRUVS into the bin
     # 1 - move to task
-    # 2 - enable detections 
+    # 2 - enable detections
     # 3 - check for the correct orientation and go to correct orientation
     # 4 - service call to obtain choice and update desired pose based on choice
     # 5 - align to desired pose
@@ -89,9 +72,9 @@ def create_bin_root():
     # 9 - disable detections
 
     goto_centre = goto.FromConstant(
-        name = "Goto the center of the bin",
+        name="Goto the center of the bin",
         parent_namespace=NAMESPACE,
-        pose=create_stamped_pose('auv4/bin/centre')
+        pose=create_stamped_pose("bin/centre"),
     )
 
     srv_enable_detections = py_trees_ros.service_clients.FromConstant(
@@ -164,8 +147,7 @@ def create_bin_root():
 
     # Populate the desired pose based on choice
     update_selection = create_bin_selector_root(
-        choice_key=fk(CHOICE_KEY),
-        pose_key=fk(POSE_KEY)
+        choice_key=fk(CHOICE_KEY), pose_key=fk(POSE_KEY)
     )
 
     align_to_target = goto.FromBlackboard(
@@ -188,7 +170,7 @@ def create_bin_root():
         qos_profile=qos_profile_system_default,
         blackboard_variable=fk("bin_actuation"),
     )
-    
+
     move_slightly = goto.FromConstant(
         name="move_slightly",
         parent_namespace=NAMESPACE,
@@ -220,21 +202,49 @@ def create_bin_root():
         ),
     )
 
-    
-    rotate_correctly.add_children([
-        get_points_1,
-        rotate_position,
-        get_points_2,
-        compare_positions,
-        moveto_correct_position,
-    ])
+    rotate_correctly.add_children(
+        [
+            get_points_1,
+            rotate_position,
+            get_points_2,
+            compare_positions,
+            moveto_correct_position,
+        ]
+    )
+
+    cluster_first = py_trees_ros.action_clients.FromConstant(
+        name="Cluster transforms before orienting to bin",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_parent="auv4/front_cam_optical",
+            in_child="bin/yolo",
+            out_child="bin/yolo/clustered",
+            duration=30,
+            use_cache=False,
+        ),
+    )
+
+    cluster_second = py_trees_ros.action_clients.FromConstant(
+        name="Cluster transforms before dropping",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_parent="auv4/front_cam_optical",
+            in_child=TEMPLATE_FRAME_OPTICAL,
+            out_child="bin/clustered",
+            duration=30,
+            use_cache=False,
+        ),
+    )
 
     launch_seq.add_children(
         children=[
+            cluster_first,
             goto_centre,
             srv_enable_detections,
             enable_detections_succeeded,
-            py_trees.timers.Timer("wait for match", duration=5.0),
+            cluster_second,
             rotate_correctly,
             choose_fish,
             update_selection,
