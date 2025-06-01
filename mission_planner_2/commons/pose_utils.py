@@ -3,6 +3,7 @@ Common pose utilities for mission_planner_2.
 """
 
 import numpy as np
+from bb_perception_msgs.action import ClusterTf
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped
 from transforms3d.euler import euler2quat
@@ -58,3 +59,88 @@ def create_stamped_pose(
     pose_stamped.pose.orientation.w = quat[0]
 
     return pose_stamped
+
+
+def create_clustering_goal(
+    in_parent: str,
+    in_child: str,
+    out_child: str,
+    out_parent: str = "world_ned",
+    duration: int = 20,
+    tf_lookup_interval: float = 0.05,
+    cache_size: int = 100,
+    min_cluster_size: int = 2,
+    min_samples: int = 1,
+    use_cache: bool = False,
+):
+    """Create a ClusterTf goal for collecting and clustering coordinate transforms.
+
+    Args:
+        in_parent (str): The parent frame ID for the input transform lookup.
+            This is the reference frame from which transforms will be measured.
+        in_child (str): The child frame ID for the input transform lookup.
+            This is the target frame to which transforms will be measured.
+        out_child (str): The child frame ID for the output clustered transform.
+            This defines the target frame in the resulting clustered transform.
+        out_parent (str, optional): The parent frame ID for the output clustered
+            transform. Defaults to "world_ned" (to keep the frame fixed with respect to the world).
+        duration (int, optional): The duration in seconds over which to collect
+            transforms for clustering. Defaults to 20 seconds.
+        tf_lookup_interval (float, optional): The interval in seconds between
+            transform lookups during collection. Defaults to 0.05 seconds (20 Hz).
+        cache_size (int, optional): The maximum number of transforms to store
+            in the cache when use_cache is True. Defaults to 100.
+        min_cluster_size (int, optional): The minimum number of transforms
+            required to form a cluster during clustering analysis. Defaults to 2.
+        min_samples (int, optional): The minimum number of samples required
+            for a point to be considered a core point in clustering. Defaults to 1.
+        use_cache (bool, optional): Whether to use caching during transform
+            collection. If True, uses cache_size; if False, collects as
+            many transforms as possible within the duration. Defaults to False.
+
+    Returns:
+        ClusterTf.Goal: A configured goal object.
+
+    Example:
+        >>> # Create a goal to cluster transforms from base_link to camera
+        >>> goal = create_clustering_goal(
+        ...     in_parent="base_link",
+        ...     in_child="camera_frame",
+        ...     out_child="clustered_camera",
+        ...     duration=60,
+        ...     tf_lookup_interval=0.1,
+        ...     min_cluster_size=5
+        ... )
+        >>>
+        >>> # Use the goal with a py_trees_ros action client
+        >>> cluster = py_trees_ros.action_clients.FromConstant(
+        ...     name="cluster_action",
+        ...     action_type=ClusterTf,
+        ...     action_name="/auv4/cluster_tf",
+        ...     action_goal=goal,
+        ... )
+        >>>
+        >>> # Or create the goal directly in the action client call
+        >>> cluster = py_trees_ros.action_clients.FromConstant(
+        ...     name="cluster_action",
+        ...     action_type=ClusterTf,
+        ...     action_name="/auv4/cluster_tf",
+        ...     action_goal=create_clustering_goal(
+        ...         in_parent="base_link",
+        ...         in_child="camera_frame",
+        ...         out_child="clustered_camera"
+        ...     ),
+        ... )
+    """
+    goal = ClusterTf.Goal()
+    goal.input_parent_frame_id = in_parent
+    goal.input_child_frame_id = in_child
+    goal.output_parent_frame_id = out_parent
+    goal.output_child_frame_id = out_child
+    goal.clustering_duration = duration
+    goal.tf_lookup_interval = tf_lookup_interval
+    goal.cache_size = cache_size
+    goal.min_cluster_size = min_cluster_size
+    goal.min_samples = min_samples
+    goal.use_cache = use_cache
+    return goal
