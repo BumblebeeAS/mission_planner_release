@@ -38,96 +38,95 @@
 # Moral of the story: if you want to retrieve the numbers in this file, you need to query the transform
 # from the parent frame to the child frame, not the other way around.
 # =============================================================================
-
 tfs:
-######################### TORPEDO 2 TFS #########################
+  ######################### TORPEDO 2 TFS #########################
   - name: torpedo_fish
     # Translation (x, y, z in meters)
     x: 0.429
     y: 0.084
     z: -0.5
-    roll: -90.0          # in degrees
-    pitch: -90.0      # in degrees
-    yaw: 0.0        # in degrees
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
     # Frame IDs
-    parent_frame_id: "auv4/torpedo_2/clustered"
-    child_frame_id: "auv4/torpedo_2/fish"
+    parent_frame_id: "torpedo_2/clustered"
+    child_frame_id: "torpedo_2/fish"
   - name: torpedo_shark
     # Translation (x, y, z in meters)
     x: 0.319
     y: 0.336
     z: -0.5
-    roll: -90.0          # in degrees
-    pitch: -90.0         # in degrees
-    yaw: 0.0           # in degrees
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
     # Frame IDs
-    parent_frame_id: "auv4/torpedo_2/clustered"
-    child_frame_id: "auv4/torpedo_2/shark"
-######################### GATE TFS #########################
+    parent_frame_id: "torpedo_2/clustered"
+    child_frame_id: "torpedo_2/shark"
+    ######################### GATE TFS #########################
   - name: gate_centre
     # Translation (x, y, z in meters)
     x: 1.5
     y: 1.0
     z: -2.0
-    roll: -90.0          # in degrees
-    pitch: -90.0         # in degrees
-    yaw: 0.0           # in degrees
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
     # Frame IDs
-    parent_frame_id: "auv4/gate/clustered"
-    child_frame_id: "auv4/gate/centre"
+    parent_frame_id: "gate/clustered"
+    child_frame_id: "gate/centre"
   - name: gate_left
     # translation (x, y, z in meters)
     x: 0.75
     y: 1.0
     z: -1.0
-    roll: -90.0          # in degrees
-    pitch: -90.0         # in degrees
-    yaw: 0.0           # in degrees
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
     # frame ids
-    parent_frame_id: "auv4/gate/clustered"
-    child_frame_id: "auv4/gate/left"
+    parent_frame_id: "gate/clustered"
+    child_frame_id: "gate/left"
   - name: gate_right
     # translation (x, y, z in meters)
     x: 2.25
     y: 1.0
     z: -1.0
-    roll: -90.0          # in degrees
-    pitch: -90.0         # in degrees
-    yaw: 0.0           # in degrees
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
     # frame ids
-    parent_frame_id: "auv4/gate/clustered"
-    child_frame_id: "auv4/gate/right"
-######################### BIN TFS #########################
+    parent_frame_id: "gate/clustered"
+    child_frame_id: "gate/right"
+    ######################### BIN TFS #########################
   - name: bin_center
     # translation (x, y, z in meters)
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    roll: 0.0          # in degrees
-    pitch: 0.0         # in degrees
-    yaw: 0.0           # in degrees
+    x: 0.1524
+    y: 0.3048
+    z: -1.0
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: -90.0 # in degrees
     # frame ids
-    parent_frame_id: "auv4/bin/yolo/clustered"
-    child_frame_id: "auv4/bin/centre"
+    parent_frame_id: "bin/yolo/clustered"
+    child_frame_id: "bin/centre"
   - name: bin_fish
     # translation (x, y, z in meters)
-    x: 0.152
-    y: 0.458
-    z: -0.5
-    roll: 0.0          # in degrees
-    pitch: 0.0         # in degrees
-    yaw: -90.0           # in degrees
+    x: 0.1524
+    y: 0.4568
+    z: -1.0
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: -90.0 # in degrees
     # frame ids
-    parent_frame_id: "auv4/bin/clustered"
-    child_frame_id: "auv4/bin/fish"
+    parent_frame_id: "bin/clustered"
+    child_frame_id: "bin/fish"
   - name: bin_shark
     # translation (x, y, z in meters)
-    x: 0.152
-    y: 0.152
-    z: 0.0
-    roll: 0.0          # in degrees
-    pitch: 0.0         # in degrees
-    yaw: -90.0           # in degrees
+    x: 0.1524
+    y: 0.1524
+    z: -1.0
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: -90.0 # in degrees
     # frame ids
-    parent_frame_id: "auv4/bin/clustered"
-    child_frame_id: "auv4/bin/shark"
+    parent_frame_id: "bin/clustered"
+    child_frame_id: "bin/shark"
