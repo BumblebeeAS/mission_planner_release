@@ -15,18 +15,10 @@ def create_move_to_bin_task_root() -> py_trees.behaviour.Behaviour:
     )
 
     bin_init_pose = create_stamped_pose(
-        "world_ned",
-        position_x=0.0,
-        position_y=0.0,
-        position_z=3.0,
-        yaw=0.0
+        "world_ned", position_x=0.0, position_y=0.0, position_z=0.8, yaw=0.0
     )
 
-    move_to_bin = goto.FromConstant(
-        "move to bin",
-        generate_namespace(),
-        bin_init_pose
-    )
+    move_to_bin = goto.FromConstant("move to bin", generate_namespace(), bin_init_pose)
 
     root.add_children(
         [

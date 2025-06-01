@@ -130,3 +130,13 @@ tfs:
     # frame ids
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/shark"
+######################### BIN TFS #########################
+  - name: torpedo
+    x: -0.14819
+    y: -0.11
+    z: -0.04617
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+    parent_frame_id: "auv4/bot_cam_optical"
+    child_frame_id: "auv4/torpedo_shooter"
