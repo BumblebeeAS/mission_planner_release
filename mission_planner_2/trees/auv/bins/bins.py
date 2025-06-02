@@ -41,7 +41,7 @@ ACTUATION_UINT = UInt8(data=6)
 CHOICE_KEY = "choice"
 POSE_KEY = "pose"
 
-CLUSTERING_DURATION = 30
+CLUSTERING_DURATION = 20
 STABILIZE_DURATION = 5.0
 #########################################################################
 
@@ -62,7 +62,9 @@ def create_bin_root():
     )
 
     # Step 1: Stabilise before starting
-    timer_stabilise = py_trees.timers.Timer("Stabilise before task", duration=3.0)
+    timer_stabilise = py_trees.timers.Timer(
+        "Stabilise before task", duration=STABILIZE_DURATION
+    )
 
     # Step 2: Cluster transforms for initial orientation using YOLO
     action_cluster_first = py_trees_ros.action_clients.FromConstant(
@@ -268,26 +270,27 @@ def create_bin_root():
     seq_drop_into_bin.add_children(
         children=[
             action_cluster_first,
-            goto_bin_centre,
-            srv_enable_detections,
-            check_enable_succeeded,
-            seq_rotate_correctly,
-            srv_choose_fish,
-            sel_update_selection,
-            action_cluster_second,
-            goto_align_to_target,
-            set_dropper_actuation,
-            pub_fire_dropper_first,
-            goto_move_slightly,
-            pub_fire_dropper_second,
-            srv_disable_detections,
-            check_disable_succeeded,
+            # goto_bin_centre,
+            # srv_enable_detections,
+            # check_enable_succeeded,
+            # seq_rotate_correctly,
+            # srv_choose_fish,
+            # sel_update_selection,
+            # action_cluster_second,
+            # goto_align_to_target,
+            # set_dropper_actuation,
+            # # pub_fire_dropper_first,
+            # # goto_move_slightly,
+            # # pub_fire_dropper_second,
+            # srv_disable_detections,
+            # check_disable_succeeded,
         ],
     )
 
     # Build root sequence
     seq_bin_root.add_children(
         children=[
+            # create_move_to_bin_task_root(),
             timer_stabilise,
             seq_drop_into_bin,
         ]

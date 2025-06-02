@@ -13,6 +13,8 @@
 #
 # CURRENT CONVENTION:
 # - The current convention of frames that are outputted by our pose estimators is as follows.
+# 
+# Front camera
 # - While FACING the object,
 # - origin is at the top left corner of the object;
 # - +x is to the right;
@@ -20,6 +22,15 @@
 # - +z is pointing into the object plane away from the camera (or apply the right hand rule).
 # - To make any child frames defined with respect to this estimator frame align with base_link_ned of the AUV,
 #   we need to apply a rotation of roll = -90, pitch = -90, yaw = 0 degrees.
+#
+# Bottom camera
+# - While bottom camera is facing the object, and AUV is aligned towards the front of the object
+# - origin is at the top left corner of the object;
+# - +x is to the right;
+# - +y is downwards;
+# - +z is pointing into the object plane away from the camera, into the pool floor (or apply the right hand rule).
+# - To make any child frames defined with respect to this estimator frame align with base_link_ned of the AUV,
+#   we need to apply a rotation of roll = 0, pitch = 0, yaw = -90 degrees.
 #
 # USAGE:
 # 1. Create a new comment header for each task.
@@ -44,7 +55,7 @@ tfs:
     # Translation (x, y, z in meters)
     x: 0.429
     y: 0.084
-    z: -0.5
+    z: -0.3
     roll: -90.0 # in degrees
     pitch: -90.0 # in degrees
     yaw: 0.0 # in degrees
@@ -55,7 +66,7 @@ tfs:
     # Translation (x, y, z in meters)
     x: 0.319
     y: 0.336
-    z: -0.5
+    z: -0.3
     roll: -90.0 # in degrees
     pitch: -90.0 # in degrees
     yaw: 0.0 # in degrees
@@ -130,13 +141,22 @@ tfs:
     # frame ids
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/shark"
-######################### BIN TFS #########################
+######################### TEMPORARY TFS #########################
   - name: torpedo
-    x: -0.14819
+    x: -0.07819
     y: -0.11
-    z: -0.04617
+    z: -0.03017
     roll: 0.0
     pitch: 0.0
     yaw: 0.0
     parent_frame_id: "auv4/bot_cam_optical"
-    child_frame_id: "auv4/torpedo_shooter"
+    child_frame_id: "auv4/torpedo_shooter_top"
+  - name: torpedo
+    x: -0.07819
+    y: -0.11
+    z: -0.02017
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+    parent_frame_id: "auv4/bot_cam_optical"
+    child_frame_id: "auv4/torpedo_shooter_bot"

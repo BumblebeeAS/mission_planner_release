@@ -28,6 +28,8 @@ TEMPLATE_NAME = "Task04_Tagging_02.png"
 CAMERA_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_OPTICAL = "Task04_Tagging_02_optical"
 TEMPLATE_FRAME_OPTICAL_CLUSTERED = "torpedo_2/clustered"
+TORPEDO_SHOOTER_TOP_FRAME = "auv4/torpedo_shooter_top"
+TORPEDO_SHOOTER_BOT_FRAME = "auv4/torpedo_shooter_bot"
 
 TOP_TORP_UINT = UInt8(data=2)
 BTM_TORP_UINT = UInt8(data=4)
@@ -131,6 +133,7 @@ def create_torpedo_root():
         name="Go to first target",
         parent_namespace=NAMESPACE,
         pose_key=POSE_KEY,
+        anchor_frame_name=TORPEDO_SHOOTER_TOP_FRAME,
     )
 
     pub_fire_first = py_trees_ros.publishers.FromBlackboard(
@@ -178,6 +181,7 @@ def create_torpedo_root():
         name="Go to second target",
         parent_namespace=NAMESPACE,
         pose_key=POSE_KEY,
+        anchor_frame_name=TORPEDO_SHOOTER_BOT_FRAME,
     )
 
     pub_fire_second = py_trees_ros.publishers.FromBlackboard(
@@ -214,13 +218,14 @@ def create_torpedo_root():
             cluster_first,
             sel_tf_first,
             goto_target_first,
-            pub_fire_first,
             py_trees.timers.Timer("Wait between firings", duration=STABILIZE_DURATION),
+            pub_fire_first,
             goto_back_centre,
             set_torp_bottom,
             cluster_second,
             sel_tf_second,
             goto_target_second,
+            py_trees.timers.Timer("Wait between firings", duration=STABILIZE_DURATION),
             pub_fire_second,
             srv_disable_detections,
             check_disable_succeeded,

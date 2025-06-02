@@ -5,8 +5,8 @@ import py_trees
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 
-FISH_HOLE_FRAME = "auv4/torpedo_2/fish"
-SHARK_HOLE_FRAME = "auv4/torpedo_2/shark"
+FISH_HOLE_FRAME = "torpedo_2/fish"
+SHARK_HOLE_FRAME = "torpedo_2/shark"
 
 
 def create_tf_selector_root(
