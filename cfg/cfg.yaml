@@ -50,9 +50,35 @@
 # from the parent frame to the child frame, not the other way around.
 # =============================================================================
 tfs:
-  ######################### TORPEDO 2 TFS #########################
-  - name: torpedo_fish
+  ######################### TORPEDO 1 TFS #########################
+  - name: torpedo_1_fish
     # Translation (x, y, z in meters)
+    # From top left corner of torpedo board, x right, y down
+    x: 0.408
+    y: 0.391
+    z: -0.3
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
+    # Frame IDs
+    parent_frame_id: "torpedo_1/clustered"
+    child_frame_id: "torpedo_1/fish"
+  - name: torpedo_1_shark
+    # Translation (x, y, z in meters)
+    # From top left corner of torpedo board, x right, y down
+    x: 0.268
+    y: 0.09
+    z: -0.3
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
+    # Frame IDs
+    parent_frame_id: "torpedo_1/clustered"
+    child_frame_id: "torpedo_1/shark"
+  ######################### TORPEDO 2 TFS #########################
+  - name: torpedo_2_fish
+    # Translation (x, y, z in meters)
+    # From top left corner of torpedo board, x right, y down
     x: 0.429
     y: 0.084
     z: -0.3
@@ -62,8 +88,9 @@ tfs:
     # Frame IDs
     parent_frame_id: "torpedo_2/clustered"
     child_frame_id: "torpedo_2/fish"
-  - name: torpedo_shark
+  - name: torpedo_2_shark
     # Translation (x, y, z in meters)
+    # From top left corner of torpedo board, x right, y down
     x: 0.319
     y: 0.336
     z: -0.3
