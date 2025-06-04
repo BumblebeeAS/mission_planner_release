@@ -168,14 +168,12 @@ def create_bin_root():
         else:
             template_frame = ROTATED_TEMPLATE_FRAME_OPTICAL
 
-        return (
-            create_clustering_goal(
-                in_parent=CAMERA_FRAME,
-                in_child=template_frame,
-                out_child=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
-                duration=CLUSTERING_DURATION,
-                use_cache=False,
-            ),
+        return create_clustering_goal(
+            in_parent=CAMERA_FRAME,
+            in_child=template_frame,
+            out_child=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+            duration=CLUSTERING_DURATION,
+            use_cache=False,
         )
 
     set_enable_detections_req = DynamicSetBlackboard(
