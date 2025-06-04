@@ -237,6 +237,7 @@ def create_bin_root():
         name="Align to target",
         parent_namespace=NAMESPACE,
         pose_key=POSE_KEY,
+        anchor_frame_name="auv4/dropper",
     )
 
     # Step 11: Set dropper actuation value
@@ -261,6 +262,7 @@ def create_bin_root():
         name="Move slightly",
         parent_namespace=NAMESPACE,
         pose=create_stamped_pose("auv4/base_link_ned", position_x=0.05),
+        anchor_frame_name="auv4/dropper",
     )
 
     # Step 14: Fire second dropper

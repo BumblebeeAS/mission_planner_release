@@ -141,8 +141,8 @@ tfs:
     # frame ids
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/shark"
-######################### TEMPORARY TFS #########################
-  - name: torpedo
+    ######################### TEMPORARY TFS #########################
+  - name: torpedo_top
     x: -0.07819
     y: -0.11
     z: -0.03017
@@ -151,7 +151,7 @@ tfs:
     yaw: 0.0
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/torpedo_shooter_top"
-  - name: torpedo
+  - name: torpedo_bot
     x: -0.07819
     y: -0.11
     z: -0.02017
@@ -160,3 +160,12 @@ tfs:
     yaw: 0.0
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/torpedo_shooter_bot"
+  - name: dropper
+    x: -0.15
+    y: -0.12
+    z: 0.06
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+    parent_frame_id: "auv4/bot_cam_optical"
+    child_frame_id: "auv4/dropper"
