@@ -5,10 +5,6 @@ import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
-from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -20,6 +16,9 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.trees.auv.bins.bin_selector import create_bin_selector_root
 from mission_planner_2.trees.auv.goto import goto
+from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -44,7 +43,7 @@ CHOICE_KEY = "choice"
 POSE_KEY = "pose"
 
 CLUSTERING_DURATION = 20
-STABILIZE_DURATION = 5.0
+STABILIZE_CONTROLS_DURATION = 5.0
 #########################################################################
 
 
@@ -65,7 +64,7 @@ def create_bin_root():
 
     # Step 1: Stabilise before starting
     timer_stabilise = py_trees.timers.Timer(
-        "Stabilise before task", duration=STABILIZE_DURATION
+        "Stabilise before task", duration=STABILIZE_CONTROLS_DURATION
     )
 
     # Step 2: Cluster transforms for initial orientation using YOLO
@@ -112,12 +111,38 @@ def create_bin_root():
         ),
     )
 
+    # Step 6a: Get first set of point correspondences
     sub_get_points_first = py_trees_ros.subscribers.ToBlackboard(
         name="Get points first",
         topic_name=POINT_CORRESPONDENCES_TOPIC,
         topic_type=PointCorrespondencesStamped,
-        qos_profile=qos_profile_system_default,
-        blackboard_variables={fk("points_1"): "object_points"},
+        qos_profile=qos_profile_sensor_data,
+        blackboard_variables={
+            fk("points_1"): "object_points",
+            fk("object_frame_id_1"): "object_frame_id",
+        },
+    )
+    check_point_correspondences_first = (
+        py_trees.behaviours.CheckBlackboardVariableValue(
+            name="Check point correspondences first",
+            check=py_trees.common.ComparisonExpression(
+                variable=fk("object_frame_id_1"),
+                value=TEMPLATE_FRAME_OPTICAL,
+                operator=operator.eq,
+            ),
+        )
+    )
+    sub_get_points_first_sequence = py_trees.composites.Sequence(
+        name="Try unrotated template",
+        memory=True,
+    )
+    sub_get_points_first_sequence.add_children(
+        children=[sub_get_points_first, check_point_correspondences_first],
+    )
+    sub_get_points_first_sequence_retry = py_trees.decorators.Retry(
+        name="Retry get points first",
+        child=sub_get_points_first_sequence,
+        num_failures=int(100e6),
     )
 
     srv_enable_detections_rotated = py_trees_ros.service_clients.FromConstant(
@@ -141,13 +166,38 @@ def create_bin_root():
         ),
     )
 
-    # Step 6d: Get second set of point correspondences
+    # Step 6b: Get second set of point correspondences
     sub_get_points_second = py_trees_ros.subscribers.ToBlackboard(
         name="Get points second",
         topic_name=POINT_CORRESPONDENCES_TOPIC,
         topic_type=PointCorrespondencesStamped,
-        qos_profile=qos_profile_system_default,
-        blackboard_variables={fk("points_2"): "object_points"},
+        qos_profile=qos_profile_sensor_data,
+        blackboard_variables={
+            fk("points_2"): "object_points",
+            fk("object_frame_id_2"): "object_frame_id",
+        },
+    )
+    check_point_correspondences_second = (
+        py_trees.behaviours.CheckBlackboardVariableValue(
+            name="Check point correspondences second",
+            check=py_trees.common.ComparisonExpression(
+                variable=fk("object_frame_id_2"),
+                value=ROTATED_TEMPLATE_FRAME_OPTICAL,
+                operator=operator.eq,
+            ),
+        )
+    )
+    sub_get_points_second_sequence = py_trees.composites.Sequence(
+        name="Get points second sequence",
+        memory=True,
+    )
+    sub_get_points_second_sequence.add_children(
+        children=[sub_get_points_second, check_point_correspondences_second],
+    )
+    sub_get_points_second_sequence_retry = py_trees.decorators.Retry(
+        name="Try rotated template",
+        child=sub_get_points_second_sequence,
+        num_failures=int(100e6),
     )
 
     def create_enable_req(points_1, points_2):
@@ -238,6 +288,10 @@ def create_bin_root():
         anchor_frame_name="auv4/dropper",
     )
 
+    stabilise_before_dropping = py_trees.timers.Timer(
+        "Stabilise before dropping", duration=STABILIZE_CONTROLS_DURATION
+    )
+
     # Step 11: Set dropper actuation value
     set_dropper_actuation = py_trees.behaviours.SetBlackboardVariable(
         name="Set dropper actuation",
@@ -253,14 +307,6 @@ def create_bin_root():
         topic_type=UInt8,
         qos_profile=qos_profile_system_default,
         blackboard_variable=fk("bin_actuation"),
-    )
-
-    # Step 13: Move slightly for second drop
-    goto_move_slightly = goto.FromConstant(
-        name="Move slightly",
-        parent_namespace=NAMESPACE,
-        pose=create_stamped_pose("auv4/base_link_ned", position_x=0.05),
-        anchor_frame_name="auv4/dropper",
     )
 
     # Step 14: Fire second dropper
@@ -298,10 +344,10 @@ def create_bin_root():
             goto_bin_centre,
             srv_enable_detections,
             check_enable_succeeded,
-            sub_get_points_first,
+            sub_get_points_first_sequence_retry,
             srv_enable_detections_rotated,
             check_enable_succeeded_rotated,
-            sub_get_points_second,
+            sub_get_points_second_sequence_retry,
             set_enable_detections_req,
             set_clustering_goal,
             srv_choose_fish,
@@ -310,9 +356,9 @@ def create_bin_root():
             check_enable_succeeded_correct,
             action_cluster_second,
             goto_align_to_target,
+            stabilise_before_dropping,
             set_dropper_actuation,
             pub_fire_dropper_first,
-            goto_move_slightly,
             pub_fire_dropper_second,
             srv_disable_detections,
             check_disable_succeeded,
