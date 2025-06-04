@@ -22,8 +22,8 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-CLUSTERING_DURATION = 30
-STABILIZE_DURATION = 20.0
+CLUSTERING_DURATION = 20
+STABILIZE_DURATION = 10.0
 
 GATE_APPROACH_HEIGHT = 0.40
 FORWARD_DISTANCE = 3.0
@@ -31,10 +31,10 @@ FORWARD_DISTANCE = 3.0
 CAMERA_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_YOLO = "gate"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
-GATE_CENTRE_FRAME = "auv4/gate/centre"
-GATE_LEFT_FRAME = "auv4/gate/left"
+GATE_CENTRE_FRAME = "gate/centre"
+GATE_LEFT_FRAME = "gate/left"
 GATE_LEFT_POSE_KEY = "gate_left_pose"
-GATE_RIGHT_FRAME = "auv4/gate/right"
+GATE_RIGHT_FRAME = "gate/right"
 GATE_RIGHT_POSE_KEY = "gate_right_pose"
 
 GATE_ORIENTATION_TOPIC = "/auv4/gate/shark_fish"
