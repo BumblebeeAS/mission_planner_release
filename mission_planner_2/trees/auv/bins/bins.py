@@ -27,11 +27,13 @@ fk = full_key_generator(NAMESPACE)
 ######################### UPDATE CONSTANTS HERE #########################
 TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
 TEMPLATE_NAME = "Task03_DropBRUVS.png"
+ROTATED_TEMPLATE_NAME = "Task03_DropBRUVS_Rotated.png"
 POINT_CORRESPONDENCES_TOPIC = "/auv4/bot_cam/image_matching/point_correspondences"
 
 
 CAMERA_FRAME = "auv4/bot_cam_optical"
 TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_optical"
+ROTATED_TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_Rotated_optical"
 TEMPLATE_FRAME_OPTICAL_CLUSTERED = "bin/clustered"
 TEMPLATE_FRAME_YOLO = "bin/yolo"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
@@ -110,13 +112,6 @@ def create_bin_root():
         ),
     )
 
-    # Step 6: Rotate correctly sequence
-    seq_rotate_correctly = py_trees.composites.Sequence(
-        name="Rotate correctly",
-        memory=True,
-    )
-
-    # Step 6a: Get first set of point correspondences
     sub_get_points_first = py_trees_ros.subscribers.ToBlackboard(
         name="Get points first",
         topic_name=POINT_CORRESPONDENCES_TOPIC,
@@ -125,17 +120,25 @@ def create_bin_root():
         blackboard_variables={fk("points_1"): "object_points"},
     )
 
-    # Step 6b: Rotate to check different orientation
-    goto_rotate_position = goto.FromConstant(
-        name="Rotate position",
-        parent_namespace=NAMESPACE,
-        pose=create_stamped_pose("auv4/base_link_ned", yaw=180.0),
+    srv_enable_detections_rotated = py_trees_ros.service_clients.FromConstant(
+        name="Enable detections",
+        service_name=TOGGLE_TEMPLATE_TOPIC,
+        service_type=IMPoseEstimatorToggleTemplate,
+        service_request=IMPoseEstimatorToggleTemplate.Request(
+            enabled=True,
+            camera_frame_id=CAMERA_FRAME,
+            template_name=ROTATED_TEMPLATE_NAME,
+        ),
+        key_response=fk("bin_rotated_enable_detections"),
     )
 
-    # Step 6c: Wait for stabilisation
-    timer_wait_points = py_trees.timers.Timer(
-        "Wait for second points",
-        duration=STABILIZE_DURATION,
+    check_enable_succeeded_rotated = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify enable succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=fk("bin_rotated_enable_detections"),
+            value=True,
+            operator=lambda x, y: operator.eq(x.new_state, y),
+        ),
     )
 
     # Step 6d: Get second set of point correspondences
@@ -147,24 +150,48 @@ def create_bin_root():
         blackboard_variables={fk("points_2"): "object_points"},
     )
 
-    # Step 6e: Compare orientations and choose best
-    set_compare_positions = DynamicSetBlackboard(
-        name="Compare positions",
+    def create_enable_req(points_1, points_2):
+        if len(points_1.data) > len(points_2.data):
+            template_name = TEMPLATE_NAME
+        else:
+            template_name = ROTATED_TEMPLATE_NAME
+
+        return IMPoseEstimatorToggleTemplate.Request(
+            enabled=True,
+            camera_frame_id=CAMERA_FRAME,
+            template_name=template_name,
+        )
+
+    def create_correct_clustering_goal(points_1, points_2):
+        if len(points_1.data) > len(points_2.data):
+            template_frame = TEMPLATE_FRAME_OPTICAL
+        else:
+            template_frame = ROTATED_TEMPLATE_FRAME_OPTICAL
+
+        return (
+            create_clustering_goal(
+                in_parent=CAMERA_FRAME,
+                in_child=template_frame,
+                out_child=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+                duration=CLUSTERING_DURATION,
+                use_cache=False,
+            ),
+        )
+
+    set_enable_detections_req = DynamicSetBlackboard(
+        name="Set enable detections request",
         namespace=NAMESPACE,
         key=["points_1", "points_2"],
-        update_key="correct_orientation_pose",
-        func=lambda x, y: (
-            create_stamped_pose("auv4/base_link_ned", yaw=180.0)
-            if len(x.data) > len(y.data)
-            else create_stamped_pose("auv4/base_link_ned")
-        ),
+        update_key="enable_detections_req",
+        func=create_enable_req,
     )
 
-    # Step 6f: Move to correct orientation
-    goto_correct_position = goto.FromBlackboard(
-        name="Goto correct position",
-        parent_namespace=NAMESPACE,
-        pose_key="correct_orientation_pose",
+    set_clustering_goal = DynamicSetBlackboard(
+        name="Set clustering goal",
+        namespace=NAMESPACE,
+        key=["points_1", "points_2"],
+        update_key="clustering_goal",
+        func=create_correct_clustering_goal,
     )
 
     # Step 7: Get fish/shark choice
@@ -181,18 +208,28 @@ def create_bin_root():
         choice_key=fk(CHOICE_KEY), pose_key=fk(POSE_KEY)
     )
 
-    # Step 9: Cluster transforms for precise dropping using image matching
-    action_cluster_second = py_trees_ros.action_clients.FromConstant(
+    srv_enable_correct_detections = py_trees_ros.service_clients.FromBlackboard(
+        "Enable correct detection template",
+        service_type=IMPoseEstimatorToggleTemplate,
+        service_name=TOGGLE_TEMPLATE_TOPIC,
+        key_request=fk("enable_detections_req"),
+        key_response=fk("bin_correct_enable_detections"),
+    )
+
+    check_enable_succeeded_correct = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify enable succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=fk("bin_correct_enable_detections"),
+            value=True,
+            operator=lambda x, y: operator.eq(x.new_state, y),
+        ),
+    )
+
+    action_cluster_second = py_trees_ros.action_clients.FromBlackboard(
         name="Cluster transforms for dropping",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_parent=CAMERA_FRAME,
-            in_child=TEMPLATE_FRAME_OPTICAL,
-            out_child=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
-            duration=CLUSTERING_DURATION,
-            use_cache=False,
-        ),
+        key=fk("clustering_goal"),
     )
 
     # Step 10: Align to precise target
@@ -254,36 +291,31 @@ def create_bin_root():
         ),
     )
 
-    # Build rotate correctly sequence
-    seq_rotate_correctly.add_children(
-        [
-            sub_get_points_first,
-            goto_rotate_position,
-            timer_wait_points,
-            sub_get_points_second,
-            set_compare_positions,
-            goto_correct_position,
-        ]
-    )
-
     # Build main drop sequence
     seq_drop_into_bin.add_children(
         children=[
             action_cluster_first,
-            # goto_bin_centre,
-            # srv_enable_detections,
-            # check_enable_succeeded,
-            # seq_rotate_correctly,
-            # srv_choose_fish,
-            # sel_update_selection,
-            # action_cluster_second,
-            # goto_align_to_target,
-            # set_dropper_actuation,
-            # # pub_fire_dropper_first,
-            # # goto_move_slightly,
-            # # pub_fire_dropper_second,
-            # srv_disable_detections,
-            # check_disable_succeeded,
+            goto_bin_centre,
+            srv_enable_detections,
+            check_enable_succeeded,
+            sub_get_points_first,
+            srv_enable_detections_rotated,
+            check_enable_succeeded_rotated,
+            sub_get_points_second,
+            set_enable_detections_req,
+            set_clustering_goal,
+            srv_choose_fish,
+            sel_update_selection,
+            srv_enable_correct_detections,
+            check_enable_succeeded_correct,
+            action_cluster_second,
+            goto_align_to_target,
+            set_dropper_actuation,
+            pub_fire_dropper_first,
+            goto_move_slightly,
+            pub_fire_dropper_second,
+            srv_disable_detections,
+            check_disable_succeeded,
         ],
     )
 
