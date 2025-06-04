@@ -122,6 +122,8 @@ def create_bin_root():
             fk("object_frame_id_1"): "object_frame_id",
         },
     )
+    # Check whether the point correspondences are for the newly
+    # set template and not from a previous task.
     check_point_correspondences_first = (
         py_trees.behaviours.CheckBlackboardVariableValue(
             name="Check point correspondences first",
@@ -142,7 +144,7 @@ def create_bin_root():
     sub_get_points_first_sequence_retry = py_trees.decorators.Retry(
         name="Retry get points first",
         child=sub_get_points_first_sequence,
-        num_failures=int(100e6),
+        num_failures=100,
     )
 
     srv_enable_detections_rotated = py_trees_ros.service_clients.FromConstant(
@@ -177,6 +179,8 @@ def create_bin_root():
             fk("object_frame_id_2"): "object_frame_id",
         },
     )
+    # Check whether the point correspondences are for the newly
+    # set template and not from a previous task.
     check_point_correspondences_second = (
         py_trees.behaviours.CheckBlackboardVariableValue(
             name="Check point correspondences second",
@@ -197,7 +201,7 @@ def create_bin_root():
     sub_get_points_second_sequence_retry = py_trees.decorators.Retry(
         name="Try rotated template",
         child=sub_get_points_second_sequence,
-        num_failures=int(100e6),
+        num_failures=100,
     )
 
     def create_enable_req(points_1, points_2):
