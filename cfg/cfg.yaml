@@ -134,6 +134,17 @@ tfs:
     # frame ids
     parent_frame_id: "gate/clustered"
     child_frame_id: "gate/right"
+  - name: gate_after_center
+    # translation (x, y, z in meters)
+    x: 1.5
+    y: 1.0
+    z: 1.5
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
+    parent_frame_id: "gate/clustered"
+    child_frame_id: "gate/after_centre"
+    # frame ids
     ######################### BIN TFS #########################
   - name: bin_center
     # translation (x, y, z in meters)

@@ -26,6 +26,7 @@ CAMERA_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_YOLO = "gate"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
 GATE_CENTRE_FRAME = "gate/centre"
+GATE_AFTER_CENTRE_FRAME = "gate/after_centre"
 #########################################################################
 
 
@@ -61,12 +62,7 @@ def create_return_root():
 
     # Step 3: Move to after center position to align
     goto_after_gate_center = goto.FromConstant(
-        "Goto after gate center",
-        NAMESPACE,
-        create_stamped_pose(
-            GATE_CENTRE_FRAME,
-            position_x=3.0
-        )
+        "Goto after gate centre", NAMESPACE, create_stamped_pose(GATE_AFTER_CENTRE_FRAME)
     )
 
     # Step 4: Wait to stabilize
@@ -78,7 +74,7 @@ def create_return_root():
     # NOTE: This actually passes through the gate since gate center is
     #       in front of the gate while the AUV will be behind at this point
     goto_gate_centre = goto.FromConstant(
-        "Goto gate center", NAMESPACE, create_stamped_pose(GATE_CENTRE_FRAME)
+        "Goto gate centre", NAMESPACE, create_stamped_pose(GATE_CENTRE_FRAME)
     )
 
     # Assemble tree in execution order
