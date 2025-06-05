@@ -161,9 +161,14 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         # Temporary variable
         self.service_future = None
 
-        # FIXME: problem was they dont raise error in sending of the goal request then use the none
-        # check to see if success or not in the original action client node dont use goal handle
-        # as a way to check the BB var exists (fixed using is_goal_sent new attr)
+        # None declarations from super.initialise
+        self.goal_handle = None
+        self.send_goal_future = None
+        self.get_result_future = None
+
+        self.result_message = None
+        self.result_status = None
+        self.result_status_string = None
 
         try:
             if self.service_client.service_is_ready():
