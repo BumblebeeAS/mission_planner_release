@@ -21,6 +21,7 @@ CLUSTERING_DURATION = 15
 STABILIZE_DURATION = 5.0
 
 GATE_APPROACH_HEIGHT = 0.40
+FORWARD_DISTANCE = 3.0
 
 CAMERA_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_YOLO = "gate"
@@ -70,12 +71,11 @@ def create_return_root():
         "Stabilize before pass through", STABILIZE_DURATION
     )
 
-    # Step 5: Move to center position, and we are done
-    # NOTE: This actually passes through the gate since gate center is
-    #       in front of the gate while the AUV will be behind at this point
-    goto_gate_centre = goto.FromConstant(
-        "Goto gate centre", NAMESPACE, create_stamped_pose(GATE_CENTRE_FRAME)
+    # Step 5: Move through gate
+    forward_pose = create_stamped_pose(
+        "auv4/base_link_ned", position_x=FORWARD_DISTANCE
     )
+    goto_through_gate = goto.FromConstant("Goto through gate", NAMESPACE, forward_pose)
 
     # Assemble tree in execution order
     seq_return_root.add_children(
@@ -84,7 +84,7 @@ def create_return_root():
             action_cluster_gate,
             goto_after_gate_center,
             timer_stabilize,
-            goto_gate_centre
+            goto_through_gate
         ]
     )
 

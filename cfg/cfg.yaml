@@ -141,7 +141,7 @@ tfs:
     z: 1.5
     roll: -90.0 # in degrees
     pitch: -90.0 # in degrees
-    yaw: 0.0 # in degrees
+    yaw: -180.0 # in degrees
     parent_frame_id: "gate/clustered"
     child_frame_id: "gate/after_centre"
     # frame ids
