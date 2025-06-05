@@ -27,7 +27,6 @@ CAMERA_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_YOLO = "gate"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
 GATE_CENTRE_FRAME = "gate/centre"
-GATE_AFTER_CENTRE_FRAME = "gate/after_centre"
 #########################################################################
 
 
@@ -63,7 +62,7 @@ def create_return_root():
 
     # Step 3: Move to after center position to align
     goto_after_gate_center = goto.FromConstant(
-        "Goto after gate centre", NAMESPACE, create_stamped_pose(GATE_AFTER_CENTRE_FRAME)
+        "Goto after gate centre", NAMESPACE, create_stamped_pose(GATE_CENTRE_FRAME)
     )
 
     # Step 4: Wait to stabilize
