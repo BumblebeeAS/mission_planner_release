@@ -72,6 +72,7 @@ def create_clustering_goal(
     min_cluster_size: int = 2,
     min_samples: int = 1,
     use_cache: bool = False,
+    persistent: bool = False,
 ):
     """Create a ClusterTf goal for collecting and clustering coordinate transforms.
 
@@ -97,6 +98,9 @@ def create_clustering_goal(
         use_cache (bool, optional): Whether to use caching during transform
             collection. If True, uses cache_size; if False, collects as
             many transforms as possible within the duration. Defaults to False.
+        persistent (bool, optional): Whether the cache is persisted between distinct
+            action calls. If True, then cache is saved and reused for subsequent calls.
+            Defaults to False.
 
     Returns:
         ClusterTf.Goal: A configured goal object.
@@ -143,4 +147,5 @@ def create_clustering_goal(
     goal.min_cluster_size = min_cluster_size
     goal.min_samples = min_samples
     goal.use_cache = use_cache
+    goal.persistent = persistent
     return goal
