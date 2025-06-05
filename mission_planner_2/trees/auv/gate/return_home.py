@@ -17,7 +17,8 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-CLUSTERING_DURATION = 20
+CLUSTERING_DURATION = 15
+STABILIZE_DURATION = 5.0
 
 GATE_APPROACH_HEIGHT = 0.40
 
@@ -58,7 +59,22 @@ def create_return_root():
         ),
     )
 
-    # Step 3: Move to center position, and we are done
+    # Step 3: Move to after center position to align
+    goto_after_gate_center = goto.FromConstant(
+        "Goto after gate center",
+        NAMESPACE,
+        create_stamped_pose(
+            GATE_CENTRE_FRAME,
+            position_x=3.0
+        )
+    )
+
+    # Step 4: Wait to stabilize
+    timer_stabilize = py_trees.timers.Timer(
+        "Stabilize before pass through", STABILIZE_DURATION
+    )
+
+    # Step 5: Move to center position, and we are done
     # NOTE: This actually passes through the gate since gate center is
     #       in front of the gate while the AUV will be behind at this point
     goto_gate_centre = goto.FromConstant(
@@ -70,6 +86,8 @@ def create_return_root():
         children=[
             goto_after_gate,
             action_cluster_gate,
+            goto_after_gate_center,
+            timer_stabilize,
             goto_gate_centre
         ]
     )
