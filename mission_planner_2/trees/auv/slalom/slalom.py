@@ -4,10 +4,14 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
     full_key_generator,
 )
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.slalom.move_and_cluster import create_move_and_cluster_root
 from mission_planner_2.trees.auv.slalom.move_to_task import create_move_to_task_root
+from mission_planner_2.trees.auv.slalom.channel_movement import create_channel_movement_root
+
+import operator
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -64,29 +68,179 @@ def create_slalom_root():
         ]
     )
 
-    move_to_channel_pair_one = goto.FromConstant(
-        name="Goto Channel Pair One",
-        parent_namespace=NAMESPACE,
-        pose=create_stamped_pose(CHANNEL_PAIR_ONE_FRAME_CLUSTERED),
+    # There is no need to read/write the transforms from the blackboard, but the below is just a means of confirmation
+    check_transform_one = py_trees_ros.transforms.ToBlackboard(
+        name="Write channel pair one transform",
+        variable_name=fk("channel_pair_one_transform"),
+        target_frame=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+        source_frame=BASE_LINK_FRAME,
     )
 
-    move_to_channel_pair_two = goto.FromConstant(
-        name="Goto Channel Pair Two",
-        parent_namespace=NAMESPACE,
-        pose=create_stamped_pose(CHANNEL_PAIR_TWO_FRAME_CLUSTERED),
+    check_transform_two = py_trees_ros.transforms.ToBlackboard(
+        name="Write channel pair two transform",
+        variable_name=fk("channel_pair_two_transform"),
+        target_frame=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+        source_frame=BASE_LINK_FRAME,
     )
 
-    move_to_channel_pair_three = goto.FromConstant(
-        name="Goto Channel Pair Three",
-        parent_namespace=NAMESPACE,
-        pose=create_stamped_pose(CHANNEL_PAIR_THREE_FRAME_CLUSTERED),
+    check_transform_three = py_trees_ros.transforms.ToBlackboard(
+        name="Write channel pair three transform",
+        variable_name=fk("channel_pair_three_transform"),
+        target_frame=CHANNEL_PAIR_THREE_FRAME_CLUSTERED,
+        source_frame=BASE_LINK_FRAME,
+    )
+
+    # Initialize the number of missing transforms in blackboard to be used by DynamicSetBlackboard
+    init_missing_transforms = py_trees.behaviours.SetBlackboardVariable(
+        name="Initialize missing transforms",
+        variable_name=fk("missing_transforms"),
+        variable_value=0,
+        overwrite=True
+    )
+
+    update_missing_transforms_one = DynamicSetBlackboard(
+        name="Update missing transforms one",
+        namespace=NAMESPACE,
+        key="missing_transforms",
+        update_key="missing_transforms",
+        overwrite=True,
+        func=lambda x: x + 1
+    )
+
+    update_missing_transforms_two = DynamicSetBlackboard(
+        name="Update missing transforms two",
+        namespace=NAMESPACE,
+        key="missing_transforms",
+        update_key="missing_transforms",
+        overwrite=True,
+        func=lambda x: x + 1
+    )
+
+    update_missing_transforms_three = DynamicSetBlackboard(
+        name="Update missing transforms three",
+        namespace=NAMESPACE,
+        key="missing_transforms",
+        update_key="missing_transforms",
+        overwrite=True,
+        func=lambda x: x + 1
+    )
+
+    # Structure the check as a fallback that will update the number of missing transforms
+    check_and_update_fallback_one = py_trees.composites.Selector(
+        name="Check and update missing transforms one",
+        memory=True,
+        children=[
+            py_trees.decorators.Timeout(
+                name="Timeout for channel pair one",
+                child=check_transform_one,
+                duration=10.0
+            ),
+            update_missing_transforms_one
+        ]
+    )
+
+    check_and_update_fallback_two = py_trees.composites.Selector(
+        name="Check and update missing transforms two",
+        memory=True,
+        children=[
+            py_trees.decorators.Timeout(
+                name="Timeout for channel pair two",
+                child=check_transform_two,
+                duration=10.0
+            ),
+            update_missing_transforms_two
+        ]
+    )
+
+    check_and_update_fallback_three = py_trees.composites.Selector(
+        name="Check and update missing transforms three",
+        memory=True,
+        children=[
+            py_trees.decorators.Timeout(
+                name="Timeout for channel pair three",
+                child=check_transform_three,
+                duration=10.0
+            ),
+            update_missing_transforms_three
+        ]
+    )
+
+    # Sequence to check transforms and update the number of missing transforms
+    seq_check_transforms = py_trees.composites.Sequence(
+        name="Check transforms",
+        memory=True,
+        children=[
+            init_missing_transforms,
+            check_and_update_fallback_one,
+            check_and_update_fallback_two,
+            check_and_update_fallback_three
+        ]
+    )
+
+    # Generate movemement options based on the number of missing transforms, generation done in compile time, execution done in runtime
+    move_channel_one = create_channel_movement_root(0, NAMESPACE)
+    move_channel_two = create_channel_movement_root(1, NAMESPACE)
+    move_channel_three = create_channel_movement_root(2, NAMESPACE)
+
+    check_missing_transforms_one = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check missing transforms one",
+        check=py_trees.common.ComparisonExpression(
+            variable=fk("missing_transforms"),
+            value=0,
+            operator=lambda x, y: operator.__eq__(x, y)
+        )
+    )
+
+    check_missing_transforms_two = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check missing transforms two",
+        check=py_trees.common.ComparisonExpression(
+            variable=fk("missing_transforms"),
+            value=1,
+            operator=lambda x, y: operator.__eq__(x, y)
+        )
+    )
+
+    check_missing_transforms_three = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check missing transforms three",
+        check=py_trees.common.ComparisonExpression(
+            variable=fk("missing_transforms"),
+            value=2,
+            operator=lambda x, y: operator.__eq__(x, y)
+        )
+    )
+
+    # Selector to choose the movement strategy based on the number of missing transforms
+    select_movement_strategy = py_trees.composites.Selector(
+        name="Select movement strategy",
+        memory=True,
+        children=[
+            py_trees.composites.Sequence(
+                name="No missing transforms",
+                memory=True,
+                children=[check_missing_transforms_one, move_channel_one]
+            ),
+            py_trees.composites.Sequence(
+                name="One missing transform",
+                memory=True,
+                children=[check_missing_transforms_two, move_channel_two]
+            ),
+            py_trees.composites.Sequence(
+                name="Two missing transforms",
+                memory=True,
+                children=[check_missing_transforms_three, move_channel_three]
+            )
+        ]
     )
 
     root.add_children(
         [
             move_to_task,
-            seq_move_and_cluster
+            seq_move_and_cluster,
+            seq_check_transforms,
+            select_movement_strategy
         ]
     )
 
     return root
+
+# generate fallback root based on number of missing transforms
