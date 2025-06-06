@@ -5,10 +5,11 @@ import py_trees.console as console
 import py_trees_ros.trees
 import rclpy
 
-# from mission_planner_2.trees.auv.bins.bins import create_bin_root as tree_root
-from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root as tree_root
-
 # from mission_planner_2.trees.auv.gate.gate import create_gate_root as tree_root
+from mission_planner_2.trees.auv.gate.return_home import create_return_root as tree_root
+
+# from mission_planner_2.trees.auv.bins.bins import create_bin_root as tree_root
+# from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root as tree_root
 
 
 def main():
@@ -26,22 +27,25 @@ def main():
     def stop_on_success_or_failure(tree):
         if tree.root.status == py_trees.common.Status.SUCCESS:
             console.loginfo(console.green + "completed one execution" + console.reset)
-            raise KeyboardInterrupt
+            raise SystemExit
         elif tree.root.status == py_trees.common.Status.FAILURE:
             console.loginfo(console.red + "stopped on failure" + console.reset)
-            raise KeyboardInterrupt
+            raise SystemExit
 
     tree.add_post_tick_handler(stop_on_success_or_failure)
     tree.tick_tock(period_ms=100)
     try:
         rclpy.spin(tree.node)
+    except KeyboardInterrupt:
+        console.loginfo(console.yellow + "interrupted" + console.reset)
+    except SystemExit:
+        console.loginfo(console.yellow + "exiting" + console.reset)
     except Exception as e:
-        console.logerror(
+        console.logfatal(
             console.red + "exception occurred: {}".format(e) + console.reset
         )
-        console.loginfo("stopping")
     finally:
-        console.loginfo(console.reset)
+        console.loginfo(console.reset + "cleaning up")
         tree.shutdown()
         rclpy.shutdown()
 
