@@ -5,6 +5,10 @@ import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
+from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -16,9 +20,6 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.trees.auv.bins.bin_selector import create_bin_selector_root
 from mission_planner_2.trees.auv.goto import goto
-from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -368,6 +369,7 @@ def create_bin_root():
             stabilise_before_dropping,
             set_dropper_actuation,
             pub_fire_dropper_first,
+            py_trees.timers.Timer(name="Wait between drops", duration=2.0),
             pub_fire_dropper_second,
             srv_disable_detections,
             check_disable_succeeded,
@@ -378,7 +380,7 @@ def create_bin_root():
     seq_bin_root.add_children(
         children=[
             # create_move_to_bin_task_root(),
-            timer_stabilise,
+            # timer_stabilise,
             seq_drop_into_bin,
         ]
     )

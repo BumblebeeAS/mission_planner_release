@@ -8,26 +8,25 @@ from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 
 # Define a main namespace for the test
-NAMESPACE = "/auv4/test_namespacing"
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 
-def f():
+def create_preempt_root():
     # Root sequence
     first_pose = create_stamped_pose(
         "auv4/base_link_ned", position_x=10.0, position_y=0.0, position_z=0.0
     )
 
     second_pose = create_stamped_pose(
-        "auv4/base_link_ned", position_x=0.0, position_y=-10.0, position_z=0.0
+        "auv4/base_link_ned", position_x=0.0, position_y=-5.0, position_z=0.0
     )
     goto_second = goto.FromConstant("Second Goto", NAMESPACE, second_pose)
     goto_first = goto.FromConstant("First Goto", NAMESPACE, first_pose)
 
     timer_wait = py_trees.timers.Timer(
         "Wait Timer",
-        3.0,  # Wait for 5 seconds
+        4.0,  # Wait for 5 seconds
     )
 
     par = py_trees.composites.Parallel(

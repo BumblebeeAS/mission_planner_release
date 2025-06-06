@@ -149,3 +149,41 @@ def create_clustering_goal(
     goal.use_cache = use_cache
     goal.persistent = persistent
     return goal
+
+
+def create_clustering_goals(
+    in_children: str | list[str],
+    out_children: str | list[str],
+    out_parents: str | list[str] = "world_ned",
+    duration: int = 20,
+    tf_lookup_interval: float = 0.05,
+    cache_size: int = 100,
+    min_cluster_size: int = 2,
+    min_samples: int = 1,
+    use_cache: bool = False,
+    persistent: bool = False,
+):
+    """ """
+    if isinstance(in_children, str):
+        in_children = [in_children]
+
+    if isinstance(out_children, str):
+        out_children = [out_children]
+
+    if isinstance(out_parents, str):
+        out_parents = [out_parents] * len(out_children)
+
+    # To be used with modified ClusterTf goal that can support multiple children
+    goal = ClusterTf.Goal()
+    goal.input_child_frame_ids = in_children
+    goal.output_child_frame_ids = out_children
+    goal.output_parent_frame_ids = out_parents
+    goal.clustering_duration = duration
+    goal.tf_lookup_interval = tf_lookup_interval
+    goal.cache_size = cache_size
+    goal.min_cluster_size = min_cluster_size
+    goal.min_samples = min_samples
+    goal.use_cache = use_cache
+    goal.persistent = persistent
+    return goal
+

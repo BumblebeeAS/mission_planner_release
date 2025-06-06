@@ -6,9 +6,9 @@ import py_trees_ros.trees
 import rclpy
 
 # from mission_planner_2.trees.auv.gate.gate import create_gate_root as tree_root
-from mission_planner_2.trees.auv.gate.return_home import create_return_root as tree_root
+# from mission_planner_2.trees.auv.gate.return_home import create_return_root as tree_root
 
-# from mission_planner_2.trees.auv.bins.bins import create_bin_root as tree_root
+from mission_planner_2.trees.auv.bins.bins import create_bin_root as tree_root
 # from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root as tree_root
 
 

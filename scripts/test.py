@@ -5,8 +5,14 @@ import py_trees.console as console
 import py_trees_ros.trees
 import rclpy
 
-from mission_planner_2.trees.auv.tests.test_convert_service import (
-    create_test_convert_service_root as tree_root,
+# from mission_planner_2.trees.auv.tests.test_convert_service import (
+#     create_test_convert_service_root as tree_root,
+# )
+# from mission_planner_2.trees.auv.tests.test_preempt_controls import (
+#     create_preempt_root as tree_root,
+# )
+from mission_planner_2.trees.auv.tests.test_multi_cluster import (
+    create_test_multi_cluster_root as tree_root,
 )
 
 
