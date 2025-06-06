@@ -168,6 +168,30 @@ tfs:
     # frame ids
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/shark"
+
+  # TODO: need check if can just swap them
+  - name: bin_shark_rotated
+    # translation (x, y, z in meters)
+    x: 0.1524
+    y: 0.4568
+    z: -0.5
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: -90.0 # in degrees
+    # frame ids
+    parent_frame_id: "bin/clustered"
+    child_frame_id: "bin/shark/rotated"
+  - name: bin_fish_rotated
+    # translation (x, y, z in meters)
+    x: 0.1524
+    y: 0.1524
+    z: -0.5
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: -90.0 # in degrees
+    # frame ids
+    parent_frame_id: "bin/clustered"
+    child_frame_id: "bin/fish/rotated"
     ######################### TEMPORARY TFS #########################
   - name: torpedo_top
     x: -0.07819

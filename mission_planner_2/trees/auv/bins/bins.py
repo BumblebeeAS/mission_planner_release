@@ -43,7 +43,7 @@ CHOICE_KEY = "choice"
 POSE_KEY = "pose"
 
 CLUSTERING_DURATION = 20
-STABILIZE_CONTROLS_DURATION = 5.0
+STABILIZE_CONTROLS_DURATION = 10.0
 #########################################################################
 
 
@@ -86,6 +86,10 @@ def create_bin_root():
         name="Goto bin centre",
         parent_namespace=NAMESPACE,
         pose=create_stamped_pose("bin/centre"),
+    )
+
+    stabilise_before_matching = py_trees.timers.Timer(
+        "Stabilise before matching", duration=STABILIZE_CONTROLS_DURATION
     )
 
     # Step 4: Enable image matching detections
@@ -257,7 +261,7 @@ def create_bin_root():
 
     # Step 8: Update pose selection based on choice
     sel_update_selection = create_bin_selector_root(
-        choice_key=fk(CHOICE_KEY), pose_key=fk(POSE_KEY)
+        namespace=NAMESPACE, choice_key=fk(CHOICE_KEY), pose_key=fk(POSE_KEY)
     )
 
     srv_enable_correct_detections = py_trees_ros.service_clients.FromBlackboard(
@@ -346,6 +350,7 @@ def create_bin_root():
         children=[
             action_cluster_first,
             goto_bin_centre,
+            stabilise_before_matching,
             srv_enable_detections,
             check_enable_succeeded,
             sub_get_points_first_sequence_retry,
