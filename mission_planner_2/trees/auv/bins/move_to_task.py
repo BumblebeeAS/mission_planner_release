@@ -1,6 +1,5 @@
 import py_trees
 
-from mission_planner_2.commons.namespace_utils import generate_namespace
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 
@@ -18,7 +17,7 @@ def create_move_to_bin_task_root() -> py_trees.behaviour.Behaviour:
         "world_ned", position_x=0.0, position_y=0.0, position_z=0.8, yaw=0.0
     )
 
-    move_to_bin = goto.FromConstant("move to bin", generate_namespace(), bin_init_pose)
+    move_to_bin = goto.FromConstant("move to bin", bin_init_pose)
 
     root.add_children(
         [

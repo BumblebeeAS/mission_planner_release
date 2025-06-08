@@ -7,11 +7,10 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goal,
+    create_clustering_goals,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
-
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -42,19 +41,16 @@ def create_return_root():
     # TODO: Eventually, we should cache some position after passing through the gate
     #       and return to this position after doing all the tasks
     gate_init_pose = create_stamped_pose("world_ned", position_z=GATE_APPROACH_HEIGHT)
-    goto_after_gate = goto.FromConstant(
-        "Goto after gate", NAMESPACE, gate_init_pose
-    )
+    goto_after_gate = goto.FromConstant("Goto after gate", gate_init_pose)
 
     # Step 2: Cluster gate transforms
     action_cluster_gate = py_trees_ros.action_clients.FromConstant(
         name="Cluster gate transforms",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_parent=CAMERA_FRAME,
-            in_child=TEMPLATE_FRAME_YOLO,
-            out_child=TEMPLATE_FRAME_YOLO_CLUSTERED,
+        action_goal=create_clustering_goals(
+            in_children=TEMPLATE_FRAME_YOLO,
+            out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
             duration=CLUSTERING_DURATION,
             use_cache=False,
         ),
@@ -62,7 +58,7 @@ def create_return_root():
 
     # Step 3: Move to after center position to align
     goto_after_gate_center = goto.FromConstant(
-        "Goto after gate centre", NAMESPACE, create_stamped_pose(GATE_CENTRE_FRAME)
+        "Goto after gate centre", create_stamped_pose(GATE_CENTRE_FRAME)
     )
 
     # Step 4: Wait to stabilize
@@ -74,7 +70,7 @@ def create_return_root():
     forward_pose = create_stamped_pose(
         "auv4/base_link_ned", position_x=FORWARD_DISTANCE
     )
-    goto_through_gate = goto.FromConstant("Goto through gate", NAMESPACE, forward_pose)
+    goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
 
     # Assemble tree in execution order
     seq_return_root.add_children(
@@ -83,7 +79,7 @@ def create_return_root():
             action_cluster_gate,
             goto_after_gate_center,
             timer_stabilize,
-            goto_through_gate
+            goto_through_gate,
         ]
     )
 

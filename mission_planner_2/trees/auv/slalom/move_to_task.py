@@ -11,6 +11,7 @@ from mission_planner_2.trees.auv.goto import goto
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
+
 def create_move_to_task_root():
     """
     Create the root of the slalom tree.
@@ -27,7 +28,6 @@ def create_move_to_task_root():
 
     move_to_slalom = goto.FromConstant(
         "Move to slalom",
-        NAMESPACE,
         slalom_init_pose,
     )
 

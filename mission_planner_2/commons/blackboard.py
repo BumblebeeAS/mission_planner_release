@@ -58,20 +58,16 @@ class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
     def __init__(
         self,
         name,
-        namespace,
         key,
         update_key,
         overwrite=True,
         func=lambda x: x,
     ):
         super().__init__(name)
-        self.blackboard = self.attach_blackboard_client(
-            name="updater", namespace=namespace
-        )
+        self.blackboard = self.attach_blackboard_client(name="updater")
         self.update_key = update_key
         self.func = func
         self.overwrite = overwrite
-        self.namespace = namespace
         self.keys = self._process_keys(key)
         self._register_keys(self.keys, update_key)
 
@@ -103,13 +99,18 @@ class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
             keys (list[str]): list of keys to read from.
             update_key (str): key to write to.
         """
-
+        # remap only changes the storage location but access from the client remains the same
         for k in keys:
-            self.blackboard.register_key(key=k, access=py_trees.common.Access.READ)
+            self.blackboard.register_key(
+                key=k,
+                access=py_trees.common.Access.READ,
+                remap_to=py_trees.blackboard.Blackboard.absolute_name("/", k),
+            )
 
         self.blackboard.register_key(
             key=update_key,
             access=py_trees.common.Access.WRITE,
+            remap_to=py_trees.blackboard.Blackboard.absolute_name("/", update_key),
         )
 
     def _apply(self) -> any:

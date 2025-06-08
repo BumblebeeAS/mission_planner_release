@@ -12,7 +12,7 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_clustering_goal
+from mission_planner_2.commons.pose_utils import create_clustering_goals
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
 from mission_planner_2.trees.auv.torpedo.tf_selector import create_tf_selector_root
@@ -34,14 +34,15 @@ TORPEDO_SHOOTER_BOT_FRAME = "auv4/torpedo_shooter_bot"
 TOP_TORP_UINT = UInt8(data=2)
 BTM_TORP_UINT = UInt8(data=4)
 
-# dont init with fk() since some use fk some use NAMESPACE
-CHOICE_KEY = "choice"
-POSE_KEY = "pose"
-GO_BACK_POSE_KEY = "go_back_pose"
-
 CLUSTER_DURATION = 30
 STABILIZE_DURATION = 10
 #########################################################################
+
+# THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
+# DONT go move it in the section to be updated
+_CHOICE_KEY = fk("choice")
+_POSE_KEY = fk("pose")
+_GO_BACK_POSE_KEY = fk("go_back_pose")
 
 
 def create_torpedo_root():
@@ -78,7 +79,7 @@ def create_torpedo_root():
         service_name="/auv4/choice/get_is_fish",
         service_type=Trigger,
         service_request=Trigger.Request(),
-        key_response=fk(CHOICE_KEY),
+        key_response=fk(_CHOICE_KEY),
     )
 
     srv_enable_detections = py_trees_ros.service_clients.FromConstant(
@@ -112,10 +113,9 @@ def create_torpedo_root():
         name="Cluster the transforms before first shot",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_parent=CAMERA_FRAME,
-            in_child=TEMPLATE_FRAME_OPTICAL,
-            out_child=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+        action_goal=create_clustering_goals(
+            in_children=TEMPLATE_FRAME_OPTICAL,
+            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
@@ -123,16 +123,15 @@ def create_torpedo_root():
 
     # we call fk(<key>) here to capture the ns of this file
     sel_tf_first = create_tf_selector_root(
-        choice_key=fk(CHOICE_KEY),
-        pose_key=fk(POSE_KEY),
-        go_back_pose_key=fk(GO_BACK_POSE_KEY),
+        choice_key=_CHOICE_KEY,
+        pose_key=_POSE_KEY,
+        go_back_pose_key=_GO_BACK_POSE_KEY,
         is_first=True,
     )
 
     goto_target_first = goto.FromBlackboard(
         name="Go to first target",
-        parent_namespace=NAMESPACE,
-        pose_key=POSE_KEY,
+        pose_key=_POSE_KEY,
         anchor_frame_name=TORPEDO_SHOOTER_TOP_FRAME,
     )
 
@@ -146,8 +145,7 @@ def create_torpedo_root():
 
     goto_back_centre = goto.FromBlackboard(
         name="Go back to centre",
-        parent_namespace=NAMESPACE,
-        pose_key=GO_BACK_POSE_KEY,
+        pose_key=_GO_BACK_POSE_KEY,
     )
 
     set_torp_bottom = py_trees.behaviours.SetBlackboardVariable(
@@ -161,26 +159,24 @@ def create_torpedo_root():
         name="Cluster the transforms before second shot",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_parent=CAMERA_FRAME,
-            in_child=TEMPLATE_FRAME_OPTICAL,
-            out_child=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+        action_goal=create_clustering_goals(
+            in_children=TEMPLATE_FRAME_OPTICAL,
+            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
     )
 
     sel_tf_second = create_tf_selector_root(
-        choice_key=fk(CHOICE_KEY),
-        pose_key=fk(POSE_KEY),
-        go_back_pose_key=fk(GO_BACK_POSE_KEY),
+        choice_key=_CHOICE_KEY,
+        pose_key=_POSE_KEY,
+        go_back_pose_key=_GO_BACK_POSE_KEY,
         is_first=False,
     )
 
     goto_target_second = goto.FromBlackboard(
         name="Go to second target",
-        parent_namespace=NAMESPACE,
-        pose_key=POSE_KEY,
+        pose_key=_POSE_KEY,
         anchor_frame_name=TORPEDO_SHOOTER_BOT_FRAME,
     )
 
@@ -234,7 +230,7 @@ def create_torpedo_root():
 
     seq_torpedo_root.add_children(
         children=[
-            create_move_to_task_root(),
+            # create_move_to_task_root(),
             py_trees.timers.Timer("Stabilise before task", duration=STABILIZE_DURATION),
             seq_launch_torpedo,
         ]

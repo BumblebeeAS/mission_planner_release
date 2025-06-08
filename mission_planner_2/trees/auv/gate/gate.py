@@ -13,7 +13,7 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goal,
+    create_clustering_goals,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
@@ -33,15 +33,17 @@ TEMPLATE_FRAME_YOLO = "gate"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
 GATE_CENTRE_FRAME = "gate/centre"
 GATE_LEFT_FRAME = "gate/left"
-GATE_LEFT_POSE_KEY = "gate_left_pose"
 GATE_RIGHT_FRAME = "gate/right"
-GATE_RIGHT_POSE_KEY = "gate_right_pose"
 
 GATE_ORIENTATION_TOPIC = "/auv4/gate/shark_fish"
-GATE_ORIENTATION_KEY = "orientation"
-
-CHOICE_KEY = "choice"
 #########################################################################
+
+# THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
+# DONT go move it in the section to be updated
+_CHOICE_KEY = fk("choice")
+_GATE_ORIENTATION_KEY = fk("orientation")
+_GATE_LEFT_POSE_KEY = fk("gate_left_pose")
+_GATE_RIGHT_POSE_KEY = fk("gate_right_pose")
 
 
 def create_gate_root():
@@ -62,19 +64,16 @@ def create_gate_root():
 
     # Step 2: Move towards gate
     gate_init_pose = create_stamped_pose("world_ned", position_z=GATE_APPROACH_HEIGHT)
-    goto_towards_gate = goto.FromConstant(
-        "Goto gate vicinity", NAMESPACE, gate_init_pose
-    )
+    goto_towards_gate = goto.FromConstant("Goto gate vicinity", gate_init_pose)
 
     # Step 3: Cluster gate transforms
     action_cluster_gate = py_trees_ros.action_clients.FromConstant(
         name="Cluster gate transforms",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_parent=CAMERA_FRAME,
-            in_child=TEMPLATE_FRAME_YOLO,
-            out_child=TEMPLATE_FRAME_YOLO_CLUSTERED,
+        action_goal=create_clustering_goals(
+            in_children=TEMPLATE_FRAME_YOLO,
+            out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
             duration=CLUSTERING_DURATION,
             use_cache=False,
         ),
@@ -83,7 +82,7 @@ def create_gate_root():
     # Step 4a: Cache transform for gate/left
     cache_tf_left = cache_tf.ToBlackboard(
         name="Cache left transform",
-        variable_name=fk(GATE_LEFT_POSE_KEY),
+        variable_name=_GATE_LEFT_POSE_KEY,
         start=GATE_CENTRE_FRAME,
         end=GATE_LEFT_FRAME,
         qos_profile=qos_profile_system_default,
@@ -92,7 +91,7 @@ def create_gate_root():
     # Step 4b: Cache transform for gate/right
     cache_tf_right = cache_tf.ToBlackboard(
         name="Cache right transform",
-        variable_name=fk(GATE_RIGHT_POSE_KEY),
+        variable_name=_GATE_RIGHT_POSE_KEY,
         start=GATE_CENTRE_FRAME,
         end=GATE_RIGHT_FRAME,
         qos_profile=qos_profile_system_default,
@@ -100,7 +99,7 @@ def create_gate_root():
 
     # Step 5: Move to picture position
     goto_see_pictures = goto.FromConstant(
-        "Goto picture position", NAMESPACE, create_stamped_pose(GATE_CENTRE_FRAME)
+        "Goto picture position", create_stamped_pose(GATE_CENTRE_FRAME)
     )
 
     # Step 6: Wait to stabilize
@@ -114,7 +113,7 @@ def create_gate_root():
         service_type=Trigger,
         service_name="/auv4/choice/get_is_fish",
         service_request=Trigger.Request(),
-        key_response=fk(CHOICE_KEY),
+        key_response=_CHOICE_KEY,
     )
 
     # Step 8: Get gate orientation
@@ -123,7 +122,7 @@ def create_gate_root():
         topic_name=GATE_ORIENTATION_TOPIC,
         topic_type=String,
         qos_profile=qos_profile_system_default,
-        blackboard_variables={fk(GATE_ORIENTATION_KEY): None},
+        blackboard_variables={_GATE_ORIENTATION_KEY: None},
     )
 
     # Step 9: Select gate side (selector with left side attempt)
@@ -135,12 +134,12 @@ def create_gate_root():
         name="Check if left side",
         checks=[
             py_trees.common.ComparisonExpression(
-                variable=fk(CHOICE_KEY),
+                variable=fk(_CHOICE_KEY),
                 value=True,
                 operator=lambda x, y: operator.__eq__(x.success, y),
             ),
             py_trees.common.ComparisonExpression(
-                variable=fk(GATE_ORIENTATION_KEY),
+                variable=fk(_GATE_ORIENTATION_KEY),
                 value="fish_shark",
                 operator=lambda x, y: operator.__eq__(x.data, y),
             ),
@@ -150,14 +149,12 @@ def create_gate_root():
 
     goto_left_approach = goto.FromBlackboard(
         name="Goto left approach",
-        parent_namespace=NAMESPACE,
-        pose_key=GATE_LEFT_POSE_KEY,
+        pose_key=_GATE_LEFT_POSE_KEY,
     )
 
     goto_right_approach = goto.FromBlackboard(
         name="Goto right approach",
-        parent_namespace=NAMESPACE,
-        pose_key=GATE_RIGHT_POSE_KEY,
+        pose_key=_GATE_RIGHT_POSE_KEY,
     )
 
     seq_try_left_side.add_children(children=[check_is_left, goto_left_approach])
@@ -172,12 +169,12 @@ def create_gate_root():
     forward_pose = create_stamped_pose(
         "auv4/base_link_ned", position_x=FORWARD_DISTANCE
     )
-    goto_through_gate = goto.FromConstant("Goto through gate", NAMESPACE, forward_pose)
+    goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
 
     # Assemble tree in execution order
     seq_gate_root.add_children(
         children=[
-            goto_towards_gate,
+            # goto_towards_gate,
             action_cluster_gate,
             cache_tf_left,
             cache_tf_right,

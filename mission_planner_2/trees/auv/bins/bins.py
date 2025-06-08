@@ -15,7 +15,7 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goal,
+    create_clustering_goals,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.bins.bin_selector import create_bin_selector_root
@@ -30,7 +30,6 @@ TEMPLATE_NAME = "Task03_DropBRUVS.png"
 ROTATED_TEMPLATE_NAME = "Task03_DropBRUVS_Rotated.png"
 POINT_CORRESPONDENCES_TOPIC = "/auv4/bot_cam/image_matching/point_correspondences"
 
-
 CAMERA_FRAME = "auv4/bot_cam_optical"
 TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_optical"
 ROTATED_TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_Rotated_optical"
@@ -40,12 +39,21 @@ TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 
 ACTUATION_UINT = UInt8(data=6)
 
-CHOICE_KEY = "choice"
-POSE_KEY = "pose"
-
 CLUSTERING_DURATION = 20
 STABILIZE_CONTROLS_DURATION = 10.0
+
+FISH_BIN_FRAME = "bin/fish"
+SHARK_BIN_FRAME = "bin/shark"
+FISH_BIN_ROTATED_FRAME = "bin/fish/rotated"
+SHARK_BIN_ROTATED_FRAME = "bin/shark/rotated"
 #########################################################################
+
+# THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
+# DONT go move it in the section to be updated
+_CHOICE_KEY = fk("choice")
+_POSE_KEY = fk("pose")
+_POINTS_1_KEY = fk("points_1")
+_POINTS_2_KEY = fk("points_2")
 
 
 def create_bin_root():
@@ -73,10 +81,9 @@ def create_bin_root():
         name="Cluster transforms for orientation",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_parent=CAMERA_FRAME,
-            in_child=TEMPLATE_FRAME_YOLO,
-            out_child=TEMPLATE_FRAME_YOLO_CLUSTERED,
+        action_goal=create_clustering_goals(
+            in_children=TEMPLATE_FRAME_YOLO,
+            out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
             duration=CLUSTERING_DURATION,
             use_cache=False,
         ),
@@ -85,7 +92,6 @@ def create_bin_root():
     # Step 3: Navigate to bin centre
     goto_bin_centre = goto.FromConstant(
         name="Goto bin centre",
-        parent_namespace=NAMESPACE,
         pose=create_stamped_pose("bin/centre"),
     )
 
@@ -123,7 +129,7 @@ def create_bin_root():
         topic_type=PointCorrespondencesStamped,
         qos_profile=qos_profile_sensor_data,
         blackboard_variables={
-            fk("points_1"): "object_points",
+            _POINTS_1_KEY: "object_points",
             fk("object_frame_id_1"): "object_frame_id",
         },
     )
@@ -144,7 +150,10 @@ def create_bin_root():
         memory=True,
     )
     sub_get_points_first_sequence.add_children(
-        children=[sub_get_points_first, check_point_correspondences_first],
+        children=[
+            sub_get_points_first,
+            check_point_correspondences_first,
+        ],
     )
     sub_get_points_first_sequence_retry = py_trees.decorators.Retry(
         name="Retry get points first",
@@ -180,7 +189,7 @@ def create_bin_root():
         topic_type=PointCorrespondencesStamped,
         qos_profile=qos_profile_sensor_data,
         blackboard_variables={
-            fk("points_2"): "object_points",
+            _POINTS_2_KEY: "object_points",
             fk("object_frame_id_2"): "object_frame_id",
         },
     )
@@ -201,7 +210,10 @@ def create_bin_root():
         memory=True,
     )
     sub_get_points_second_sequence.add_children(
-        children=[sub_get_points_second, check_point_correspondences_second],
+        children=[
+            sub_get_points_second,
+            check_point_correspondences_second,
+        ],
     )
     sub_get_points_second_sequence_retry = py_trees.decorators.Retry(
         name="Try rotated template",
@@ -227,27 +239,24 @@ def create_bin_root():
         else:
             template_frame = ROTATED_TEMPLATE_FRAME_OPTICAL
 
-        return create_clustering_goal(
-            in_parent=CAMERA_FRAME,
-            in_child=template_frame,
-            out_child=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+        return create_clustering_goals(
+            in_children=template_frame,
+            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
             duration=CLUSTERING_DURATION,
             use_cache=False,
         )
 
     set_enable_detections_req = DynamicSetBlackboard(
         name="Set enable detections request",
-        namespace=NAMESPACE,
-        key=["points_1", "points_2"],
-        update_key="enable_detections_req",
+        key=[_POINTS_1_KEY, _POINTS_2_KEY],
+        update_key=fk("enable_detections_req"),
         func=create_enable_req,
     )
 
     set_clustering_goal = DynamicSetBlackboard(
         name="Set clustering goal",
-        namespace=NAMESPACE,
-        key=["points_1", "points_2"],
-        update_key="clustering_goal",
+        key=[_POINTS_1_KEY, _POINTS_2_KEY],
+        update_key=fk("clustering_goal"),
         func=create_correct_clustering_goal,
     )
 
@@ -257,12 +266,19 @@ def create_bin_root():
         service_name="/auv4/choice/get_is_fish",
         service_type=Trigger,
         service_request=Trigger.Request(),
-        key_response=fk(CHOICE_KEY),
+        key_response=_CHOICE_KEY,
     )
 
     # Step 8: Update pose selection based on choice
     sel_update_selection = create_bin_selector_root(
-        namespace=NAMESPACE, choice_key=fk(CHOICE_KEY), pose_key=fk(POSE_KEY)
+        choice_key=_CHOICE_KEY,
+        pose_key=_POSE_KEY,
+        points1_key=_POINTS_1_KEY,
+        points2_key=_POINTS_2_KEY,
+        fish_bin_frame=FISH_BIN_FRAME,
+        shark_bin_frame=SHARK_BIN_FRAME,
+        fish_bin_rotated_frame=FISH_BIN_ROTATED_FRAME,
+        shark_bin_rotated_frame=SHARK_BIN_ROTATED_FRAME,
     )
 
     srv_enable_correct_detections = py_trees_ros.service_clients.FromBlackboard(
@@ -292,8 +308,7 @@ def create_bin_root():
     # Step 10: Align to precise target
     goto_align_to_target = goto.FromBlackboard(
         name="Align to target",
-        parent_namespace=NAMESPACE,
-        pose_key=POSE_KEY,
+        pose_key=_POSE_KEY,
         anchor_frame_name="auv4/dropper",
     )
 

@@ -1,17 +1,22 @@
+import operator
+
 import py_trees
 import py_trees_ros
-from mission_planner_2.commons.namespace_utils import (
-    generate_namespace,
-    full_key_generator,
-)
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard
-from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.slalom.move_and_cluster import create_move_and_cluster_root
-from mission_planner_2.trees.auv.slalom.move_to_task import create_move_to_task_root
-from mission_planner_2.trees.auv.slalom.channel_movement import create_channel_movement_root
 
-import operator
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
+from mission_planner_2.commons.namespace_utils import (
+    full_key_generator,
+    generate_namespace,
+)
+from mission_planner_2.commons.pose_utils import create_stamped_pose
+from mission_planner_2.trees.auv.goto import goto
+from mission_planner_2.trees.auv.slalom.channel_movement import (
+    create_channel_movement_root,
+)
+from mission_planner_2.trees.auv.slalom.move_and_cluster import (
+    create_move_and_cluster_root,
+)
+from mission_planner_2.trees.auv.slalom.move_to_task import create_move_to_task_root
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -28,12 +33,9 @@ CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "channel_pair_three/yolo/clustered"
 
 TRANSFORM_TIMEOUT_DURATION = 10.0
 
-FIRST_VIEW = {"position_x": 0.0, "position_y": 0.0,
-              "position_z": 0.8, "yaw": 0.0}
-SECOND_VIEW = {"position_x": 0.0, "position_y": 0.0,
-               "position_z": 0.8, "yaw": 0.0}
-THIRD_VIEW = {"position_x": 0.0, "position_y": 0.0,
-              "position_z": 0.8, "yaw": 0.0}
+FIRST_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.8, "yaw": 0.0}
+SECOND_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.8, "yaw": 0.0}
+THIRD_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.8, "yaw": 0.0}
 #########################################################################
 
 
@@ -62,45 +64,68 @@ def create_slalom_root():
     # TODO: Update the frame and pose to move to
     move_and_cluster_one = create_move_and_cluster_root(
         pose_stamped=create_stamped_pose(
-            BASE_LINK_FRAME, position_x=FIRST_VIEW["position_x"],
+            BASE_LINK_FRAME,
+            position_x=FIRST_VIEW["position_x"],
             position_y=FIRST_VIEW["position_y"],
-            position_z=FIRST_VIEW["position_z"], yaw=FIRST_VIEW["yaw"]),
-        in_children=[CHANNEL_PAIR_ONE_FRAME,
-                     CHANNEL_PAIR_TWO_FRAME, CHANNEL_PAIR_THREE_FRAME],
-        out_children=[CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-                      CHANNEL_PAIR_TWO_FRAME_CLUSTERED, CHANNEL_PAIR_THREE_FRAME_CLUSTERED],
+            position_z=FIRST_VIEW["position_z"],
+            yaw=FIRST_VIEW["yaw"],
+        ),
+        in_children=[
+            CHANNEL_PAIR_ONE_FRAME,
+            CHANNEL_PAIR_TWO_FRAME,
+            CHANNEL_PAIR_THREE_FRAME,
+        ],
+        out_children=[
+            CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+            CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            CHANNEL_PAIR_THREE_FRAME_CLUSTERED,
+        ],
     )
 
     move_and_cluster_two = create_move_and_cluster_root(
         pose_stamped=create_stamped_pose(
-            BASE_LINK_FRAME, position_x=SECOND_VIEW["position_x"],
+            BASE_LINK_FRAME,
+            position_x=SECOND_VIEW["position_x"],
             position_y=SECOND_VIEW["position_y"],
-            position_z=SECOND_VIEW["position_z"], yaw=SECOND_VIEW["yaw"]),
-        in_children=[CHANNEL_PAIR_ONE_FRAME,
-                     CHANNEL_PAIR_TWO_FRAME, CHANNEL_PAIR_THREE_FRAME],
-        out_children=[CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-                      CHANNEL_PAIR_TWO_FRAME_CLUSTERED, CHANNEL_PAIR_THREE_FRAME_CLUSTERED],
+            position_z=SECOND_VIEW["position_z"],
+            yaw=SECOND_VIEW["yaw"],
+        ),
+        in_children=[
+            CHANNEL_PAIR_ONE_FRAME,
+            CHANNEL_PAIR_TWO_FRAME,
+            CHANNEL_PAIR_THREE_FRAME,
+        ],
+        out_children=[
+            CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+            CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            CHANNEL_PAIR_THREE_FRAME_CLUSTERED,
+        ],
     )
 
     move_and_cluster_three = create_move_and_cluster_root(
         pose_stamped=create_stamped_pose(
-            BASE_LINK_FRAME, position_x=THIRD_VIEW["position_x"],
+            BASE_LINK_FRAME,
+            position_x=THIRD_VIEW["position_x"],
             position_y=THIRD_VIEW["position_y"],
-            position_z=THIRD_VIEW["position_z"], yaw=THIRD_VIEW["yaw"]),
-        in_children=[CHANNEL_PAIR_ONE_FRAME,
-                     CHANNEL_PAIR_TWO_FRAME, CHANNEL_PAIR_THREE_FRAME],
-        out_children=[CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-                      CHANNEL_PAIR_TWO_FRAME_CLUSTERED, CHANNEL_PAIR_THREE_FRAME_CLUSTERED],
+            position_z=THIRD_VIEW["position_z"],
+            yaw=THIRD_VIEW["yaw"],
+        ),
+        in_children=[
+            CHANNEL_PAIR_ONE_FRAME,
+            CHANNEL_PAIR_TWO_FRAME,
+            CHANNEL_PAIR_THREE_FRAME,
+        ],
+        out_children=[
+            CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+            CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            CHANNEL_PAIR_THREE_FRAME_CLUSTERED,
+        ],
     )
 
     seq_move_and_cluster = py_trees.composites.Sequence(
         name="Move to different views and cluster",
         memory=True,
-        children=[
-            move_and_cluster_one,
-            move_and_cluster_two,
-            move_and_cluster_three
-        ]
+        children=[move_and_cluster_one, move_and_cluster_two, move_and_cluster_three],
     )
 
     # Initialize the number of missing transforms in blackboard to be used by DynamicSetBlackboard
@@ -108,7 +133,7 @@ def create_slalom_root():
         name="Initialize missing transforms",
         variable_name=fk("missing_transforms"),
         variable_value=0,
-        overwrite=True
+        overwrite=True,
     )
 
     # There is no need to read/write the transforms from the blackboard, but the below is just a means of confirmation
@@ -135,29 +160,26 @@ def create_slalom_root():
 
     update_missing_transforms_one = DynamicSetBlackboard(
         name="Update missing transforms one",
-        namespace=NAMESPACE,
-        key="missing_transforms",
-        update_key="missing_transforms",
+        key=fk("missing_transforms"),
+        update_key=fk("missing_transforms"),
         overwrite=True,
-        func=lambda x: x + 1
+        func=lambda x: x + 1,
     )
 
     update_missing_transforms_two = DynamicSetBlackboard(
         name="Update missing transforms two",
-        namespace=NAMESPACE,
-        key="missing_transforms",
-        update_key="missing_transforms",
+        key=fk("missing_transforms"),
+        update_key=fk("missing_transforms"),
         overwrite=True,
-        func=lambda x: x + 1
+        func=lambda x: x + 1,
     )
 
     update_missing_transforms_three = DynamicSetBlackboard(
         name="Update missing transforms three",
-        namespace=NAMESPACE,
-        key="missing_transforms",
-        update_key="missing_transforms",
+        key=fk("missing_transforms"),
+        update_key=fk("missing_transforms"),
         overwrite=True,
-        func=lambda x: x + 1
+        func=lambda x: x + 1,
     )
 
     # Structure the check as a fallback that will update the number of missing transforms
@@ -168,10 +190,10 @@ def create_slalom_root():
             py_trees.decorators.Timeout(
                 name="Timeout for channel pair one",
                 child=check_transform_one,
-                duration=TRANSFORM_TIMEOUT_DURATION
+                duration=TRANSFORM_TIMEOUT_DURATION,
             ),
-            update_missing_transforms_one
-        ]
+            update_missing_transforms_one,
+        ],
     )
 
     check_and_update_fallback_two = py_trees.composites.Selector(
@@ -181,10 +203,10 @@ def create_slalom_root():
             py_trees.decorators.Timeout(
                 name="Timeout for channel pair two",
                 child=check_transform_two,
-                duration=TRANSFORM_TIMEOUT_DURATION
+                duration=TRANSFORM_TIMEOUT_DURATION,
             ),
-            update_missing_transforms_two
-        ]
+            update_missing_transforms_two,
+        ],
     )
 
     check_and_update_fallback_three = py_trees.composites.Selector(
@@ -194,10 +216,10 @@ def create_slalom_root():
             py_trees.decorators.Timeout(
                 name="Timeout for channel pair three",
                 child=check_transform_three,
-                duration=TRANSFORM_TIMEOUT_DURATION
+                duration=TRANSFORM_TIMEOUT_DURATION,
             ),
-            update_missing_transforms_three
-        ]
+            update_missing_transforms_three,
+        ],
     )
 
     # Sequence to check transforms and update the number of missing transforms
@@ -208,8 +230,8 @@ def create_slalom_root():
             init_missing_transforms,
             check_and_update_fallback_one,
             check_and_update_fallback_two,
-            check_and_update_fallback_three
-        ]
+            check_and_update_fallback_three,
+        ],
     )
 
     # Generate movemement options based on the number of missing transforms, generation done in compile time, execution done in runtime
@@ -222,8 +244,8 @@ def create_slalom_root():
         check=py_trees.common.ComparisonExpression(
             variable=fk("missing_transforms"),
             value=0,
-            operator=lambda x, y: operator.__eq__(x, y)
-        )
+            operator=lambda x, y: operator.__eq__(x, y),
+        ),
     )
 
     check_missing_transforms_two = py_trees.behaviours.CheckBlackboardVariableValue(
@@ -231,8 +253,8 @@ def create_slalom_root():
         check=py_trees.common.ComparisonExpression(
             variable=fk("missing_transforms"),
             value=1,
-            operator=lambda x, y: operator.__eq__(x, y)
-        )
+            operator=lambda x, y: operator.__eq__(x, y),
+        ),
     )
 
     check_missing_transforms_three = py_trees.behaviours.CheckBlackboardVariableValue(
@@ -240,8 +262,8 @@ def create_slalom_root():
         check=py_trees.common.ComparisonExpression(
             variable=fk("missing_transforms"),
             value=2,
-            operator=lambda x, y: operator.__eq__(x, y)
-        )
+            operator=lambda x, y: operator.__eq__(x, y),
+        ),
     )
 
     # Selector to choose the movement strategy based on the number of missing transforms
@@ -252,19 +274,19 @@ def create_slalom_root():
             py_trees.composites.Sequence(
                 name="No missing transforms",
                 memory=True,
-                children=[check_missing_transforms_one, move_channel_one]
+                children=[check_missing_transforms_one, move_channel_one],
             ),
             py_trees.composites.Sequence(
                 name="One missing transform",
                 memory=True,
-                children=[check_missing_transforms_two, move_channel_two]
+                children=[check_missing_transforms_two, move_channel_two],
             ),
             py_trees.composites.Sequence(
                 name="Two missing transforms",
                 memory=True,
-                children=[check_missing_transforms_three, move_channel_three]
-            )
-        ]
+                children=[check_missing_transforms_three, move_channel_three],
+            ),
+        ],
     )
 
     root.add_children(
@@ -272,7 +294,7 @@ def create_slalom_root():
             move_to_task,
             seq_move_and_cluster,
             seq_check_transforms,
-            select_movement_strategy
+            select_movement_strategy,
         ]
     )
 

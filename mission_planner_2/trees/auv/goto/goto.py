@@ -98,17 +98,17 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
     def __init__(
         self,
         name: str,
-        parent_namespace: str,
         pose_key: str,
         anchor_frame_name: str = "auv4/base_link_ned",
         generate_feedback_message: Callable | None = None,
         wait_for_server_timeout_sec: int = -3,
         wait_for_service_timeout_sec: int = -3,
     ):
+
+        # FIXME: this convert to safe name seems useless @advaypakhale
         self.safe_name = convert_to_safe_name(name)
-        self.parent_namespace = parent_namespace
         self.namespace = py_trees.blackboard.Blackboard.absolute_name(
-            parent_namespace, self.safe_name
+            "/", self.safe_name
         )
 
         super().__init__(
@@ -131,7 +131,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
             key="request",
             access=py_trees.common.Access.READ,
             remap_to=py_trees.blackboard.Blackboard.absolute_name(
-                self.parent_namespace, key=pose_key
+                self.namespace, key=pose_key
             ),
         )
 
@@ -407,7 +407,7 @@ class FromConstant(FromBlackboard):
     def __init__(
         self,
         name,
-        parent_namespace,
+        # parent_namespace,
         pose,
         anchor_frame_name="auv4/base_link_ned",
         generate_feedback_message=None,
@@ -417,10 +417,11 @@ class FromConstant(FromBlackboard):
         import uuid
 
         pose_key = f"pose_{str(uuid.uuid4()).replace('-', '')}"
+        # TODO: check this logic should not affect functionality @advaypakhale
+        namespace = f"/{str(uuid.uuid4()).replace('-', '')}"
 
         super().__init__(
             name=name,
-            parent_namespace=parent_namespace,
             pose_key=pose_key,
             anchor_frame_name=anchor_frame_name,
             generate_feedback_message=generate_feedback_message,
@@ -428,12 +429,18 @@ class FromConstant(FromBlackboard):
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
         )
 
+        # FIXME: this convert to safe name seems useless @advaypakhale
+        self.safe_name = convert_to_safe_name(name)
+        self.namespace = py_trees.blackboard.Blackboard.absolute_name(
+            namespace, self.safe_name
+        )
+
         # Store the pose directly on the blackboard
         self.blackboard.register_key(
             key="request",
             access=py_trees.common.Access.WRITE,
             remap_to=py_trees.blackboard.Blackboard.absolute_name(
-                self.parent_namespace, key=pose_key
+                self.namespace, key=pose_key
             ),
         )
         self.blackboard.set(name="request", value=pose)

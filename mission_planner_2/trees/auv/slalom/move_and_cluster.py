@@ -1,17 +1,14 @@
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
-from mission_planner_2.commons.namespace_utils import (
-    generate_namespace,
-    full_key_generator,
-)
-from mission_planner_2.commons.pose_utils import (
-    create_stamped_pose,
-    create_clustering_goal,
-    create_clustering_goals
-)
-from mission_planner_2.trees.auv.goto import goto
 from geometry_msgs.msg import PoseStamped
+
+from mission_planner_2.commons.namespace_utils import (
+    full_key_generator,
+    generate_namespace,
+)
+from mission_planner_2.commons.pose_utils import create_clustering_goals
+from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -31,11 +28,11 @@ BASE_LINK_FRAME = "auv4/base_link_ned"
 
 
 def create_move_and_cluster_root(
-        pose_stamped: PoseStamped,
-        in_children: list[str],
-        out_children: list[str],
-        out_parent: str = "world_ned"
-    ):
+    pose_stamped: PoseStamped,
+    in_children: list[str],
+    out_children: list[str],
+    out_parent: str = "world_ned",
+):
     """
     Create the root of the move and cluster tree.
     Presumes that out_parent is "world_ned"
@@ -48,17 +45,13 @@ def create_move_and_cluster_root(
         in_children: List of child frames to cluster.
         out_parent: Parent frame for the output clustering frame.
         out_children: List of child frames to output after clustering.
-   """
+    """
     seq_root = py_trees.composites.Sequence(
         name="Move and cluster",
         memory=True,
-    )    
-
-    goto_view_location = goto.FromConstant(
-        name="Goto view location",
-        parent_namespace=NAMESPACE,
-        pose=pose_stamped
     )
+
+    goto_view_location = goto.FromConstant(name="Goto view location", pose=pose_stamped)
 
     timer_wait_stabilize = py_trees.timers.Timer(
         name="Stabilize before clustering",
@@ -75,9 +68,9 @@ def create_move_and_cluster_root(
             out_children=out_children,
             out_parent=out_parent,
             duration=CLUSTERING_DURATION,
-            cache_size=1000, # To adjust
-            persistent=True, # Reuse caches
-        )
+            cache_size=1000,  # To adjust
+            persistent=True,  # Reuse caches
+        ),
     )
 
     # Add the children to the root sequence

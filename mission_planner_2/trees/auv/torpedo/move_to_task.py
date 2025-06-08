@@ -27,7 +27,6 @@ def create_move_to_task_root():
 
     move_to_torp = goto.FromConstant(
         "Move to torpedo",
-        NAMESPACE,
         torpedo_init_pose,
     )
 
