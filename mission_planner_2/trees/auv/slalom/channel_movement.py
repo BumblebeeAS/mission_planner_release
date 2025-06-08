@@ -13,16 +13,16 @@ CHANNEL_PAIR_ONE_FRAME = "channel_pair_one/yolo"
 CHANNEL_PAIR_TWO_FRAME = "channel_pair_two/yolo"
 CHANNEL_PAIR_THREE_FRAME = "channel_pair_three/yolo"
 
-CHANNEL_PAIR_ONE_FRAME_CLUSTERED = "channel_pair_one/yolo/clustered"
-CHANNEL_PAIR_TWO_FRAME_CLUSTERED = "channel_pair_two/yolo/clustered"
-CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "channel_pair_three/yolo/clustered"
+CHANNEL_PAIR_ONE_FRAME_CLUSTERED = "channel_pair_one/clustered"
+CHANNEL_PAIR_TWO_FRAME_CLUSTERED = "channel_pair_two/clustered"
+CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "channel_pair_three/clustered"
 
 # TODO: Update the following in cfg.yaml
 # Hardcoded transform defined from channel two to three, two is clustered/hardcoded
-CHANNEL_PAIR_THREE_FROM_TWO_HARDCODE = "channel_pair_three/hardcode"
+CHANNEL_PAIR_THREE_FROM_TWO_HARDCODE = "channel_pair_three/hardcoded"
 
 # Hardcoded transform defined from channel one to two, one is clustered
-CHANNEL_PAIR_TWO_FROM_ONE_HARDCODE = "channel_pair_two/hardcode"
+CHANNEL_PAIR_TWO_FROM_ONE_HARDCODE = "channel_pair_two/hardcoded"
 #########################################################################
 
 def create_channel_movement_root(
