@@ -192,6 +192,41 @@ tfs:
     # frame ids
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/fish/rotated"
+    ######################### SLALOM TFS #########################
+    # TODO: ALL HERE MUST CHECK AND UPDATE 
+  - name: channel_pair_two_from_one_hardcoded
+    # translation (x, y, z in meters)
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
+    # frame ids
+    parent_frame_id: "channel_pair_one/clustered"
+    child_frame_id: "channel_pair_two/hardcoded"
+  - name: channel_pair_three_from_two_hardcoded
+    # translation (x, y, z in metres)
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
+    # frame ids
+    parent_frame_id: "channel_pair_two/clustered"
+    child_frame_id: "channel_pair_three/hardcoded"
+  - name: channel_pair_three_from_two_hardcoded_hardcoded # forgive my naming sins
+    # translation (x, y, z in metres)
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
+    # frame ids
+    parent_frame_id: "channel_pair_two/hardcoded"
+    child_frame_id: "channel_pair_three/hardcoded"
     ######################### TEMPORARY TFS #########################
   - name: torpedo_top
     x: -0.07819
