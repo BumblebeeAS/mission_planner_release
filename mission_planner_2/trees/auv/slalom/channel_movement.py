@@ -5,20 +5,20 @@ from mission_planner_2.trees.auv.goto import goto
 
 ########################## UPDATE CONSTANTS HERE #########################
 BASE_LINK_FRAME = "auv4/base_link_ned"
-CHANNEL_PAIR_ONE_FRAME = "channel_pair_one/yolo"
-CHANNEL_PAIR_TWO_FRAME = "channel_pair_two/yolo"
-CHANNEL_PAIR_THREE_FRAME = "channel_pair_three/yolo"
+CHANNEL_PAIR_ONE_FRAME = "slalom_layer_0"
+CHANNEL_PAIR_TWO_FRAME = "slalom_layer_1"
+CHANNEL_PAIR_THREE_FRAME = "slalom_layer_2"
 
-CHANNEL_PAIR_ONE_FRAME_CLUSTERED = "channel_pair_one/clustered"
-CHANNEL_PAIR_TWO_FRAME_CLUSTERED = "channel_pair_two/clustered"
-CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "channel_pair_three/clustered"
+CHANNEL_PAIR_ONE_FRAME_CLUSTERED = "slalom_layer_0/clustered"
+CHANNEL_PAIR_TWO_FRAME_CLUSTERED = "slalom_layer_1/clustered"
+CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "slalom_layer_2/clustered"
 
 # TODO: Update the following in cfg.yaml
 # Hardcoded transform defined from channel two to three, two is clustered/hardcoded
-CHANNEL_PAIR_THREE_FROM_TWO_HARDCODE = "channel_pair_three/hardcoded"
+CHANNEL_PAIR_THREE_FROM_TWO_HARDCODE = "slalom_layer_2/hardcoded"
 
 # Hardcoded transform defined from channel one to two, one is clustered
-CHANNEL_PAIR_TWO_FROM_ONE_HARDCODE = "channel_pair_two/hardcoded"
+CHANNEL_PAIR_TWO_FROM_ONE_HARDCODE = "slalom_layer_1/hardcoded"
 #########################################################################
 
 

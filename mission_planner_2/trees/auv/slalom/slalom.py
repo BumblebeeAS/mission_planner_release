@@ -2,6 +2,7 @@ import operator
 
 import py_trees
 import py_trees_ros
+from rclpy.qos import qos_profile_system_default
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
@@ -9,7 +10,6 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.slalom.channel_movement import (
     create_channel_movement_root,
 )
@@ -23,13 +23,13 @@ fk = full_key_generator(NAMESPACE)
 
 ########################## UPDATE CONSTANTS HERE #########################
 BASE_LINK_FRAME = "auv4/base_link_ned"
-CHANNEL_PAIR_ONE_FRAME = "channel_pair_one/yolo"
-CHANNEL_PAIR_TWO_FRAME = "channel_pair_two/yolo"
-CHANNEL_PAIR_THREE_FRAME = "channel_pair_three/yolo"
+CHANNEL_PAIR_ONE_FRAME = "slalom_layer_0"
+CHANNEL_PAIR_TWO_FRAME = "slalom_layer_1"
+CHANNEL_PAIR_THREE_FRAME = "slalom_layer_2"
 
-CHANNEL_PAIR_ONE_FRAME_CLUSTERED = "channel_pair_one/yolo/clustered"
-CHANNEL_PAIR_TWO_FRAME_CLUSTERED = "channel_pair_two/yolo/clustered"
-CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "channel_pair_three/yolo/clustered"
+CHANNEL_PAIR_ONE_FRAME_CLUSTERED = "slalom_layer_0/clustered"
+CHANNEL_PAIR_TWO_FRAME_CLUSTERED = "slalom_layer_1/clustered"
+CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "slalom_layer_2/clustered"
 
 TRANSFORM_TIMEOUT_DURATION = 10.0
 
@@ -70,16 +70,6 @@ def create_slalom_root():
             position_z=FIRST_VIEW["position_z"],
             yaw=FIRST_VIEW["yaw"],
         ),
-        in_children=[
-            CHANNEL_PAIR_ONE_FRAME,
-            CHANNEL_PAIR_TWO_FRAME,
-            CHANNEL_PAIR_THREE_FRAME,
-        ],
-        out_children=[
-            CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-            CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-            CHANNEL_PAIR_THREE_FRAME_CLUSTERED,
-        ],
     )
 
     move_and_cluster_two = create_move_and_cluster_root(
@@ -90,16 +80,6 @@ def create_slalom_root():
             position_z=SECOND_VIEW["position_z"],
             yaw=SECOND_VIEW["yaw"],
         ),
-        in_children=[
-            CHANNEL_PAIR_ONE_FRAME,
-            CHANNEL_PAIR_TWO_FRAME,
-            CHANNEL_PAIR_THREE_FRAME,
-        ],
-        out_children=[
-            CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-            CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-            CHANNEL_PAIR_THREE_FRAME_CLUSTERED,
-        ],
     )
 
     move_and_cluster_three = create_move_and_cluster_root(
@@ -110,16 +90,6 @@ def create_slalom_root():
             position_z=THIRD_VIEW["position_z"],
             yaw=THIRD_VIEW["yaw"],
         ),
-        in_children=[
-            CHANNEL_PAIR_ONE_FRAME,
-            CHANNEL_PAIR_TWO_FRAME,
-            CHANNEL_PAIR_THREE_FRAME,
-        ],
-        out_children=[
-            CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-            CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-            CHANNEL_PAIR_THREE_FRAME_CLUSTERED,
-        ],
     )
 
     seq_move_and_cluster = py_trees.composites.Sequence(
@@ -142,6 +112,7 @@ def create_slalom_root():
         variable_name=fk("channel_pair_one_transform"),
         target_frame=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
         source_frame=BASE_LINK_FRAME,
+        qos_profile=qos_profile_system_default,
     )
 
     check_transform_two = py_trees_ros.transforms.ToBlackboard(
@@ -149,6 +120,7 @@ def create_slalom_root():
         variable_name=fk("channel_pair_two_transform"),
         target_frame=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
         source_frame=BASE_LINK_FRAME,
+        qos_profile=qos_profile_system_default,
     )
 
     check_transform_three = py_trees_ros.transforms.ToBlackboard(
@@ -156,6 +128,7 @@ def create_slalom_root():
         variable_name=fk("channel_pair_three_transform"),
         target_frame=CHANNEL_PAIR_THREE_FRAME_CLUSTERED,
         source_frame=BASE_LINK_FRAME,
+        qos_profile=qos_profile_system_default,
     )
 
     update_missing_transforms_one = DynamicSetBlackboard(
@@ -235,9 +208,9 @@ def create_slalom_root():
     )
 
     # Generate movemement options based on the number of missing transforms, generation done in compile time, execution done in runtime
-    move_channel_one = create_channel_movement_root(0, NAMESPACE)
-    move_channel_two = create_channel_movement_root(1, NAMESPACE)
-    move_channel_three = create_channel_movement_root(2, NAMESPACE)
+    move_channel_one = create_channel_movement_root(0)
+    move_channel_two = create_channel_movement_root(1)
+    move_channel_three = create_channel_movement_root(2)
 
     check_missing_transforms_one = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Check missing transforms one",

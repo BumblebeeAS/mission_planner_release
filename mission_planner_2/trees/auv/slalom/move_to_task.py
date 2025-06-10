@@ -26,6 +26,17 @@ def create_move_to_task_root():
         "world_ned", position_x=0.0, position_y=0.0, position_z=0.8, yaw=0.0
     )
 
+    """
+    For sim.
+
+    slalom_init_pose = create_stamped_pose(
+        "world_ned", position_x=6.0, position_y=-0.8, position_z=1.0, yaw=-90.0
+    )
+    """
+    slalom_init_pose = create_stamped_pose(
+        "world_ned", position_x=6.0, position_y=-0.8, position_z=1.0, yaw=-90.0
+    )
+
     move_to_slalom = goto.FromConstant(
         "Move to slalom",
         slalom_init_pose,
