@@ -1,54 +1,3 @@
-# =============================================================================
-# STATIC TRANSFORM CONFIGURATION
-# =============================================================================
-# This file defines static transforms for AUV4 competition tasks.
-# This config is loaded by main.launch.py which launches a static_transform_publisher
-# node for each transform defined here.
-#
-# COORDINATE CONVENTIONS:
-# - parent_frame_id: Reference frame
-# - child_frame_id: Target frame
-# - Translation: x, y, z in meters
-# - Rotation: roll, pitch, yaw in degrees
-#
-# CURRENT CONVENTION:
-# - The current convention of frames that are outputted by our pose estimators is as follows.
-# 
-# Front camera
-# - While FACING the object,
-# - origin is at the top left corner of the object;
-# - +x is to the right;
-# - +y is downwards;
-# - +z is pointing into the object plane away from the camera (or apply the right hand rule).
-# - To make any child frames defined with respect to this estimator frame align with base_link_ned of the AUV,
-#   we need to apply a rotation of roll = -90, pitch = -90, yaw = 0 degrees.
-#
-# Bottom camera
-# - While bottom camera is facing the object, and AUV is aligned towards the front of the object
-# - origin is at the top left corner of the object;
-# - +x is to the right;
-# - +y is downwards;
-# - +z is pointing into the object plane away from the camera, into the pool floor (or apply the right hand rule).
-# - To make any child frames defined with respect to this estimator frame align with base_link_ned of the AUV,
-#   we need to apply a rotation of roll = 0, pitch = 0, yaw = -90 degrees.
-#
-# USAGE:
-# 1. Create a new comment header for each task.
-# 2. Define the transforms in the format below.
-# 3. Visually verify the frames in foxglove (we might not be handling extrinsic/intrinsic rotations correctly).
-#
-# =============================================================================
-# A NOTE ON TRANSFORMS:
-# Note that for a transform from frame A to frame B defined here, the inputted rotation R
-# and the translation vector t here in fact define the INVERSE transform f^-1: B -> A. To see
-# this, note that given a point x in frame A, to get the corresponding point in frame B, we
-# translate back to the origin by -t and reverse the rotation by R^T. Thus f: A -> B is defined by
-# f(x) = R^T(x - t). But then inverting this map gives us f^-1: B -> A defined by exactly
-# f^-1(x) = Rx + t, as desired.
-#
-# Moral of the story: if you want to retrieve the numbers in this file, you need to query the transform
-# from the parent frame to the child frame, not the other way around.
-# =============================================================================
 tfs:
   ######################### TORPEDO 1 TFS #########################
   - name: torpedo_1_fish
@@ -168,7 +117,6 @@ tfs:
     # frame ids
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/shark"
-
   # TODO: need check if can just swap them
   - name: bin_shark_rotated
     # translation (x, y, z in meters)
@@ -193,8 +141,7 @@ tfs:
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/fish/rotated"
     ######################### SLALOM TFS #########################
-    # TODO: ALL HERE MUST CHECK AND UPDATE 
-  - name: channel_pair_two_from_one_hardcoded
+  - name: slalom_layer_1_from_0_hardcoded
     # translation (x, y, z in meters)
     x: 0.0
     y: 0.0
@@ -203,9 +150,9 @@ tfs:
     pitch: -90.0 # in degrees
     yaw: 0.0 # in degrees
     # frame ids
-    parent_frame_id: "channel_pair_one/clustered"
-    child_frame_id: "channel_pair_two/hardcoded"
-  - name: channel_pair_three_from_two_hardcoded
+    parent_frame_id: "slalom_layer_0/clustered"
+    child_frame_id: "slalom_layer_1/hardcoded"
+  - name: slalom_layer_2_from_1_hardcoded
     # translation (x, y, z in metres)
     x: 0.0
     y: 0.0
@@ -214,9 +161,9 @@ tfs:
     pitch: -90.0 # in degrees
     yaw: 0.0 # in degrees
     # frame ids
-    parent_frame_id: "channel_pair_two/clustered"
-    child_frame_id: "channel_pair_three/hardcoded"
-  - name: channel_pair_three_from_two_hardcoded_hardcoded # forgive my naming sins
+    parent_frame_id: "slalom_layer_1/clustered"
+    child_frame_id: "slalom_layer_2/hardcoded"
+  - name: slalom_layer_2_from_1_hardcoded_hardcoded # forgive my naming sins
     # translation (x, y, z in metres)
     x: 0.0
     y: 0.0
@@ -225,8 +172,8 @@ tfs:
     pitch: -90.0 # in degrees
     yaw: 0.0 # in degrees
     # frame ids
-    parent_frame_id: "channel_pair_two/hardcoded"
-    child_frame_id: "channel_pair_three/hardcoded"
+    parent_frame_id: "slalom_layer_1/hardcoded"
+    child_frame_id: "slalom_layer_2/hardcoded"
     ######################### TEMPORARY TFS #########################
   - name: torpedo_top
     x: -0.07819
