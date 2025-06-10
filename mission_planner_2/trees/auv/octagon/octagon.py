@@ -175,10 +175,9 @@ def create_octagon_root():
         children=[
             srv_get_choice,
             set_activate_grabber,
-            pub_activate_grabber,
             set_half_close_grabber,
-            cluster_spoon,
             cache_tf_surface,
+            cluster_spoon,
             goto_spoon,
             py_trees.timers.Timer(
                 "Stabilise before pick up", duration=STABILIZE_DURATION
@@ -188,6 +187,7 @@ def create_octagon_root():
             goto_surface_spoon,
             cluster_spoon_basket,
             goto_spoon_basket,
+            pub_activate_grabber,
         ]
     )
 
