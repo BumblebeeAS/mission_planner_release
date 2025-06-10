@@ -7,7 +7,7 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goals,
+    create_clustering_goal,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
@@ -30,7 +30,6 @@ GATE_CENTRE_FRAME = "gate/centre"
 
 
 def create_return_root():
-
     # Root sequence
     seq_return_root = py_trees.composites.Sequence(
         name="Return root",
@@ -48,7 +47,7 @@ def create_return_root():
         name="Cluster gate transforms",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goals(
+        action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_YOLO,
             out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
             duration=CLUSTERING_DURATION,

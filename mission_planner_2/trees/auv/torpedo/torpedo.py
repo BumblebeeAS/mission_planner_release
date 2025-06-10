@@ -12,9 +12,8 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_clustering_goals
+from mission_planner_2.commons.pose_utils import create_clustering_goal
 from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
 from mission_planner_2.trees.auv.torpedo.tf_selector import create_tf_selector_root
 
 # Generate namespace automatically from file path DONT set manually
@@ -113,7 +112,7 @@ def create_torpedo_root():
         name="Cluster the transforms before first shot",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goals(
+        action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_OPTICAL,
             out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
             duration=CLUSTER_DURATION,
@@ -159,7 +158,7 @@ def create_torpedo_root():
         name="Cluster the transforms before second shot",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goals(
+        action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_OPTICAL,
             out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
             duration=CLUSTER_DURATION,

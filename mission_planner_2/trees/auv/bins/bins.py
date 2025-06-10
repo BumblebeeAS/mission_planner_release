@@ -15,7 +15,7 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goals,
+    create_clustering_goal,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.bins.bin_selector import create_bin_selector_root
@@ -81,7 +81,7 @@ def create_bin_root():
         name="Cluster transforms for orientation",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goals(
+        action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_YOLO,
             out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
             duration=CLUSTERING_DURATION,
@@ -239,7 +239,7 @@ def create_bin_root():
         else:
             template_frame = ROTATED_TEMPLATE_FRAME_OPTICAL
 
-        return create_clustering_goals(
+        return create_clustering_goal(
             in_children=template_frame,
             out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
             duration=CLUSTERING_DURATION,

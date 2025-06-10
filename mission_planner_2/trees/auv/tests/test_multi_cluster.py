@@ -2,7 +2,7 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 
-from mission_planner_2.commons.pose_utils import create_clustering_goals
+from mission_planner_2.commons.pose_utils import create_clustering_goal
 
 
 def create_test_multi_cluster_root():
@@ -15,7 +15,7 @@ def create_test_multi_cluster_root():
         name="cluster",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goals(
+        action_goal=create_clustering_goal(
             in_children=in_children,
             out_children=out_children,
             duration=40,

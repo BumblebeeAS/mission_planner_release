@@ -1,9 +1,6 @@
-import operator
-
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
-from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
@@ -14,12 +11,10 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goals,
+    create_clustering_goal,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.torpedo.move_to_task import create_move_to_task_root
-from mission_planner_2.trees.auv.torpedo.tf_selector import create_tf_selector_root
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -103,7 +98,7 @@ def create_octagon_root():
         name="Cluster spoon",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goals(
+        action_goal=create_clustering_goal(
             in_children=SPOON_FRAME,
             out_children=SPOON_FRAME_CLUSTERED,
             duration=CLUSTER_DURATION,
@@ -156,7 +151,7 @@ def create_octagon_root():
         name="Cluster spoon basket",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goals(
+        action_goal=create_clustering_goal(
             in_children=SPOON_BASKET_FRAME,
             out_children=SPOON_BASKET_FRAME_CLUSTERED,
             duration=CLUSTER_DURATION,
