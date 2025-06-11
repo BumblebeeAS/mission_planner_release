@@ -23,6 +23,7 @@ fk = full_key_generator(NAMESPACE)
 
 ########################## UPDATE CONSTANTS HERE #########################
 BASE_LINK_FRAME = "auv4/base_link_ned"
+WORLD_FRAME = "world_ned"
 CHANNEL_PAIR_ONE_FRAME = "slalom_layer_0"
 CHANNEL_PAIR_TWO_FRAME = "slalom_layer_1"
 CHANNEL_PAIR_THREE_FRAME = "slalom_layer_2"
@@ -31,11 +32,18 @@ CHANNEL_PAIR_ONE_FRAME_CLUSTERED = "slalom_layer_0/clustered"
 CHANNEL_PAIR_TWO_FRAME_CLUSTERED = "slalom_layer_1/clustered"
 CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "slalom_layer_2/clustered"
 
-TRANSFORM_TIMEOUT_DURATION = 10.0
+TRANSFORM_TIMEOUT_DURATION = 5.0
 
-FIRST_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.8, "yaw": 0.0}
-SECOND_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.8, "yaw": 0.0}
-THIRD_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.8, "yaw": 0.0}
+"""
+For sim.
+FIRST_VIEW = {"position_x": 6.0, "position_y": -0.8, "position_z": 1.0, "yaw": -90.0}
+SECOND_VIEW = {"position_x": 5.0, "position_y": -0.8, "position_z": 1.0, "yaw": -90.0}
+THIRD_VIEW = {"position_x": 7.0, "position_y": -0.8, "position_z": 1.0, "yaw": -90.0}
+"""
+
+FIRST_VIEW = {"position_x": 6.0, "position_y": -0.6, "position_z": 0.7, "yaw": -90.0}
+SECOND_VIEW = {"position_x": 5.0, "position_y": -0.6, "position_z": 0.7, "yaw": -90.0}
+THIRD_VIEW = {"position_x": 7.0, "position_y": -0.6, "position_z": 0.7, "yaw": -90.0}
 #########################################################################
 
 
@@ -64,7 +72,7 @@ def create_slalom_root():
     # TODO: Update the frame and pose to move to
     move_and_cluster_one = create_move_and_cluster_root(
         pose_stamped=create_stamped_pose(
-            BASE_LINK_FRAME,
+            WORLD_FRAME,
             position_x=FIRST_VIEW["position_x"],
             position_y=FIRST_VIEW["position_y"],
             position_z=FIRST_VIEW["position_z"],
@@ -74,7 +82,7 @@ def create_slalom_root():
 
     move_and_cluster_two = create_move_and_cluster_root(
         pose_stamped=create_stamped_pose(
-            BASE_LINK_FRAME,
+            WORLD_FRAME,
             position_x=SECOND_VIEW["position_x"],
             position_y=SECOND_VIEW["position_y"],
             position_z=SECOND_VIEW["position_z"],
@@ -84,7 +92,7 @@ def create_slalom_root():
 
     move_and_cluster_three = create_move_and_cluster_root(
         pose_stamped=create_stamped_pose(
-            BASE_LINK_FRAME,
+            WORLD_FRAME,
             position_x=THIRD_VIEW["position_x"],
             position_y=THIRD_VIEW["position_y"],
             position_z=THIRD_VIEW["position_z"],
@@ -95,7 +103,11 @@ def create_slalom_root():
     seq_move_and_cluster = py_trees.composites.Sequence(
         name="Move to different views and cluster",
         memory=True,
-        children=[move_and_cluster_one, move_and_cluster_two, move_and_cluster_three],
+        children=[
+            move_and_cluster_one,
+            # move_and_cluster_two,
+            # move_and_cluster_three
+        ],
     )
 
     # Initialize the number of missing transforms in blackboard to be used by DynamicSetBlackboard
@@ -263,12 +275,11 @@ def create_slalom_root():
     )
 
     # Write is left (for testing)
-    write_is_left = DynamicSetBlackboard(
+    write_is_left = py_trees.behaviours.SetBlackboardVariable(
         name="Write is left side",
         variable_name="is_left_side",
-        update_key="is_left_side",
+        variable_value=True,
         overwrite=True,
-        func=lambda: True,
     )
 
     root.add_children(

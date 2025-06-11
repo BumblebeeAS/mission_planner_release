@@ -21,7 +21,7 @@ Send clustering goal
 """
 
 ######################### UPDATE CONSTANTS HERE #########################
-CLUSTERING_DURATION = 20
+CLUSTERING_DURATION = 40
 STABILIZE_CONTROLS_DURATION = 10
 BASE_LINK_FRAME = "auv4/base_link_ned"
 #########################################################################

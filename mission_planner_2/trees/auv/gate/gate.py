@@ -8,7 +8,6 @@ from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import cache_tf
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -149,12 +148,11 @@ def create_gate_root():
         operator=operator.__eq__,
     )
 
-    write_is_left = DynamicSetBlackboard(
+    write_is_left = py_trees.behaviours.SetBlackboardVariable(
         name="Write is left side",
         variable_name=_IS_LEFT_KEY,
-        update_key=_IS_LEFT_KEY,
+        variable_value=True,
         overwrite=True,
-        func=lambda: True,
     )
 
     goto_left_approach = goto.FromBlackboard(
@@ -164,12 +162,11 @@ def create_gate_root():
 
     seq_go_right_side = py_trees.composites.Sequence(name="Go right side", memory=True)
 
-    write_not_is_left = DynamicSetBlackboard(
-        name="Write not is left side",
+    write_not_is_left = py_trees.behaviours.SetBlackboardVariable(
+        name="Write is left side",
         variable_name=_IS_LEFT_KEY,
-        update_key=_IS_LEFT_KEY,
+        variable_value=False,
         overwrite=True,
-        func=lambda: False,
     )
 
     goto_right_approach = goto.FromBlackboard(

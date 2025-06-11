@@ -1,8 +1,6 @@
 import operator
 
 import py_trees
-import py_trees_ros
-from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -27,6 +25,8 @@ SLALOM_TWO_FROM_ONE_HARDCODED = "slalom_layer_2/hardcoded"
 SLALOM_ONE_FROM_ZERO_HARDCODED = "slalom_layer_1/hardcoded"
 SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
 
+WAIT_BETWEEN_MOVES = 30.0
+
 # Gate Constants
 #########################################################################
 
@@ -42,12 +42,12 @@ def create_slalom_left_pose(frame_id: str):
     """
     return create_stamped_pose(
         frame_id=frame_id,
-        x=0.0,
-        y=0.0,
-        z=0.0,
-        roll=0.0,
-        pitch=0.0,
-        yaw=-90.0,  # Facing left
+        position_x=0.75,
+        position_y=0.5,
+        position_z=0.0,
+        roll=-90.0,
+        pitch=-90.0,
+        yaw=0.0,  # Facing left
     )
 
 
@@ -57,12 +57,12 @@ def create_slalom_right_pose(frame_id: str):
     """
     return create_stamped_pose(
         frame_id=frame_id,
-        x=0.0,
-        y=0.0,
-        z=0.0,
-        roll=0.0,
-        pitch=0.0,
-        yaw=90.0,  # Facing right
+        position_x=2.25,
+        position_y=0.5,
+        position_z=0.0,
+        roll=-90.0,
+        pitch=-90.0,
+        yaw=0.0,
     )
 
 
@@ -78,42 +78,32 @@ def create_channel_movement_root(number_of_missing_channels: int):
     )
 
     # Left Check
-    check_is_fish_zero = py_trees.behaviours.CheckBlackboardVariableValues(
+    check_is_fish_zero = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Check if left side zero",
-        checks=[
-            py_trees.common.ComparisonExpression(
-                variable=_IS_LEFT_KEY,
-                value=True,
-                operator=lambda x, y: operator.__eq__(x, y),
-            ),
-        ],
-        operator=operator.__eq__,
+        check=py_trees.common.ComparisonExpression(
+            variable=_IS_LEFT_KEY,
+            value=True,
+            operator=lambda x, y: operator.__eq__(x, y),
+        ),
     )
 
-    check_is_fish_one = py_trees.behaviours.CheckBlackboardVariableValues(
-        name="Check if left side one",
-        checks=[
-            py_trees.common.ComparisonExpression(
-                variable=_IS_LEFT_KEY,
-                value=True,
-                operator=lambda x, y: operator.__eq__(x, y),
-            ),
-        ],
-        operator=operator.__eq__,
+    check_is_fish_one = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check if left side zero",
+        check=py_trees.common.ComparisonExpression(
+            variable=_IS_LEFT_KEY,
+            value=True,
+            operator=lambda x, y: operator.__eq__(x, y),
+        ),
     )
 
-    check_is_fish_two = py_trees.behaviours.CheckBlackboardVariableValues(
-        name="Check if left side two",
-        checks=[
-            py_trees.common.ComparisonExpression(
-                variable=_IS_LEFT_KEY,
-                value=True,
-                operator=lambda x, y: operator.__eq__(x, y),
-            ),
-        ],
-        operator=operator.__eq__,
+    check_is_fish_two = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check if left side zero",
+        check=py_trees.common.ComparisonExpression(
+            variable=_IS_LEFT_KEY,
+            value=True,
+            operator=lambda x, y: operator.__eq__(x, y),
+        ),
     )
-
     # No Missing Transforms
     zero_root = py_trees.composites.Selector(
         name="Zero Missing Transforms",
@@ -128,10 +118,12 @@ def create_channel_movement_root(number_of_missing_channels: int):
                 name="Goto zero left side zero",
                 pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto zero left side one",
                 pose=create_slalom_left_pose(SLALOM_ONE_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto zero left side two",
                 pose=create_slalom_left_pose(SLALOM_TWO_FRAME_CLUSTERED),
@@ -147,10 +139,12 @@ def create_channel_movement_root(number_of_missing_channels: int):
                 name="Goto zero right side zero",
                 pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto zero right side one",
                 pose=create_slalom_right_pose(SLALOM_ONE_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto zero right side two",
                 pose=create_slalom_right_pose(SLALOM_TWO_FRAME_CLUSTERED),
@@ -180,10 +174,12 @@ def create_channel_movement_root(number_of_missing_channels: int):
                 name="Goto one left side zero",
                 pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto one left side one",
                 pose=create_slalom_left_pose(SLALOM_ONE_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto one left side two hardcoded",
                 pose=create_slalom_left_pose(SLALOM_TWO_FROM_ONE_HARDCODED),
@@ -199,10 +195,12 @@ def create_channel_movement_root(number_of_missing_channels: int):
                 name="Goto one right side zero",
                 pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto one right side one",
                 pose=create_slalom_right_pose(SLALOM_ONE_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto one right side two hardcoded",
                 pose=create_slalom_right_pose(SLALOM_TWO_FROM_ONE_HARDCODED),
@@ -232,10 +230,12 @@ def create_channel_movement_root(number_of_missing_channels: int):
                 name="Goto two left side zero",
                 pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto two left side one hardcoded",
                 pose=create_slalom_left_pose(SLALOM_ONE_FROM_ZERO_HARDCODED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto two left side two hardcoded hardcoded",
                 pose=create_slalom_left_pose(SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED),
@@ -251,10 +251,12 @@ def create_channel_movement_root(number_of_missing_channels: int):
                 name="Goto two right side zero",
                 pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto two right side one hardcoded",
                 pose=create_slalom_right_pose(SLALOM_ONE_FROM_ZERO_HARDCODED),
             ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto two right side two hardcoded hardcoded",
                 pose=create_slalom_right_pose(SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED),
