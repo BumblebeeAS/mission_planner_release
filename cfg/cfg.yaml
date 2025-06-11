@@ -141,17 +141,8 @@ tfs:
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/fish/rotated"
     ######################### SLALOM TFS #########################
-  - name: slalom_layer_1_from_0_hardcoded
-    # translation (x, y, z in meters)
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    roll: -90.0 # in degrees
-    pitch: -90.0 # in degrees
-    yaw: 0.0 # in degrees
-    # frame ids
-    parent_frame_id: "slalom_layer_0/clustered"
-    child_frame_id: "slalom_layer_1/hardcoded"
+    # No Missing Transforms
+    # One Missing Transform
   - name: slalom_layer_2_from_1_hardcoded
     # translation (x, y, z in metres)
     x: 0.0
@@ -163,6 +154,18 @@ tfs:
     # frame ids
     parent_frame_id: "slalom_layer_1/clustered"
     child_frame_id: "slalom_layer_2/hardcoded"
+    # Two Missing Transforms
+  - name: slalom_layer_1_from_0_hardcoded
+    # translation (x, y, z in meters)
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    roll: -90.0 # in degrees
+    pitch: -90.0 # in degrees
+    yaw: 0.0 # in degrees
+    # frame ids
+    parent_frame_id: "slalom_layer_0/clustered"
+    child_frame_id: "slalom_layer_1/hardcoded"
   - name: slalom_layer_2_from_1_hardcoded_hardcoded # forgive my naming sins
     # translation (x, y, z in metres)
     x: 0.0
@@ -173,7 +176,7 @@ tfs:
     yaw: 0.0 # in degrees
     # frame ids
     parent_frame_id: "slalom_layer_1/hardcoded"
-    child_frame_id: "slalom_layer_2/hardcoded"
+    child_frame_id: "slalom_layer_2/hardcoded/hardcoded"
     ######################### TEMPORARY TFS #########################
   - name: torpedo_top
     x: -0.07819

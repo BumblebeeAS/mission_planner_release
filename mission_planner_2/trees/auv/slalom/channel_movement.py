@@ -1,25 +1,69 @@
-import py_trees
+import operator
 
+import py_trees
+import py_trees_ros
+from std_srvs.srv import Trigger
+
+from mission_planner_2.commons.namespace_utils import (
+    full_key_generator,
+    generate_namespace,
+)
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 
 ########################## UPDATE CONSTANTS HERE #########################
 BASE_LINK_FRAME = "auv4/base_link_ned"
-CHANNEL_PAIR_ONE_FRAME = "slalom_layer_0"
-CHANNEL_PAIR_TWO_FRAME = "slalom_layer_1"
-CHANNEL_PAIR_THREE_FRAME = "slalom_layer_2"
 
-CHANNEL_PAIR_ONE_FRAME_CLUSTERED = "slalom_layer_0/clustered"
-CHANNEL_PAIR_TWO_FRAME_CLUSTERED = "slalom_layer_1/clustered"
-CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "slalom_layer_2/clustered"
+# No Missing Transforms
+SLALOM_ZERO_FRAME_CLUSTERED = "slalom_layer_0/clustered"
+SLALOM_ONE_FRAME_CLUSTERED = "slalom_layer_1/clustered"
+SLALOM_TWO_FRAME_CLUSTERED = "slalom_layer_2/clustered"
 
-# TODO: Update the following in cfg.yaml
-# Hardcoded transform defined from channel two to three, two is clustered/hardcoded
-CHANNEL_PAIR_THREE_FROM_TWO_HARDCODE = "slalom_layer_2/hardcoded"
+# One Missing Transform
+# SLALOM_ZERO_FRAME_CLUSTERED
+SLALOM_TWO_FROM_ONE_HARDCODED = "slalom_layer_2/hardcoded"
 
-# Hardcoded transform defined from channel one to two, one is clustered
-CHANNEL_PAIR_TWO_FROM_ONE_HARDCODE = "slalom_layer_1/hardcoded"
+# Two Missing Transforms
+SLALOM_ONE_FROM_ZERO_HARDCODED = "slalom_layer_1/hardcoded"
+SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
+
+# Gate Constants
 #########################################################################
+
+NAMESPACE = generate_namespace()
+fk = full_key_generator(NAMESPACE)
+
+_IS_LEFT_KEY = "is_left_side"  # Global key for left option or not
+
+
+def create_slalom_left_pose(frame_id: str):
+    """
+    Create a PoseStamped for the left side of the slalom.
+    """
+    return create_stamped_pose(
+        frame_id=frame_id,
+        x=0.0,
+        y=0.0,
+        z=0.0,
+        roll=0.0,
+        pitch=0.0,
+        yaw=-90.0,  # Facing left
+    )
+
+
+def create_slalom_right_pose(frame_id: str):
+    """
+    Create a PoseStamped for the right side of the slalom.
+    """
+    return create_stamped_pose(
+        frame_id=frame_id,
+        x=0.0,
+        y=0.0,
+        z=0.0,
+        roll=0.0,
+        pitch=0.0,
+        yaw=90.0,  # Facing right
+    )
 
 
 def create_channel_movement_root(number_of_missing_channels: int):
@@ -33,47 +77,207 @@ def create_channel_movement_root(number_of_missing_channels: int):
         memory=True,
     )
 
-    move_channel_one = goto.FromConstant(
-        name="Goto channel one",
-        pose=create_stamped_pose(CHANNEL_PAIR_ONE_FRAME_CLUSTERED),
+    # Left Check
+    check_is_fish_zero = py_trees.behaviours.CheckBlackboardVariableValues(
+        name="Check if left side zero",
+        checks=[
+            py_trees.common.ComparisonExpression(
+                variable=_IS_LEFT_KEY,
+                value=True,
+                operator=lambda x, y: operator.__eq__(x, y),
+            ),
+        ],
+        operator=operator.__eq__,
     )
 
-    move_channel_two = goto.FromConstant(
-        name="Goto channel two",
-        pose=create_stamped_pose(CHANNEL_PAIR_TWO_FRAME_CLUSTERED),
+    check_is_fish_one = py_trees.behaviours.CheckBlackboardVariableValues(
+        name="Check if left side one",
+        checks=[
+            py_trees.common.ComparisonExpression(
+                variable=_IS_LEFT_KEY,
+                value=True,
+                operator=lambda x, y: operator.__eq__(x, y),
+            ),
+        ],
+        operator=operator.__eq__,
     )
 
-    move_channel_three = goto.FromConstant(
-        name="Goto channel three",
-        pose=create_stamped_pose(CHANNEL_PAIR_THREE_FRAME_CLUSTERED),
+    check_is_fish_two = py_trees.behaviours.CheckBlackboardVariableValues(
+        name="Check if left side two",
+        checks=[
+            py_trees.common.ComparisonExpression(
+                variable=_IS_LEFT_KEY,
+                value=True,
+                operator=lambda x, y: operator.__eq__(x, y),
+            ),
+        ],
+        operator=operator.__eq__,
     )
 
-    move_channel_three_hardcode = goto.FromConstant(
-        name="Goto channel three hardcode",
-        pose=create_stamped_pose(CHANNEL_PAIR_THREE_FROM_TWO_HARDCODE),
+    # No Missing Transforms
+    zero_root = py_trees.composites.Selector(
+        name="Zero Missing Transforms",
+        memory=True,
+    )
+    zero_left_seq = py_trees.composites.Sequence(
+        name="Zero Left Side Sequence",
+        memory=True,
+        children=[
+            check_is_fish_zero,
+            goto.FromConstant(
+                name="Goto zero left side zero",
+                pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto zero left side one",
+                pose=create_slalom_left_pose(SLALOM_ONE_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto zero left side two",
+                pose=create_slalom_left_pose(SLALOM_TWO_FRAME_CLUSTERED),
+            ),
+        ],
     )
 
-    move_channel_two_hardcode = goto.FromConstant(
-        name="Goto channel two hardcode",
-        pose=create_stamped_pose(CHANNEL_PAIR_TWO_FROM_ONE_HARDCODE),
+    zero_right_seq = py_trees.composites.Sequence(
+        name="Zero Right Side Sequence",
+        memory=True,
+        children=[
+            goto.FromConstant(
+                name="Goto zero right side zero",
+                pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto zero right side one",
+                pose=create_slalom_right_pose(SLALOM_ONE_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto zero right side two",
+                pose=create_slalom_right_pose(SLALOM_TWO_FRAME_CLUSTERED),
+            ),
+        ],
     )
 
+    zero_root.add_children(
+        children=[
+            zero_left_seq,
+            zero_right_seq,
+        ]
+    )
+
+    # One Missing Transform
+    one_root = py_trees.composites.Selector(
+        name="One Missing Transform",
+        memory=True,
+    )
+
+    one_left_seq = py_trees.composites.Sequence(
+        name="One Left Side Sequence",
+        memory=True,
+        children=[
+            check_is_fish_one,
+            goto.FromConstant(
+                name="Goto one left side zero",
+                pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto one left side one",
+                pose=create_slalom_left_pose(SLALOM_ONE_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto one left side two hardcoded",
+                pose=create_slalom_left_pose(SLALOM_TWO_FROM_ONE_HARDCODED),
+            ),
+        ],
+    )
+
+    one_right_seq = py_trees.composites.Sequence(
+        name="One Right Side Sequence",
+        memory=True,
+        children=[
+            goto.FromConstant(
+                name="Goto one right side zero",
+                pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto one right side one",
+                pose=create_slalom_right_pose(SLALOM_ONE_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto one right side two hardcoded",
+                pose=create_slalom_right_pose(SLALOM_TWO_FROM_ONE_HARDCODED),
+            ),
+        ],
+    )
+
+    one_root.add_children(
+        children=[
+            one_left_seq,
+            one_right_seq,
+        ]
+    )
+
+    # Two Missing Transforms
+    two_root = py_trees.composites.Selector(
+        name="Two Missing Transforms",
+        memory=True,
+    )
+
+    two_left_seq = py_trees.composites.Sequence(
+        name="Two Left Side Sequence",
+        memory=True,
+        children=[
+            check_is_fish_two,
+            goto.FromConstant(
+                name="Goto two left side zero",
+                pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto two left side one hardcoded",
+                pose=create_slalom_left_pose(SLALOM_ONE_FROM_ZERO_HARDCODED),
+            ),
+            goto.FromConstant(
+                name="Goto two left side two hardcoded hardcoded",
+                pose=create_slalom_left_pose(SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED),
+            ),
+        ],
+    )
+
+    two_right_seq = py_trees.composites.Sequence(
+        name="Two Right Side Sequence",
+        memory=True,
+        children=[
+            goto.FromConstant(
+                name="Goto two right side zero",
+                pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+            ),
+            goto.FromConstant(
+                name="Goto two right side one hardcoded",
+                pose=create_slalom_right_pose(SLALOM_ONE_FROM_ZERO_HARDCODED),
+            ),
+            goto.FromConstant(
+                name="Goto two right side two hardcoded hardcoded",
+                pose=create_slalom_right_pose(SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED),
+            ),
+        ],
+    )
+
+    two_root.add_children(
+        children=[
+            two_left_seq,
+            two_right_seq,
+        ]
+    )
+
+    # Add the roots to the main root based on the number of missing channels
     if number_of_missing_channels == 0:
-        root.add_children(
-            children=[move_channel_one, move_channel_two, move_channel_three]
-        )
+        root.add_child(zero_root)
     elif number_of_missing_channels == 1:
-        root.add_children(
-            children=[move_channel_one, move_channel_two, move_channel_three_hardcode]
-        )
+        root.add_child(one_root)
     elif number_of_missing_channels == 2:
-        root.add_children(
-            children=[
-                move_channel_one,
-                move_channel_two_hardcode,
-                move_channel_three_hardcode,
-            ]
-        )
+        root.add_child(two_root)
+    else:
+        raise ValueError("Invalid number of missing channels. Must be 0, 1, or 2.")
 
     # Currently, the tree does not support the case where all three channels are missing.
     return root

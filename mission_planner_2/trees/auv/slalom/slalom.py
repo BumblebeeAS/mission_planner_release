@@ -262,9 +262,19 @@ def create_slalom_root():
         ],
     )
 
+    # Write is left (for testing)
+    write_is_left = DynamicSetBlackboard(
+        name="Write is left side",
+        variable_name="is_left_side",
+        update_key="is_left_side",
+        overwrite=True,
+        func=lambda: True,
+    )
+
     root.add_children(
         [
             move_to_task,
+            write_is_left,
             seq_move_and_cluster,
             seq_check_transforms,
             select_movement_strategy,

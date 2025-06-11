@@ -8,6 +8,7 @@ from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import cache_tf
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -44,6 +45,7 @@ _CHOICE_KEY = fk("choice")
 _GATE_ORIENTATION_KEY = fk("orientation")
 _GATE_LEFT_POSE_KEY = fk("gate_left_pose")
 _GATE_RIGHT_POSE_KEY = fk("gate_right_pose")
+_IS_LEFT_KEY = "is_left_side"  # Global key for left option or not
 
 
 def create_gate_root():
@@ -147,9 +149,27 @@ def create_gate_root():
         operator=operator.__eq__,
     )
 
+    write_is_left = DynamicSetBlackboard(
+        name="Write is left side",
+        variable_name=_IS_LEFT_KEY,
+        update_key=_IS_LEFT_KEY,
+        overwrite=True,
+        func=lambda: True,
+    )
+
     goto_left_approach = goto.FromBlackboard(
         name="Goto left approach",
         pose_key=_GATE_LEFT_POSE_KEY,
+    )
+
+    seq_go_right_side = py_trees.composites.Sequence(name="Go right side", memory=True)
+
+    write_not_is_left = DynamicSetBlackboard(
+        name="Write not is left side",
+        variable_name=_IS_LEFT_KEY,
+        update_key=_IS_LEFT_KEY,
+        overwrite=True,
+        func=lambda: False,
     )
 
     goto_right_approach = goto.FromBlackboard(
@@ -157,8 +177,12 @@ def create_gate_root():
         pose_key=_GATE_RIGHT_POSE_KEY,
     )
 
-    seq_try_left_side.add_children(children=[check_is_left, goto_left_approach])
-    sel_gate_side.add_children(children=[seq_try_left_side, goto_right_approach])
+    seq_go_right_side.add_children(children=[write_not_is_left, goto_right_approach])
+
+    seq_try_left_side.add_children(
+        children=[check_is_left, write_is_left, goto_left_approach]
+    )
+    sel_gate_side.add_children(children=[seq_try_left_side, seq_go_right_side])
 
     # Step 10: Wait to stabilize before passage
     timer_stabilize_final = py_trees.timers.Timer(
