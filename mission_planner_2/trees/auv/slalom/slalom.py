@@ -10,6 +10,7 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import create_stamped_pose
+from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.slalom.channel_movement import (
     create_channel_movement_root,
 )
@@ -274,9 +275,14 @@ def create_slalom_root():
     # Write is left (for testing)
     write_is_left = py_trees.behaviours.SetBlackboardVariable(
         name="Write is left side",
-        variable_name="is_left_side",
+        variable_name="/global/is_left_side",
         variable_value=True,
         overwrite=True,
+    )
+
+    goto_pass_through = goto.FromConstant(
+        "Pass through gate",
+        pose=create_stamped_pose("auv4/base_link_ned", position_x=2.0),
     )
 
     root.add_children(
@@ -285,6 +291,7 @@ def create_slalom_root():
             seq_move_and_cluster,
             seq_check_transforms,
             select_movement_strategy,
+            goto_pass_through,
         ]
     )
 

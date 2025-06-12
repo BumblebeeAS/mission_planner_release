@@ -147,7 +147,7 @@ tfs:
     # translation (x, y, z in metres)
     x: 1.0
     y: 0.0
-    z: 1.0
+    z: 2.0
     roll: 0.0 # in degrees
     pitch: 0.0 # in degrees
     yaw: 0.0 # in degrees
@@ -159,7 +159,7 @@ tfs:
     # translation (x, y, z in meters)
     x: -0.5
     y: 0.0
-    z: 1.0
+    z: 2.0
     roll: 0.0 # in degrees
     pitch: 0.0 # in degrees
     yaw: 0.0 # in degrees
@@ -170,7 +170,7 @@ tfs:
     # translation (x, y, z in metres)
     x: 1.0
     y: 0.0
-    z: 1.0
+    z: 2.0
     roll: 0.0 # in degrees
     pitch: 0.0 # in degrees
     yaw: 0.0 # in degrees

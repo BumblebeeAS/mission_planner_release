@@ -44,7 +44,7 @@ _CHOICE_KEY = fk("choice")
 _GATE_ORIENTATION_KEY = fk("orientation")
 _GATE_LEFT_POSE_KEY = fk("gate_left_pose")
 _GATE_RIGHT_POSE_KEY = fk("gate_right_pose")
-_IS_LEFT_KEY = "is_left_side"  # Global key for left option or not
+_IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 
 
 def create_gate_root():

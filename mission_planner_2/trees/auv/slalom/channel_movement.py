@@ -33,7 +33,7 @@ WAIT_BETWEEN_MOVES = 30.0
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
-_IS_LEFT_KEY = "is_left_side"  # Global key for left option or not
+_IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 
 
 def create_slalom_left_pose(frame_id: str):
