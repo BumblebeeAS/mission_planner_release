@@ -229,7 +229,6 @@ def create_torpedo_root():
 
     seq_torpedo_root.add_children(
         children=[
-            # create_move_to_task_root(),
             py_trees.timers.Timer("Stabilise before task", duration=STABILIZE_DURATION),
             seq_launch_torpedo,
         ]

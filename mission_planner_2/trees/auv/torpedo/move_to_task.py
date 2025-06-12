@@ -12,7 +12,7 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 
-def create_move_to_task_root():
+def create_move_to_torpedo_task_root():
     """
     Create the root of the torpedo tree.
     """

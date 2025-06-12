@@ -394,7 +394,6 @@ def create_bin_root():
     # Build root sequence
     seq_bin_root.add_children(
         children=[
-            # create_move_to_bin_task_root(),
             # timer_stabilise,
             seq_drop_into_bin,
         ]
