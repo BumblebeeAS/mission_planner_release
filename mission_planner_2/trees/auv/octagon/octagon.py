@@ -6,6 +6,7 @@ from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import cache_tf
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -23,30 +24,53 @@ fk = full_key_generator(NAMESPACE)
 ######################### UPDATE CONSTANTS HERE #########################
 CAMERA_FRAME = "auv4/front_cam_optical"
 
-SPOON_FRAME = "spoon"
-SPOON_FRAME_CLUSTERED = "spoon/clustered"
-CUP_FRAME = "cup"
-CUP_FRAME_CLUSTERED = "cup/clustered"
+LADLE_1_FRAME = "ladle_1"
+LADLE_1_FRAME_CLUSTERED = "ladle_1/clustered"
+BOTTLE_1_FRAME = "bottle_1"
+BOTTLE_1_FRAME_CLUSTERED = "bottle_1/clustered"
 
-SPOON_BASKET_FRAME = "spoon_basket"
-SPOON_BASKET_FRAME_CLUSTERED = "spoon_basket/clustered"
-CUP_BASKET_FRAME = "cup_basket"
-CUP_BASKET_FRAME_CLUSTERED = "cup_basket/clustered"
+LADLE_2_FRAME = "ladle_2"
+LADLE_2_FRAME_CLUSTERED = "ladle_2/clustered"
+BOTTLE_2_FRAME = "bottle_2"
+BOTTLE_2_FRAME_CLUSTERED = "bottle_2/clustered"
+
+LADLE_BASKET_FRAME = "ladle_basket"
+LADLE_BASKET_FRAME_CLUSTERED = "ladle_basket/clustered"
+BOTTLE_BASKET_FRAME = "bottle_basket"
+BOTTLE_BASKET_FRAME_CLUSTERED = "bottle_basket/clustered"
+
+FISH_FRAME = "trash/fish"
+SHARK_FRAME = "trash/shark"
+FISH_FRAME_CLUSTERED = "trash/fish/clustered"
+SHARK_FRAME_CLUSTERED = "trash/shark/clustered"
+FISH_VIEW_FRAME = "trash/fish/view"
+SHARK_VIEW_FRAME = "trash/shark/view"
 
 ACTIVATE_GRABBER = UInt8(data=0)
 HALF_CLOSE_GRABBER = UInt8(data=3)
 
 CLUSTER_DURATION = 30
+NUM_ROTATIONS = 6
 STABILIZE_DURATION = 10
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
 _CHOICE_KEY = fk("choice")
-_POSE_KEY = fk("pose")
-_GO_SURFACE_POSE_KEY = fk("go_surface_pose")
+_GO_SURFACE_FRAME_KEY = fk("go_surface_frame")
 _ACTIVATE_GRABBER_KEY = fk("activate_grabber")
 _HALF_CLOSE_GRABBER_KEY = fk("half_close_grabber")
+
+
+# TODO might have btr way to do this im just lz to type same thing so many times
+def _create_search_tag_goto(num_rotations):
+    return goto.FromConstant(
+        name="search goto",
+        pose=create_stamped_pose(
+            frame_id="auv4/base_link_ned",
+            yaw=360.0 / num_rotations,
+        ),
+    )
 
 
 def create_octagon_root():
@@ -76,8 +100,6 @@ def create_octagon_root():
         key_response=_CHOICE_KEY,
     )
 
-    # TODO: if the two objects end up to be very similar logic almost the same can put in a sub tree for now this is easier to test each one
-    ################## SPOON PART #################
     set_activate_grabber = py_trees.behaviours.SetBlackboardVariable(
         name="Set claw actuation",
         variable_name=_ACTIVATE_GRABBER_KEY,
@@ -92,41 +114,75 @@ def create_octagon_root():
         overwrite=True,
     )
 
-    pub_activate_grabber_spoon = py_trees_ros.publishers.FromBlackboard(
-        name="grab spoon",
+    pub_activate_grabber = py_trees_ros.publishers.FromBlackboard(
+        name="Init grabber",
         topic_name="/auv4/actuation/input",
         topic_type=UInt8,
         qos_profile=qos_profile_system_default,
         blackboard_variable=_ACTIVATE_GRABBER_KEY,
     )
 
-    # TODO: search for the tags
+    par_search_tag = py_trees.composites.Parallel(
+        name="Search tag",
+        policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
+    )
 
+    seq_rotate_search = py_trees.composites.Sequence(
+        name="Search goto seq",
+        memory=True,
+    )
+
+    seq_rotate_search.add_children(
+        [_create_search_tag_goto(NUM_ROTATIONS) for _ in range(NUM_ROTATIONS)]
+    )
+
+    cluster_tags = py_trees_ros.actions.ActionClient(
+        name="Cluster tags",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_children=[FISH_FRAME, SHARK_FRAME],
+            out_children=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
+            duration=CLUSTER_DURATION,
+            use_cache=False,
+            persistent=True,
+        ),
+    )
+
+    par_search_tag.add_children(
+        [
+            seq_rotate_search,
+            cluster_tags,
+        ]
+    )
+
+    dynamic_set_surface_pose_frame = DynamicSetBlackboard(
+        name="select surface frame",
+        key=_CHOICE_KEY,
+        update_key=_GO_SURFACE_FRAME_KEY,
+        overwrite=True,
+        func=lambda choice: FISH_VIEW_FRAME if choice.success else SHARK_VIEW_FRAME,
+    )
+
+    # TODO: if the two objects end up to be very similar logic almost the same can put in a sub tree for now this is easier to test each one
+    ################## SPOON PART #################
     cluster_spoon = py_trees_ros.actions.ActionClient(
         name="Cluster spoon",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
-            in_children=SPOON_FRAME,
-            out_children=SPOON_FRAME_CLUSTERED,
+            in_children=LADLE_1_FRAME,
+            out_children=LADLE_1_FRAME_CLUSTERED,
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
-    )
-
-    # assuming can see the spoon on the table from here if not need to move down first add a tf if needed
-    cache_tf_surface = cache_tf.ToBlackboard(
-        name="Cache tf surface",
-        variable_name=fk(_GO_SURFACE_POSE_KEY),
-        start=SPOON_FRAME_CLUSTERED,
-        end="auv4/base_link_ned",
     )
 
     # move down to pick up the spoon
     goto_spoon = goto.FromConstant(
         name="Go to spoon",
         pose=create_stamped_pose(
-            frame_id=SPOON_FRAME_CLUSTERED,
+            frame_id=LADLE_1_FRAME_CLUSTERED,
         ),
     )
 
@@ -141,7 +197,7 @@ def create_octagon_root():
     # now surface with the spoon facing the saved tf
     goto_surface_spoon = goto.FromBlackboard(
         name="Go to surface with spoon",
-        pose_key=_GO_SURFACE_POSE_KEY,
+        pose_key=_GO_SURFACE_FRAME_KEY,
         anchor_frame_name="auv4/base_link_ned",
     )
 
@@ -150,8 +206,8 @@ def create_octagon_root():
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
-            in_children=SPOON_BASKET_FRAME,
-            out_children=SPOON_BASKET_FRAME_CLUSTERED,
+            in_children=LADLE_BASKET_FRAME,
+            out_children=LADLE_BASKET_FRAME_CLUSTERED,
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
@@ -160,7 +216,7 @@ def create_octagon_root():
     goto_spoon_basket = goto.FromConstant(
         name="Go to spoon basket",
         pose=create_stamped_pose(
-            frame_id=SPOON_BASKET_FRAME_CLUSTERED,
+            frame_id=LADLE_BASKET_FRAME_CLUSTERED,
         ),
     )
 
@@ -176,8 +232,21 @@ def create_octagon_root():
     # TODO: may need to recluster the surface pose when surface for pts (goto_surface_spoon)
     goto_surface_reset = goto.FromBlackboard(
         name="Go to surface reset",
-        pose_key=_GO_SURFACE_POSE_KEY,
+        pose_key=_GO_SURFACE_FRAME_KEY,
         anchor_frame_name="auv4/base_link_ned",
+    )
+
+    cluster_tags_spoon_1 = py_trees_ros.actions.ActionClient(
+        name="Cluster tags spoon 1",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_children=[FISH_FRAME, SHARK_FRAME],
+            out_children=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
+            duration=CLUSTER_DURATION,
+            use_cache=False,
+            persistent=True,
+        ),
     )
 
     ################## CUP PART #################
@@ -187,25 +256,17 @@ def create_octagon_root():
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
-            in_children=CUP_FRAME,
-            out_children=CUP_FRAME_CLUSTERED,
+            in_children=BOTTLE_1_FRAME,
+            out_children=BOTTLE_1_FRAME_CLUSTERED,
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
     )
 
-    # assuming can see the spoon on the table from here if not need to move down first
-    cache_tf_surface_2 = cache_tf.ToBlackboard(
-        name="Cache tf surface",
-        variable_name=fk(_GO_SURFACE_POSE_KEY),
-        start=CUP_FRAME_CLUSTERED,
-        end="auv4/base_link_ned",
-    )
-
     goto_cup = goto.FromConstant(
         name="Go to cup",
         pose=create_stamped_pose(
-            frame_id=CUP_FRAME_CLUSTERED,
+            frame_id=BOTTLE_1_FRAME_CLUSTERED,
         ),
     )
 
@@ -220,7 +281,7 @@ def create_octagon_root():
     # now surface with the cup facing the saved tf
     goto_surface_cup = goto.FromBlackboard(
         name="Go to surface with cup",
-        pose_key=fk(_GO_SURFACE_POSE_KEY),
+        pose_key=_GO_SURFACE_FRAME_KEY,
         anchor_frame_name="auv4/base_link_ned",
     )
 
@@ -229,8 +290,8 @@ def create_octagon_root():
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
-            in_children=CUP_BASKET_FRAME,
-            out_children=CUP_BASKET_FRAME_CLUSTERED,
+            in_children=BOTTLE_BASKET_FRAME,
+            out_children=BOTTLE_BASKET_FRAME_CLUSTERED,
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
@@ -239,7 +300,7 @@ def create_octagon_root():
     goto_cup_basket = goto.FromConstant(
         name="Go to cup basket",
         pose=create_stamped_pose(
-            frame_id=CUP_BASKET_FRAME_CLUSTERED,
+            frame_id=BOTTLE_BASKET_FRAME_CLUSTERED,
         ),
     )
 
@@ -256,8 +317,21 @@ def create_octagon_root():
     # TODO: may need to recluster the surface pose when surface for pts (goto_surface_spoon)
     goto_surface_reset_2 = goto.FromBlackboard(
         name="Go to surface reset",
-        pose_key=_GO_SURFACE_POSE_KEY,
+        pose_key=_GO_SURFACE_FRAME_KEY,
         anchor_frame_name="auv4/base_link_ned",
+    )
+
+    cluster_tags_cup_1 = py_trees_ros.actions.ActionClient(
+        name="Cluster tags cup 1",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_children=[FISH_FRAME, SHARK_FRAME],
+            out_children=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
+            duration=CLUSTER_DURATION,
+            use_cache=False,
+            persistent=True,
+        ),
     )
 
     goto_rotation_spoon = goto.FromConstant(
@@ -272,7 +346,6 @@ def create_octagon_root():
 
     seq_spoon.add_children(
         children=[
-            cache_tf_surface,
             cluster_spoon,
             goto_spoon,
             py_trees.timers.Timer(
@@ -286,12 +359,12 @@ def create_octagon_root():
             pub_activate_grabber_spoon,
             py_trees.timers.Timer("Wait after drop", duration=STABILIZE_DURATION),
             goto_surface_reset,
+            cluster_tags_spoon_1,
         ]
     )
 
     seq_cup.add_children(
         children=[
-            cache_tf_surface_2,
             cluster_cup,
             goto_cup,
             py_trees.timers.Timer(
@@ -305,6 +378,7 @@ def create_octagon_root():
             pub_activate_grabber_cup,
             py_trees.timers.Timer("Wait after drop", duration=STABILIZE_DURATION),
             goto_surface_reset_2,
+            cluster_tags_cup_1,
         ]
     )
 
@@ -313,6 +387,9 @@ def create_octagon_root():
             srv_get_choice,
             set_activate_grabber,
             set_half_close_grabber,
+            pub_activate_grabber,
+            par_search_tag,
+            dynamic_set_surface_pose_frame,
             seq_spoon,
             seq_cup,
             goto_rotation_spoon,

@@ -177,6 +177,25 @@ tfs:
     # frame ids
     parent_frame_id: "slalom_layer_1/hardcoded"
     child_frame_id: "slalom_layer_2/hardcoded/hardcoded"
+    ######################### OCTAGON TFS #####################
+  - name: fish_view
+    x: 0.0 
+    y: 0.5
+    z: -1.0
+    roll: -90.0 
+    pitch: -90.0
+    yaw: 0.0
+    parent_frame_id: "trash/fish/clustered"
+    child_frame_id: "trash/fish/view"
+  - name: shark_view
+    x: 0.0
+    y: 0.5
+    z: -1.0
+    roll: -90.0
+    pitch: -90.0
+    yaw: 0.0
+    parent_frame_id: "trash/shark/clustered"
+    child_frame_id: "trash/shark/view"
     ######################### TEMPORARY TFS #########################
   - name: torpedo_top
     x: -0.07819
