@@ -17,9 +17,6 @@ from mission_planner_2.trees.auv.slalom.channel_movement import (
 from mission_planner_2.trees.auv.slalom.move_and_cluster import (
     create_move_and_cluster_root,
 )
-from mission_planner_2.trees.auv.slalom.move_to_task import (
-    create_move_to_slalom_task_root,
-)
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -286,7 +283,6 @@ def create_slalom_root():
 
     root.add_children(
         [
-            create_move_to_slalom_task_root(),
             write_is_left,
             seq_move_and_cluster,
             seq_check_transforms,
