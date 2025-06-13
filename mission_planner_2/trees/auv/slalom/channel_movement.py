@@ -1,6 +1,8 @@
 import operator
 
 import py_trees
+import py_trees_ros
+from rclpy.qos import qos_profile_system_default
 
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -26,6 +28,7 @@ SLALOM_ONE_FROM_ZERO_HARDCODED = "slalom_layer_1/hardcoded"
 SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
 
 WAIT_BETWEEN_MOVES = 10.0
+TRANSFORM_CHECK_TIMEOUT = 5.0
 
 # Gate Constants
 #########################################################################
@@ -171,59 +174,156 @@ def create_channel_movement_root(number_of_missing_channels: int):
         memory=True,
     )
 
-    one_left_seq = py_trees.composites.Sequence(
-        name="One Left Side Sequence",
+    one_missing_layer_one = py_trees.composites.Sequence(
+        name="One Missing Transform with Layer One Missing",
+        memory=True,
+    )
+
+    one_missing_layer_one_check = py_trees_ros.transforms.ToBlackboard(
+        name="One Missing Transform with Layer One Missing Check",
+        variable_name=fk("one_missing_layer_one"),
+        target_frame=SLALOM_ONE_FRAME_CLUSTERED,
+        source_frame=BASE_LINK_FRAME,
+        qos_profile=qos_profile_system_default,
+    )
+
+    one_missing_layer_one_sel = py_trees.composites.Selector(
+        name="One Missing Transform with Layer One Missing Selector",
+        memory=True,
+    )
+
+    one_missing_layer_one_left_seq = py_trees.composites.Sequence(
+        name="One Missing Transform with Layer One Missing Left Sequence",
         memory=True,
         children=[
             check_is_fish_one,
             goto.FromConstant(
-                name="Goto one left side zero",
+                name="Goto one layer one missing left side zero",
                 pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
                 specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
-                name="Goto one left side one",
+                name="Goto one layer one missing left side one hardcoded",
+                pose=create_slalom_left_pose(SLALOM_ONE_FROM_ZERO_HARDCODED),
+                specified_heading=False,
+            ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
+            goto.FromConstant(
+                name="Goto one layer one missing left side two",
+                pose=create_slalom_left_pose(SLALOM_TWO_FRAME_CLUSTERED),
+                specified_heading=False,
+            ),
+        ],
+    )
+
+    one_missing_layer_one_right_seq = py_trees.composites.Sequence(
+        name="One Missing Transform with Layer One Missing Right Sequence",
+        memory=True,
+        children=[
+            goto.FromConstant(
+                name="Goto one layer one missing right side zero",
+                pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+                specified_heading=False,
+            ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
+            goto.FromConstant(
+                name="Goto one layer one missing right side one hardcoded",
+                pose=create_slalom_right_pose(SLALOM_ONE_FROM_ZERO_HARDCODED),
+                specified_heading=False,
+            ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
+            goto.FromConstant(
+                name="Goto one layer one missing right side two",
+                pose=create_slalom_right_pose(SLALOM_TWO_FRAME_CLUSTERED),
+                specified_heading=False,
+            ),
+        ],
+    )
+
+    one_missing_layer_one_sel.add_children(
+        children=[
+            one_missing_layer_one_left_seq,
+            one_missing_layer_one_right_seq,
+        ]
+    )
+
+    one_missing_layer_one.add_children(
+        children=[
+            py_trees.decorators.Timeout(
+                name="One Missing Transform Layer One Check Timeout",
+                child=one_missing_layer_one_check,
+                duration=TRANSFORM_CHECK_TIMEOUT,
+            ),
+            one_missing_layer_one_sel,
+        ]
+    )
+
+    one_missing_layer_two = py_trees.composites.Selector(
+        name="One Missing Transform with Layer Two Missing",
+        memory=True,
+    )
+
+    one_missing_layer_two_left_seq = py_trees.composites.Sequence(
+        name="One Missing Transform with Layer Two Missing Left Sequence",
+        memory=True,
+        children=[
+            check_is_fish_one,
+            goto.FromConstant(
+                name="Goto one layer two missing left side zero",
+                pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+                specified_heading=False,
+            ),
+            py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
+            goto.FromConstant(
+                name="Goto one layer two missing left side one",
                 pose=create_slalom_left_pose(SLALOM_ONE_FRAME_CLUSTERED),
                 specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
-                name="Goto one left side two hardcoded",
+                name="Goto one layer two missing left side two hardcoded",
                 pose=create_slalom_left_pose(SLALOM_TWO_FROM_ONE_HARDCODED),
                 specified_heading=False,
             ),
         ],
     )
 
-    one_right_seq = py_trees.composites.Sequence(
-        name="One Right Side Sequence",
+    one_missing_layer_two_right_seq = py_trees.composites.Sequence(
+        name="One Missing Transform with Layer Two Missing Right Sequence",
         memory=True,
         children=[
             goto.FromConstant(
-                name="Goto one right side zero",
+                name="Goto one layer two missing right side zero",
                 pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
                 specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
-                name="Goto one right side one",
+                name="Goto one layer two missing right side one",
                 pose=create_slalom_right_pose(SLALOM_ONE_FRAME_CLUSTERED),
                 specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
-                name="Goto one right side two hardcoded",
+                name="Goto one layer two missing right side two hardcoded",
                 pose=create_slalom_right_pose(SLALOM_TWO_FROM_ONE_HARDCODED),
                 specified_heading=False,
             ),
         ],
     )
 
+    one_missing_layer_two.add_children(
+        children=[
+            one_missing_layer_two_left_seq,
+            one_missing_layer_two_right_seq,
+        ]
+    )
+
     one_root.add_children(
         children=[
-            one_left_seq,
-            one_right_seq,
+            one_missing_layer_one,
+            one_missing_layer_two,
         ]
     )
 
