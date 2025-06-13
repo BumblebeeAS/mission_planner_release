@@ -5,12 +5,13 @@ import py_trees.console as console
 import py_trees_ros.trees
 import rclpy
 
-from mission_planner_2.trees.auv.mother.mother import create_mother
+# from mission_planner_2.trees.auv.mother.mother import create_mother
+from mission_planner_2.trees.auv.slalom.slalom import create_slalom_root
 
 
 def main():
     rclpy.init(args=None)
-    root = create_mother()
+    root = create_slalom_root()
     py_trees.logging.level = py_trees.logging.Level.DEBUG
     tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
     try:
