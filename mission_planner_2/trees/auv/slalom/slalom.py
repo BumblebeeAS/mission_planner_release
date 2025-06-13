@@ -45,8 +45,8 @@ THIRD_VIEW = {"position_x": 7.0, "position_y": -0.8, "position_z": 1.0, "yaw": -
 """
 
 FIRST_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.0, "yaw": 0.0}
-SECOND_VIEW = {"position_x": 5.0, "position_y": -0.6, "position_z": 0.7, "yaw": -90.0}
-THIRD_VIEW = {"position_x": 7.0, "position_y": -0.6, "position_z": 0.7, "yaw": -90.0}
+SECOND_VIEW = {"position_x": 0.0, "position_y": -1.2, "position_z": 0.0, "yaw": 0.0}
+THIRD_VIEW = {"position_x": 0.0, "position_y": 2.4, "position_z": 0.0, "yaw": 0.0}
 #########################################################################
 
 
@@ -83,7 +83,7 @@ def create_slalom_root():
 
     move_and_cluster_two = create_move_and_cluster_root(
         pose_stamped=create_stamped_pose(
-            WORLD_FRAME,
+            BASE_LINK_FRAME,
             position_x=SECOND_VIEW["position_x"],
             position_y=SECOND_VIEW["position_y"],
             position_z=SECOND_VIEW["position_z"],
@@ -93,7 +93,7 @@ def create_slalom_root():
 
     move_and_cluster_three = create_move_and_cluster_root(
         pose_stamped=create_stamped_pose(
-            WORLD_FRAME,
+            BASE_LINK_FRAME,
             position_x=THIRD_VIEW["position_x"],
             position_y=THIRD_VIEW["position_y"],
             position_z=THIRD_VIEW["position_z"],
@@ -104,11 +104,7 @@ def create_slalom_root():
     seq_move_and_cluster = py_trees.composites.Sequence(
         name="Move to different views and cluster",
         memory=True,
-        children=[
-            move_and_cluster_one,
-            # move_and_cluster_two,
-            # move_and_cluster_three
-        ],
+        children=[move_and_cluster_one, move_and_cluster_two, move_and_cluster_three],
     )
 
     # Initialize the number of missing transforms in blackboard to be used by DynamicSetBlackboard
@@ -279,7 +275,7 @@ def create_slalom_root():
     write_is_left = py_trees.behaviours.SetBlackboardVariable(
         name="Write is left side",
         variable_name="/global/is_left_side",
-        variable_value=True,
+        variable_value=False,
         overwrite=True,
     )
 
@@ -295,6 +291,7 @@ def create_slalom_root():
             seq_move_and_cluster,
             seq_check_transforms,
             select_movement_strategy,
+            py_trees.timers.Timer(name="timer", duration=10.0),
             goto_pass_through,
         ]
     )

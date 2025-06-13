@@ -100,11 +100,11 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         name: str,
         pose_key: str,
         anchor_frame_name: str = "auv4/base_link_ned",
+        specified_heading: bool = True,
         generate_feedback_message: Callable | None = None,
         wait_for_server_timeout_sec: int = -3,
         wait_for_service_timeout_sec: int = -3,
     ):
-
         # FIXME: this convert to safe name seems useless @advaypakhale
         self.safe_name = convert_to_safe_name(name)
         self.namespace = py_trees.blackboard.Blackboard.absolute_name(
@@ -124,6 +124,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
 
         self.wait_for_service_timeout_sec = wait_for_service_timeout_sec
         self.anchor_frame_name = anchor_frame_name
+        self.specified_heading = specified_heading
 
         # Register the pose_key on the BB as the req to be converted
         # pose_key entry should be a pose stamped
@@ -269,7 +270,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         request.anchor_frame_name = self.anchor_frame_name
         return request
 
-    def _gen_goal(self, service_response: PoseStamped):
+    def _gen_goal(self, service_response: PoseStamped, specified_heading: bool = True):
         output_pose = service_response.pose
 
         goal_msg = Locomotion.Goal()
@@ -285,7 +286,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
             print(e)
             goal_msg.depth_ctrl = 0
 
-        goal_msg.specified_heading = True
+        goal_msg.specified_heading = specified_heading
 
         _, _, yaw = rad2deg(
             quat2euler(
@@ -363,7 +364,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         self.result_status_string = None
         self.is_goal_sent = False
 
-        goal = self._gen_goal(resp.output_pose)
+        goal = self._gen_goal(resp.output_pose, self.specified_heading)
 
         # send_goal_request sets teh send_goal_future attr
         self.send_goal_request(goal)
@@ -410,6 +411,7 @@ class FromConstant(FromBlackboard):
         # parent_namespace,
         pose,
         anchor_frame_name="auv4/base_link_ned",
+        specified_heading: bool = True,
         generate_feedback_message=None,
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
@@ -424,6 +426,7 @@ class FromConstant(FromBlackboard):
             name=name,
             pose_key=pose_key,
             anchor_frame_name=anchor_frame_name,
+            specified_heading=specified_heading,
             generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,

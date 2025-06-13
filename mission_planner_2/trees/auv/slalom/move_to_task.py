@@ -29,7 +29,7 @@ def create_move_to_slalom_task_root():
     )
     """
     slalom_init_pose = create_stamped_pose(
-        "world_ned", position_x=0.0, position_y=0.0, position_z=0.7, yaw=0.0
+        "world_ned", position_x=0.0, position_y=0.0, position_z=0.3, yaw=0.0
     )
 
     move_to_slalom = goto.FromConstant(

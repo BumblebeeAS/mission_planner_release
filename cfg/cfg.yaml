@@ -145,7 +145,7 @@ tfs:
     # One Missing Transform
   - name: slalom_layer_2_from_1_hardcoded
     # translation (x, y, z in metres)
-    x: 1.0
+    x: 0.75
     y: 0.0
     z: 2.0
     roll: 0.0 # in degrees
@@ -157,7 +157,7 @@ tfs:
     # Two Missing Transforms
   - name: slalom_layer_1_from_0_hardcoded
     # translation (x, y, z in meters)
-    x: -0.5
+    x: -0.75
     y: 0.0
     z: 2.0
     roll: 0.0 # in degrees
@@ -168,7 +168,7 @@ tfs:
     child_frame_id: "slalom_layer_1/hardcoded"
   - name: slalom_layer_2_from_1_hardcoded_hardcoded # forgive my naming sins
     # translation (x, y, z in metres)
-    x: 1.0
+    x: 0.75
     y: 0.0
     z: 2.0
     roll: 0.0 # in degrees

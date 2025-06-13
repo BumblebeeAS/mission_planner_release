@@ -167,16 +167,16 @@ def create_clustering_goal(
     return goal
 
 
-def create_slalom_clustering_goal(duration=20, min_cluster_size=2, min_samples=1):
+def create_slalom_clustering_goal(duration=20, min_cluster_size=10, min_samples=10):
     """Create a ClusterTf goal for slalom clustering.
 
     Args:
        duration (int, optional): The duration in seconds over which to collect
            transforms for clustering. Defaults to 20 seconds.
        min_cluster_size (int, optional): The minimum number of transforms
-           required to form a cluster during clustering analysis. Defaults to 2.
+           required to form a cluster during clustering analysis. Defaults to 10.
        min_samples (int, optional): The minimum number of samples required
-           for a point to be considered a core point in clustering. Defaults to 1.
+           for a point to be considered a core point in clustering. Defaults to 10.
 
     Returns:
        ClusterTf.Goal: A configured goal object.

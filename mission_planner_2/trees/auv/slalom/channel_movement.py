@@ -25,7 +25,7 @@ SLALOM_TWO_FROM_ONE_HARDCODED = "slalom_layer_2/hardcoded"
 SLALOM_ONE_FROM_ZERO_HARDCODED = "slalom_layer_1/hardcoded"
 SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
 
-WAIT_BETWEEN_MOVES = 30.0
+WAIT_BETWEEN_MOVES = 10.0
 
 # Gate Constants
 #########################################################################
@@ -43,7 +43,7 @@ def create_slalom_left_pose(frame_id: str):
     return create_stamped_pose(
         frame_id=frame_id,
         position_x=0.75,
-        position_y=0.5,
+        position_y=0.3,
         position_z=0.0,
         roll=-90.0,
         pitch=-90.0,
@@ -58,7 +58,7 @@ def create_slalom_right_pose(frame_id: str):
     return create_stamped_pose(
         frame_id=frame_id,
         position_x=2.25,
-        position_y=0.5,
+        position_y=0.3,
         position_z=0.0,
         roll=-90.0,
         pitch=-90.0,
@@ -117,16 +117,19 @@ def create_channel_movement_root(number_of_missing_channels: int):
             goto.FromConstant(
                 name="Goto zero left side zero",
                 pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto zero left side one",
                 pose=create_slalom_left_pose(SLALOM_ONE_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto zero left side two",
                 pose=create_slalom_left_pose(SLALOM_TWO_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
         ],
     )
@@ -138,16 +141,19 @@ def create_channel_movement_root(number_of_missing_channels: int):
             goto.FromConstant(
                 name="Goto zero right side zero",
                 pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto zero right side one",
                 pose=create_slalom_right_pose(SLALOM_ONE_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto zero right side two",
                 pose=create_slalom_right_pose(SLALOM_TWO_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
         ],
     )
@@ -173,16 +179,19 @@ def create_channel_movement_root(number_of_missing_channels: int):
             goto.FromConstant(
                 name="Goto one left side zero",
                 pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto one left side one",
                 pose=create_slalom_left_pose(SLALOM_ONE_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto one left side two hardcoded",
                 pose=create_slalom_left_pose(SLALOM_TWO_FROM_ONE_HARDCODED),
+                specified_heading=False,
             ),
         ],
     )
@@ -194,16 +203,19 @@ def create_channel_movement_root(number_of_missing_channels: int):
             goto.FromConstant(
                 name="Goto one right side zero",
                 pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto one right side one",
                 pose=create_slalom_right_pose(SLALOM_ONE_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto one right side two hardcoded",
                 pose=create_slalom_right_pose(SLALOM_TWO_FROM_ONE_HARDCODED),
+                specified_heading=False,
             ),
         ],
     )
@@ -229,16 +241,19 @@ def create_channel_movement_root(number_of_missing_channels: int):
             goto.FromConstant(
                 name="Goto two left side zero",
                 pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto two left side one hardcoded",
                 pose=create_slalom_left_pose(SLALOM_ONE_FROM_ZERO_HARDCODED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto two left side two hardcoded hardcoded",
                 pose=create_slalom_left_pose(SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED),
+                specified_heading=False,
             ),
         ],
     )
@@ -250,16 +265,19 @@ def create_channel_movement_root(number_of_missing_channels: int):
             goto.FromConstant(
                 name="Goto two right side zero",
                 pose=create_slalom_right_pose(SLALOM_ZERO_FRAME_CLUSTERED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto two right side one hardcoded",
                 pose=create_slalom_right_pose(SLALOM_ONE_FROM_ZERO_HARDCODED),
+                specified_heading=False,
             ),
             py_trees.timers.Timer(name="timer", duration=WAIT_BETWEEN_MOVES),
             goto.FromConstant(
                 name="Goto two right side two hardcoded hardcoded",
                 pose=create_slalom_right_pose(SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED),
+                specified_heading=False,
             ),
         ],
     )
