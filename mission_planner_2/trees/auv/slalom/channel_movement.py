@@ -99,6 +99,15 @@ def create_channel_movement_root(number_of_missing_channels: int):
         ),
     )
 
+    check_is_fish_one_dup = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check if left side zero",
+        check=py_trees.common.ComparisonExpression(
+            variable=_IS_LEFT_KEY,
+            value=True,
+            operator=lambda x, y: operator.__eq__(x, y),
+        ),
+    )
+
     check_is_fish_two = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Check if left side zero",
         check=py_trees.common.ComparisonExpression(
@@ -268,7 +277,7 @@ def create_channel_movement_root(number_of_missing_channels: int):
         name="One Missing Transform with Layer Two Missing Left Sequence",
         memory=True,
         children=[
-            check_is_fish_one,
+            check_is_fish_one_dup,
             goto.FromConstant(
                 name="Goto one layer two missing left side zero",
                 pose=create_slalom_left_pose(SLALOM_ZERO_FRAME_CLUSTERED),
