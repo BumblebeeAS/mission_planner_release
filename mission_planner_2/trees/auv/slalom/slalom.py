@@ -69,7 +69,7 @@ def create_slalom_root():
     )
 
     # TODO: Update the frame and pose to move to
-    move_and_cluster_one = goto.FromConstant(
+    move_view_one = goto.FromConstant(
         name="move one",
         pose=create_stamped_pose(
             BASE_LINK_FRAME,
@@ -80,7 +80,7 @@ def create_slalom_root():
         ),
     )
 
-    move_and_cluster_two = goto.FromConstant(
+    move_view_two = goto.FromConstant(
         name="move two",
         pose=create_stamped_pose(
             BASE_LINK_FRAME,
@@ -91,7 +91,7 @@ def create_slalom_root():
         ),
     )
 
-    move_and_cluster_three = goto.FromConstant(
+    move_view_three = goto.FromConstant(
         name="move three",
         pose=create_stamped_pose(
             BASE_LINK_FRAME,
@@ -118,11 +118,11 @@ def create_slalom_root():
         name="Move to different views and cluster",
         memory=True,
         children=[
-            move_and_cluster_one,
+            move_view_one,
             py_trees.timers.Timer(duration=10),
-            move_and_cluster_two,
+            move_view_two,
             py_trees.timers.Timer(duration=10),
-            move_and_cluster_three,
+            move_view_three,
             py_trees.timers.Timer(duration=10),
         ],
     )
