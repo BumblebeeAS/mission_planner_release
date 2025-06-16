@@ -2,6 +2,7 @@ import operator
 
 import py_trees
 import py_trees_ros
+from bb_perception_msgs.action import ClusterTf
 from rclpy.qos import qos_profile_system_default
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -9,13 +10,13 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_stamped_pose
+from mission_planner_2.commons.pose_utils import (
+    create_slalom_clustering_goal,
+    create_stamped_pose,
+)
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.slalom.channel_movement import (
     create_channel_movement_root,
-)
-from mission_planner_2.trees.auv.slalom.move_and_cluster import (
-    create_move_and_cluster_root,
 )
 
 NAMESPACE = generate_namespace()
@@ -68,8 +69,9 @@ def create_slalom_root():
     )
 
     # TODO: Update the frame and pose to move to
-    move_and_cluster_one = create_move_and_cluster_root(
-        pose_stamped=create_stamped_pose(
+    move_and_cluster_one = goto.FromConstant(
+        name="move one",
+        pose=create_stamped_pose(
             BASE_LINK_FRAME,
             position_x=FIRST_VIEW["position_x"],
             position_y=FIRST_VIEW["position_y"],
@@ -78,8 +80,9 @@ def create_slalom_root():
         ),
     )
 
-    move_and_cluster_two = create_move_and_cluster_root(
-        pose_stamped=create_stamped_pose(
+    move_and_cluster_two = goto.FromConstant(
+        name="move two",
+        pose=create_stamped_pose(
             BASE_LINK_FRAME,
             position_x=SECOND_VIEW["position_x"],
             position_y=SECOND_VIEW["position_y"],
@@ -88,8 +91,9 @@ def create_slalom_root():
         ),
     )
 
-    move_and_cluster_three = create_move_and_cluster_root(
-        pose_stamped=create_stamped_pose(
+    move_and_cluster_three = goto.FromConstant(
+        name="move three",
+        pose=create_stamped_pose(
             BASE_LINK_FRAME,
             position_x=THIRD_VIEW["position_x"],
             position_y=THIRD_VIEW["position_y"],
@@ -98,11 +102,32 @@ def create_slalom_root():
         ),
     )
 
+    move_and_cluster_par = py_trees.composites.Parallel(
+        name="Move to different views and cluster",
+        policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
+    )
+
+    cluster_action = py_trees_ros.action_clients.FromConstant(
+        name="Cluster slalom transforms",
+        action_type=ClusterTf,
+        action_name="/auv4/slalom",
+        action_goal=create_slalom_clustering_goal(duration=40),
+    )
+
     seq_move_and_cluster = py_trees.composites.Sequence(
         name="Move to different views and cluster",
         memory=True,
-        children=[move_and_cluster_one, move_and_cluster_two, move_and_cluster_three],
+        children=[
+            move_and_cluster_one,
+            py_trees.timers.Timer(duration=10),
+            move_and_cluster_two,
+            py_trees.timers.Timer(duration=10),
+            move_and_cluster_three,
+            py_trees.timers.Timer(duration=10),
+        ],
     )
+
+    move_and_cluster_par.add_children([cluster_action, seq_move_and_cluster])
 
     # Initialize the number of missing transforms in blackboard to be used by DynamicSetBlackboard
     init_missing_transforms = py_trees.behaviours.SetBlackboardVariable(
@@ -284,7 +309,8 @@ def create_slalom_root():
     root.add_children(
         [
             write_is_left,
-            seq_move_and_cluster,
+            # seq_move_and_cluster,
+            move_and_cluster_par,
             seq_check_transforms,
             select_movement_strategy,
             py_trees.timers.Timer(name="timer", duration=10.0),
