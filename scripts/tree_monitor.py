@@ -107,9 +107,6 @@ def main(args=None):
         node.get_logger().info("stopped")
     except Exception as e:
         node.get_logger().fatal(f"stopped with exception: {e}")
-    finally:
-        node.shutdown()
-        rclpy.shutdown()
 
 
 if __name__ == "__main__":
