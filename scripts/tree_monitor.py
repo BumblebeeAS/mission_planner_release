@@ -92,9 +92,11 @@ class TreeMonitor(Node):
         tip_name = root.tip().name.lower()
         self.get_logger().info("the tip is currently: " + tip_name)
         if "goto" in tip_name:
-            self.led_pub.publish(String(data="ff8243"))
+            self.led_pub.publish(String(data="ff8243")) # mango tango
         elif "wait" in tip_name or "stabilize" in tip_name:
-            self.led_pub.publish(String(data="fce205"))
+            self.led_pub.publish(String(data="fce205")) # bumblebee yellow
+        elif "cluster" in tip_name:
+            self.led_pub.publish(String(data="568203")) # avocado green
 
 
 def main(args=None):

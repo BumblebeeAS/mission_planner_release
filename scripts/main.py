@@ -6,11 +6,12 @@ import py_trees_ros.trees
 import rclpy
 
 from mission_planner_2.trees.auv.mother.mother import create_mother
+from mission_planner_2.trees.turtlesim.turtle_circle import create_turtle_circle_root
 
 
 def main():
     rclpy.init(args=None)
-    root = create_mother()
+    root = create_turtle_circle_root()
     py_trees.logging.level = py_trees.logging.Level.DEBUG
     tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
     try:
