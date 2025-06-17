@@ -94,7 +94,7 @@ class TreeMonitor(Node):
         self.get_logger().info("the tip is currently: " + tip_name)
         if "goto" in tip_name:
             self.led_pub.publish(String(data="ff8243"))
-        elif "wait" in tip_name:
+        elif "wait" in tip_name or "stabilize" in tip_name:
             self.led_pub.publish(String(data="fce205"))
 
 
