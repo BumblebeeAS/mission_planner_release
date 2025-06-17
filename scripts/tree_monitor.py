@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import py_trees
-from py_trees.behaviour import Behaviour
 from py_trees_ros import conversions, utilities
 from py_trees_ros_interfaces.msg import BehaviourTree
 from py_trees_ros_interfaces.srv import OpenSnapshotStream, CloseSnapshotStream
