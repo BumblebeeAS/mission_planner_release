@@ -43,7 +43,6 @@ def main():
     finally:
         console.loginfo(console.reset + "cleaning up")
         tree.shutdown()
-        rclpy.shutdown()
 
 
 if __name__ == "__main__":
