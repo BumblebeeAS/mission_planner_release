@@ -62,7 +62,7 @@ class TreeMonitor(Node):
             serialised_behaviours[
                 conversions.msg_to_uuid4(serialised_behaviour.own_id)
             ] = serialised_behaviour
-    
+
         def deserialise_tree_recursively(msg):
             behaviour = conversions.msg_to_behaviour(msg)
             for serialised_child_id in msg.child_ids:
