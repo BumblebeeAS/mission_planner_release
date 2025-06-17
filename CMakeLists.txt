@@ -43,6 +43,7 @@ install(PROGRAMS
   scripts/main.py
   scripts/test.py
   scripts/render.py
+  scripts/tree_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
