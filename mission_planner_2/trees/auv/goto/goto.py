@@ -5,6 +5,7 @@
 Behaviours for ROS services
 """
 
+import uuid
 from typing import Callable
 
 import action_msgs
@@ -98,7 +99,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
     def __init__(
         self,
         name: str,
-        pose_key: str,
+        pose_key: str | list[str],
         anchor_frame_name: str = "auv4/base_link_ned",
         specified_heading: bool = True,
         generate_feedback_message: Callable | None = None,
@@ -106,9 +107,8 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         wait_for_service_timeout_sec: int = -3,
     ):
         # FIXME: this convert to safe name seems useless @advaypakhale
-        self.safe_name = convert_to_safe_name(name)
-        self.namespace = py_trees.blackboard.Blackboard.absolute_name(
-            "/", self.safe_name
+        namespace = py_trees.blackboard.Blackboard.absolute_name(
+            "/", convert_to_safe_name(name) + "/" + str(uuid.uuid4()).replace("-", "")
         )
 
         super().__init__(
@@ -116,7 +116,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
             self.ACTION_TYPE,
             self.ACTION_NAME,
             py_trees.blackboard.Blackboard.absolute_name(
-                self.namespace, self.ACTION_GOAL_KEY
+                namespace, self.ACTION_GOAL_KEY
             ),
             generate_feedback_message,
             wait_for_server_timeout_sec,
@@ -126,15 +126,25 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         self.anchor_frame_name = anchor_frame_name
         self.specified_heading = specified_heading
 
-        # Register the pose_key on the BB as the req to be converted
-        # pose_key entry should be a pose stamped
-        self.blackboard.register_key(
-            key="request",
-            access=py_trees.common.Access.READ,
-            remap_to=py_trees.blackboard.Blackboard.absolute_name(
-                self.namespace, key=pose_key
-            ),
-        )
+        if isinstance(pose_key, str):
+            pose_key = [pose_key]
+
+        # Register the pose_keys on the BB as the poses to be converted
+        # Each pose_key entry should be a pose stamped
+        for i, key in enumerate(pose_key):
+            self.blackboard.register_key(
+                key=f"request_{i}",
+                access=py_trees.common.Access.READ,
+                remap_to=py_trees.blackboard.Blackboard.absolute_name(
+                    # TODO: can remove self.namespace and just use uuid + convert to safe name for the internal action goal key to be passed into init.
+                    # Think this should be absolute_name("/", key=key)
+                    # Implementing change in separate branch for now
+                    "/",
+                    key=key,
+                ),
+            )
+
+        self.num_waypoints = len(pose_key)
 
         self.service_client = None
 
@@ -174,7 +184,12 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         try:
             if self.service_client.service_is_ready():
                 self.service_future = self.service_client.call_async(
-                    self._gen_srv_req(self.blackboard.request)
+                    self._gen_srv_req(
+                        [
+                            self.blackboard.get(f"request_{i}")
+                            for i in range(self.num_waypoints)
+                        ]
+                    )
                 )
             self.feedback_message = "sent service request"
             self.service_future.add_done_callback(self._srv_done_callback)
@@ -263,15 +278,16 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         super().shutdown()
         self.service_client.destroy()
 
-    def _gen_srv_req(self, pose):
+    def _gen_srv_req(self, poses: list[PoseStamped]):
         request = GetPoseToControlsFrame.Request()
-        print(type(pose))
-        request.input_pose = pose
+        request.input_poses = poses
         request.anchor_frame_name = self.anchor_frame_name
         return request
 
-    def _gen_goal(self, service_response: PoseStamped, specified_heading: bool = True):
-        output_pose = service_response.pose
+    def _gen_goal(
+        self, service_response: list[PoseStamped], specified_heading: bool = True
+    ):
+        output_poses = [p.pose for p in service_response]
 
         goal_msg = Locomotion.Goal()
 
@@ -288,26 +304,37 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
 
         goal_msg.specified_heading = specified_heading
 
-        _, _, yaw = rad2deg(
-            quat2euler(
-                [
-                    output_pose.orientation.w,
-                    output_pose.orientation.x,
-                    output_pose.orientation.y,
-                    output_pose.orientation.z,
-                ]
+        forward_setpoints = []
+        sidemove_setpoints = []
+        depth_setpoints = []
+        heading_setpoints = []
+
+        for output_pose in output_poses:
+            _, _, yaw = rad2deg(
+                quat2euler(
+                    [
+                        output_pose.orientation.w,
+                        output_pose.orientation.x,
+                        output_pose.orientation.y,
+                        output_pose.orientation.z,
+                    ]
+                )
             )
-        )
+
+            forward_setpoints.append(output_pose.position.x)
+            sidemove_setpoints.append(output_pose.position.y)
+            depth_setpoints.append(output_pose.position.z)
+            heading_setpoints.append(yaw)
 
         # Set the setpoints
-        goal_msg.forward_setpoints = [output_pose.position.x]
-        goal_msg.sidemove_setpoints = [output_pose.position.y]
-        goal_msg.depth_setpoints = [output_pose.position.z]
-        goal_msg.heading_setpoints = [yaw]
+        goal_msg.forward_setpoints = forward_setpoints
+        goal_msg.sidemove_setpoints = sidemove_setpoints
+        goal_msg.depth_setpoints = depth_setpoints
+        goal_msg.heading_setpoints = heading_setpoints
 
         # Lists that need to be populated but aren't used
-        goal_msg.roll_setpoints = [0.0]
-        goal_msg.pitch_setpoints = [0.0]
+        goal_msg.roll_setpoints = [0.0 for i in range(len(output_poses))]
+        goal_msg.pitch_setpoints = [0.0 for i in range(len(output_poses))]
         goal_msg.altitude_setpoints = []
 
         return goal_msg
@@ -364,7 +391,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         self.result_status_string = None
         self.is_goal_sent = False
 
-        goal = self._gen_goal(resp.output_pose, self.specified_heading)
+        goal = self._gen_goal(resp.output_poses, self.specified_heading)
 
         # send_goal_request sets teh send_goal_future attr
         self.send_goal_request(goal)
@@ -409,18 +436,27 @@ class FromConstant(FromBlackboard):
         self,
         name,
         # parent_namespace,
-        pose,
+        pose: PoseStamped | list[PoseStamped],
         anchor_frame_name="auv4/base_link_ned",
         specified_heading: bool = True,
         generate_feedback_message=None,
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
     ):
-        import uuid
+        if not isinstance(pose, list):
+            pose = [pose]
 
-        pose_key = f"pose_{str(uuid.uuid4()).replace('-', '')}"
-        # TODO: check this logic should not affect functionality @advaypakhale
-        namespace = f"/{str(uuid.uuid4()).replace('-', '')}"
+        namespace = py_trees.blackboard.Blackboard.absolute_name(
+            "/", convert_to_safe_name(name)
+        )
+        pose_key = []
+
+        for p in pose:
+            pose_key.append(
+                py_trees.blackboard.Blackboard.absolute_name(
+                    namespace, f"pose_{str(uuid.uuid4()).replace('-', '')}"
+                )
+            )
 
         super().__init__(
             name=name,
@@ -432,18 +468,13 @@ class FromConstant(FromBlackboard):
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
         )
 
-        # FIXME: this convert to safe name seems useless @advaypakhale
-        self.safe_name = convert_to_safe_name(name)
-        self.namespace = py_trees.blackboard.Blackboard.absolute_name(
-            namespace, self.safe_name
-        )
-
-        # Store the pose directly on the blackboard
-        self.blackboard.register_key(
-            key="request",
-            access=py_trees.common.Access.WRITE,
-            remap_to=py_trees.blackboard.Blackboard.absolute_name(
-                self.namespace, key=pose_key
-            ),
-        )
-        self.blackboard.set(name="request", value=pose)
+        for i, key in enumerate(pose_key):
+            self.blackboard.register_key(
+                key=f"request_{i}",
+                access=py_trees.common.Access.WRITE,
+                remap_to=py_trees.blackboard.Blackboard.absolute_name(
+                    "/",
+                    key=key,
+                ),
+            )
+            self.blackboard.set(name=f"request_{i}", value=pose[i])
