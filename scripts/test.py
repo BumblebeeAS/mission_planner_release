@@ -11,8 +11,11 @@ import rclpy
 # from mission_planner_2.trees.auv.tests.test_preempt_controls import (
 #     create_preempt_root as tree_root,
 # )
-from mission_planner_2.trees.auv.tests.test_multi_cluster import (
-    create_test_multi_cluster_root as tree_root,
+# from mission_planner_2.trees.auv.tests.test_multi_cluster import (
+#     create_test_multi_cluster_root as tree_root,
+# )
+from mission_planner_2.trees.auv.tests.test_multi_waypoint import (
+    create_test_multi_waypoint_root as tree_root,
 )
 
 
