@@ -5,11 +5,13 @@ import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
-from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
-
+from lifecycle_msgs.srv import ChangeState
+from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
+from mission_planner_2.commons.detection_utils import (
+    create_end_vision_req,
+    create_start_vision_req,
+)
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -20,15 +22,20 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.trees.auv.bins.bin_selector import create_bin_selector_root
 from mission_planner_2.trees.auv.goto import goto
+from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
+VISION_SERVER_TOPIC = "/auv4/bin/manage_nodes"
+
+TOGGLE_TEMPLATE_TOPIC = "/auv4/bin/image_matching/toggle_template"
 TEMPLATE_NAME = "Task03_DropBRUVS.png"
 ROTATED_TEMPLATE_NAME = "Task03_DropBRUVS_Rotated.png"
-POINT_CORRESPONDENCES_TOPIC = "/auv4/bot_cam/image_matching/point_correspondences"
+POINT_CORRESPONDENCES_TOPIC = "/auv4/bin/image_matching/point_correspondences"
 
 CAMERA_FRAME = "auv4/bot_cam_optical"
 TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_optical"
@@ -38,6 +45,7 @@ TEMPLATE_FRAME_YOLO = "bin/yolo"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 
 ACTUATION_UINT = UInt8(data=6)
+ACTUATION_INPUT_TOPIC = "/auv4/actuation/input"
 
 CLUSTERING_DURATION = 20
 STABILIZE_CONTROLS_DURATION = 10.0
@@ -71,6 +79,22 @@ def create_bin_root():
         memory=True,
     )
 
+    # Step 0: Enable vision pipeline
+    srv_start_vision = py_trees_ros.service_clients.FromConstant(
+        name="Start vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_start_vision_req(),
+        key_response=fk("bin_start_vision"),
+    )
+    check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify start vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=fk("bin_start_vision"),
+            value=True,
+            operator=lambda x, y: operator.eq(x.success, y),
+        ),
+    )
     # Step 1: Stabilise before starting
     timer_stabilise = py_trees.timers.Timer(
         "Stabilise before task", duration=STABILIZE_CONTROLS_DURATION
@@ -327,7 +351,7 @@ def create_bin_root():
     # Step 12: Fire first dropper
     pub_fire_dropper_first = py_trees_ros.publishers.FromBlackboard(
         name="Fire dropper first",
-        topic_name="/auv4/actuation/input",
+        topic_name=ACTUATION_INPUT_TOPIC,
         topic_type=UInt8,
         qos_profile=qos_profile_system_default,
         blackboard_variable=fk("bin_actuation"),
@@ -336,7 +360,7 @@ def create_bin_root():
     # Step 14: Fire second dropper
     pub_fire_dropper_second = py_trees_ros.publishers.FromBlackboard(
         name="Fire dropper second",
-        topic_name="/auv4/actuation/input",
+        topic_name=ACTUATION_INPUT_TOPIC,
         topic_type=UInt8,
         qos_profile=qos_profile_system_default,
         blackboard_variable=fk("bin_actuation"),
@@ -361,9 +385,28 @@ def create_bin_root():
         ),
     )
 
+    # Step 17: End vision pipeline
+    srv_end_vision = py_trees_ros.service_clients.FromConstant(
+        name="End vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_end_vision_req(),
+        key_response=fk("bin_end_vision"),
+    )
+    check_end_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify end vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=fk("bin_end_vision"),
+            value=True,
+            operator=lambda x, y: operator.eq(x.success, y),
+        ),
+    )
+
     # Build main drop sequence
     seq_drop_into_bin.add_children(
         children=[
+            srv_start_vision,
+            check_start_vision_succeeded,
             action_cluster_first,
             goto_bin_centre,
             stabilise_before_matching,
@@ -388,6 +431,8 @@ def create_bin_root():
             pub_fire_dropper_second,
             srv_disable_detections,
             check_disable_succeeded,
+            srv_end_vision,
+            check_end_vision_succeeded,
         ],
     )
 
