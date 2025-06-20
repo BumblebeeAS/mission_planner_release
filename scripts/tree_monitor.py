@@ -27,31 +27,18 @@ class TreeMonitor(Node):
             "/tree/snapshot_streams/open"
         )
 
-        future = self.open_client.call_async(OpenSnapshotStream.Request())
+        future = self.open_client.call_async(OpenSnapshotStream.Request(topic_name="led"))
         rclpy.spin_until_future_complete(self, future)
         response: OpenSnapshotStream.Response = future.result()
-        self.topic_name = response.topic_name
 
         self.snapshot_sub = self.create_subscription(
             BehaviourTree,
-            self.topic_name,
+            response.topic_name,
             self.snapshot_callback,
             utilities.qos_profile_latched()
         )
 
-        self.close_client = self.create_client(
-            CloseSnapshotStream,
-            "/tree/snapshot_streams/close"
-        )
-
-    def shutdown(self):
-        if self.close_client is None:
-            return
-        req = CloseSnapshotStream.Request(topic_name=self.topic_name)
-        future = self.close_client.call_async(req)
-        rclpy.spin_until_future_complete(self, future)
-        _ = future.result()
-        self.get_logger().info("snapshot_closed")
+        self.get_logger().info("successfully init tree monitor")
 
     def snapshot_callback(self, msg: BehaviourTree) -> None:
         serialised_behaviours = {}
@@ -91,6 +78,9 @@ class TreeMonitor(Node):
 
         tip_name = root.tip().name.lower()
         self.get_logger().info("the tip is currently: " + tip_name)
+        self.handle_led(tip_name)
+
+    def handle_led(self, tip_name: str) -> None:
         if "goto" in tip_name:
             self.led_pub.publish(String(data="ff8243")) # mango tango
         elif "wait" in tip_name or "stabilize" in tip_name:

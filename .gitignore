@@ -4,3 +4,5 @@
 *.png
 *.svg
 *.dot
+
+scripts/render.py
