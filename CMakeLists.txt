@@ -44,17 +44,17 @@ install(PROGRAMS
   scripts/test.py
   scripts/render.py
   scripts/tree_monitor.py
+  scripts/mission_tfs.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(FILES
-  # launch/choice.launch.py
   launch/main.launch.py
   DESTINATION share/${PROJECT_NAME}/launch
 )
 
 install(FILES
-  cfg/cfg.yaml
+  cfg/mission_tfs.yaml
   DESTINATION share/${PROJECT_NAME}/cfg
 )
 
