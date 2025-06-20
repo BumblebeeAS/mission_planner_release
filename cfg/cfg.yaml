@@ -5,50 +5,83 @@ tfs:
     # From top left corner of torpedo board, x right, y down
     x: 0.408
     y: 0.391
-    z: -0.3
-    roll: -90.0 # in degrees
-    pitch: -90.0 # in degrees
-    yaw: 0.0 # in degrees
-    # Frame IDs
+    z: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
     parent_frame_id: "torpedo_1/clustered"
     child_frame_id: "torpedo_1/fish"
+  - name: torpedo_1_fish_shoot
+    x: 0.0
+    y: 0.0
+    z: -0.4
+    roll: -90.0
+    pitch: -90.0
+    yaw: 0.0
+    parent_frame_id: "torpedo_1/fish"
+    child_frame_id: "torpedo_1/fish/shoot"
   - name: torpedo_1_shark
     # Translation (x, y, z in meters)
     # From top left corner of torpedo board, x right, y down
     x: 0.268
     y: 0.09
-    z: -0.3
-    roll: -90.0 # in degrees
-    pitch: -90.0 # in degrees
-    yaw: 0.0 # in degrees
-    # Frame IDs
+    z: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
     parent_frame_id: "torpedo_1/clustered"
     child_frame_id: "torpedo_1/shark"
+  - name: torpedo_1_shark_shoot
+    x: 0.0
+    y: 0.0
+    z: -0.4
+    roll: -90.0
+    pitch: -90.0
+    yaw: 0.0
+    parent_frame_id: "torpedo_1/shark"
+    child_frame_id: "torpedo_1/shark/shoot"
   ######################### TORPEDO 2 TFS #########################
   - name: torpedo_2_fish
     # Translation (x, y, z in meters)
     # From top left corner of torpedo board, x right, y down
     x: 0.429
     y: 0.084
-    z: -0.3
-    roll: -90.0 # in degrees
-    pitch: -90.0 # in degrees
+    z: 0.0
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
     yaw: 0.0 # in degrees
     # Frame IDs
     parent_frame_id: "torpedo_2/clustered"
     child_frame_id: "torpedo_2/fish"
+  - name: torpedo_2_fish_shoot
+    x: 0.0
+    y: 0.0
+    z: -0.4
+    roll: -90.0
+    pitch: -90.0
+    yaw: 0.0
+    parent_frame_id: "torpedo_2/fish"
+    child_frame_id: "torpedo_2/fish/shoot"
   - name: torpedo_2_shark
     # Translation (x, y, z in meters)
     # From top left corner of torpedo board, x right, y down
     x: 0.319
     y: 0.336
-    z: -0.3
-    roll: -90.0 # in degrees
-    pitch: -90.0 # in degrees
-    yaw: 0.0 # in degrees
-    # Frame IDs
+    z: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
     parent_frame_id: "torpedo_2/clustered"
     child_frame_id: "torpedo_2/shark"
+  - name: torpedo_2_shark_shoot
+    x: 0.0
+    y: 0.0
+    z: -0.4
+    roll: -90.0
+    pitch: -90.0
+    yaw: 0.0
+    parent_frame_id: "torpedo_2/shark"
+    child_frame_id: "torpedo_2/shark/shoot"
     ######################### GATE TFS #########################
   - name: gate_centre
     # Translation (x, y, z in meters)
