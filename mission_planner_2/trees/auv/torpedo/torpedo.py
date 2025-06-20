@@ -33,7 +33,7 @@ TORPEDO_SHOOTER_BOT_FRAME = "auv4/torpedo_shooter_bot"
 TOP_TORP_UINT = UInt8(data=2)
 BTM_TORP_UINT = UInt8(data=4)
 
-CLUSTER_DURATION = 30
+CLUSTER_DURATION = 10
 STABILIZE_DURATION = 10
 #########################################################################
 
