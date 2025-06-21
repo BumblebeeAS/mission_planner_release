@@ -4,6 +4,7 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from rclpy.qos import qos_profile_system_default
+from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
@@ -11,12 +12,14 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import (
-    create_slalom_clustering_goal,
+    create_clustering_goal,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.slalom.channel_movement import (
-    create_channel_movement_root,
+    create_channel_movement_one_root,
+    create_channel_movement_two_root,
+    create_channel_movement_zero_root,
 )
 
 NAMESPACE = generate_namespace()
@@ -25,15 +28,19 @@ fk = full_key_generator(NAMESPACE)
 ########################## UPDATE CONSTANTS HERE #########################
 BASE_LINK_FRAME = "auv4/base_link_ned"
 WORLD_FRAME = "world_ned"
-CHANNEL_PAIR_ONE_FRAME = "slalom_layer_0"
-CHANNEL_PAIR_TWO_FRAME = "slalom_layer_1"
-CHANNEL_PAIR_THREE_FRAME = "slalom_layer_2"
+CHANNEL_PAIR_ZERO_FRAME = "slalom_layer_0"
+CHANNEL_PAIR_ONE_FRAME = "slalom_layer_1"
+CHANNEL_PAIR_TWO_FRAME = "slalom_layer_2"
 
-CHANNEL_PAIR_ONE_FRAME_CLUSTERED = "slalom_layer_0/clustered"
-CHANNEL_PAIR_TWO_FRAME_CLUSTERED = "slalom_layer_1/clustered"
-CHANNEL_PAIR_THREE_FRAME_CLUSTERED = "slalom_layer_2/clustered"
+CHANNEL_PAIR_ZERO_FRAME_CLUSTERED = CHANNEL_PAIR_ZERO_FRAME + "/clustered"
+CHANNEL_PAIR_ONE_FRAME_CLUSTERED = CHANNEL_PAIR_ONE_FRAME + "/clustered"
+CHANNEL_PAIR_TWO_FRAME_CLUSTERED = CHANNEL_PAIR_TWO_FRAME + "/clustered"
+
+SLALOM_ONE_FROM_ZERO_HARDCODED = "slalom_layer_1/hardcoded"
+SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
 
 TRANSFORM_TIMEOUT_DURATION = 5.0
+CLUSTER_VIEW_DURATION = 40
 
 """
 For sim.
@@ -45,7 +52,46 @@ THIRD_VIEW = {"position_x": 7.0, "position_y": -0.8, "position_z": 1.0, "yaw": -
 FIRST_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.0, "yaw": 0.0}
 SECOND_VIEW = {"position_x": 0.0, "position_y": -1.2, "position_z": 0.0, "yaw": 0.0}
 THIRD_VIEW = {"position_x": 0.0, "position_y": 2.4, "position_z": 0.0, "yaw": 0.0}
+
+# set by  gate task if there change must change here too
+IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 #########################################################################
+
+_CHANNEL_ZERO_KEY = fk("channel_pair_zero_tf")
+_CHANNEL_ONE_KEY = fk("channel_pair_one_tf")
+_CHANNEL_TWO_KEY = fk("channel_pair_two_tf")
+_CREATE_POSE_FUNC_KEY = fk("create_pose_func")  # key for pose creation function
+_MISSING_TRANSFORMS_KEY = fk("missing_transforms")  # key for missing transforms
+
+
+def _create_slalom_left_pose(frame_id: str):
+    """
+    Create a PoseStamped for the left side of the slalom.
+    """
+    return create_stamped_pose(
+        frame_id=frame_id,
+        position_x=0.75,
+        position_y=0.3,
+        position_z=0.0,
+        roll=-90.0,
+        pitch=-90.0,
+        yaw=0.0,  # Facing left
+    )
+
+
+def _create_slalom_right_pose(frame_id: str):
+    """
+    Create a PoseStamped for the right side of the slalom.
+    """
+    return create_stamped_pose(
+        frame_id=frame_id,
+        position_x=2.25,
+        position_y=0.3,
+        position_z=0.0,
+        roll=-90.0,
+        pitch=-90.0,
+        yaw=0.0,
+    )
 
 
 def create_slalom_root():
@@ -68,7 +114,7 @@ def create_slalom_root():
         memory=True,
     )
 
-    # TODO: Update the frame and pose to move to
+    # TODO: Update the frame and pose to move to (consider doing it similar to octagon task search seq)
     move_view_one = goto.FromConstant(
         name="move one",
         pose=create_stamped_pose(
@@ -110,8 +156,20 @@ def create_slalom_root():
     cluster_action = py_trees_ros.action_clients.FromConstant(
         name="Cluster slalom transforms",
         action_type=ClusterTf,
-        action_name="/auv4/slalom",
-        action_goal=create_slalom_clustering_goal(duration=40),
+        action_name="/auv4/cluster_tf_multi",
+        action_goal=create_clustering_goal(
+            in_children=[
+                CHANNEL_PAIR_ZERO_FRAME,
+                CHANNEL_PAIR_ONE_FRAME,
+                CHANNEL_PAIR_TWO_FRAME,
+            ],
+            out_children=[
+                CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+                CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+                CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            ],
+            duration=CLUSTER_VIEW_DURATION,
+        ),
     )
 
     seq_move_and_cluster = py_trees.composites.Sequence(
@@ -137,10 +195,18 @@ def create_slalom_root():
         overwrite=True,
     )
 
-    # There is no need to read/write the transforms from the blackboard, but the below is just a means of confirmation
+    # There is now A need to read/write the transforms from the blackboard (changed)
+    check_transform_zero = py_trees_ros.transforms.ToBlackboard(
+        name="Write channel pair zero transform",
+        variable_name=_CHANNEL_ZERO_KEY,
+        target_frame=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+        source_frame=BASE_LINK_FRAME,
+        qos_profile=qos_profile_system_default,
+    )
+
     check_transform_one = py_trees_ros.transforms.ToBlackboard(
         name="Write channel pair one transform",
-        variable_name=fk("channel_pair_one_transform"),
+        variable_name=_CHANNEL_ONE_KEY,
         target_frame=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
         source_frame=BASE_LINK_FRAME,
         qos_profile=qos_profile_system_default,
@@ -148,40 +214,32 @@ def create_slalom_root():
 
     check_transform_two = py_trees_ros.transforms.ToBlackboard(
         name="Write channel pair two transform",
-        variable_name=fk("channel_pair_two_transform"),
+        variable_name=_CHANNEL_TWO_KEY,
         target_frame=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-        source_frame=BASE_LINK_FRAME,
-        qos_profile=qos_profile_system_default,
-    )
-
-    check_transform_three = py_trees_ros.transforms.ToBlackboard(
-        name="Write channel pair three transform",
-        variable_name=fk("channel_pair_three_transform"),
-        target_frame=CHANNEL_PAIR_THREE_FRAME_CLUSTERED,
         source_frame=BASE_LINK_FRAME,
         qos_profile=qos_profile_system_default,
     )
 
     update_missing_transforms_one = DynamicSetBlackboard(
         name="Update missing transforms one",
-        key=fk("missing_transforms"),
-        update_key=fk("missing_transforms"),
+        key=_MISSING_TRANSFORMS_KEY,
+        update_key=_MISSING_TRANSFORMS_KEY,
         overwrite=True,
         func=lambda x: x + 1,
     )
 
     update_missing_transforms_two = DynamicSetBlackboard(
         name="Update missing transforms two",
-        key=fk("missing_transforms"),
-        update_key=fk("missing_transforms"),
+        key=_MISSING_TRANSFORMS_KEY,
+        update_key=_MISSING_TRANSFORMS_KEY,
         overwrite=True,
         func=lambda x: x + 1,
     )
 
     update_missing_transforms_three = DynamicSetBlackboard(
         name="Update missing transforms three",
-        key=fk("missing_transforms"),
-        update_key=fk("missing_transforms"),
+        key=_MISSING_TRANSFORMS_KEY,
+        update_key=_MISSING_TRANSFORMS_KEY,
         overwrite=True,
         func=lambda x: x + 1,
     )
@@ -193,7 +251,7 @@ def create_slalom_root():
         children=[
             py_trees.decorators.Timeout(
                 name="Timeout for channel pair one",
-                child=check_transform_one,
+                child=check_transform_zero,
                 duration=TRANSFORM_TIMEOUT_DURATION,
             ),
             update_missing_transforms_one,
@@ -206,7 +264,7 @@ def create_slalom_root():
         children=[
             py_trees.decorators.Timeout(
                 name="Timeout for channel pair two",
-                child=check_transform_two,
+                child=check_transform_one,
                 duration=TRANSFORM_TIMEOUT_DURATION,
             ),
             update_missing_transforms_two,
@@ -219,7 +277,7 @@ def create_slalom_root():
         children=[
             py_trees.decorators.Timeout(
                 name="Timeout for channel pair three",
-                child=check_transform_three,
+                child=check_transform_two,
                 duration=TRANSFORM_TIMEOUT_DURATION,
             ),
             update_missing_transforms_three,
@@ -238,36 +296,45 @@ def create_slalom_root():
         ],
     )
 
-    # Generate movemement options based on the number of missing transforms, generation done in compile time, execution done in runtime
-    move_channel_one = create_channel_movement_root(0)
-    move_channel_two = create_channel_movement_root(1)
-    move_channel_three = create_channel_movement_root(2)
+    # Generate movement options based on the number of missing transforms, generation done in compile time, execution done in runtime
+    move_channel_one = create_channel_movement_zero_root(
+        slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+        slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+        slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+        create_func_key=_CREATE_POSE_FUNC_KEY,
+    )
+    move_channel_two = create_channel_movement_one_root(
+        slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+        slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+        slalom_frame_zero_key=_CHANNEL_ZERO_KEY,
+        slalom_frame_one_key=_CHANNEL_ONE_KEY,
+        slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
+        slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
+        create_func_key=_CREATE_POSE_FUNC_KEY,
+    )
+    move_channel_three = create_channel_movement_two_root(
+        slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+        slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
+        slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
+        create_func_key=_CREATE_POSE_FUNC_KEY,
+    )
+
+    # helper function to check num missing tfs
+    check = lambda num_missing: py_trees.common.ComparisonExpression(
+        variable=_MISSING_TRANSFORMS_KEY,
+        value=num_missing,
+        operator=operator.eq,
+    )
 
     check_missing_transforms_one = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check missing transforms one",
-        check=py_trees.common.ComparisonExpression(
-            variable=fk("missing_transforms"),
-            value=0,
-            operator=lambda x, y: operator.__eq__(x, y),
-        ),
+        name="Check missing zero transforms",
+        check=check(0),
     )
-
     check_missing_transforms_two = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check missing transforms two",
-        check=py_trees.common.ComparisonExpression(
-            variable=fk("missing_transforms"),
-            value=1,
-            operator=lambda x, y: operator.__eq__(x, y),
-        ),
+        name="Check missing one transform", check=check(1)
     )
-
     check_missing_transforms_three = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check missing transforms three",
-        check=py_trees.common.ComparisonExpression(
-            variable=fk("missing_transforms"),
-            value=2,
-            operator=lambda x, y: operator.__eq__(x, y),
-        ),
+        name="Check missing two transforms", check=check(2)
     )
 
     # Selector to choose the movement strategy based on the number of missing transforms
@@ -276,7 +343,7 @@ def create_slalom_root():
         memory=True,
         children=[
             py_trees.composites.Sequence(
-                name="No missing transforms",
+                name="Zero missing transforms",
                 memory=True,
                 children=[check_missing_transforms_one, move_channel_one],
             ),
@@ -293,12 +360,47 @@ def create_slalom_root():
         ],
     )
 
-    # Write is left (for testing)
-    write_is_left = py_trees.behaviours.SetBlackboardVariable(
-        name="Write is left side",
-        variable_name="/global/is_left_side",
-        variable_value=False,
-        overwrite=True,
+    sel_left_right = py_trees.composites.Selector(
+        name="Left or right side",
+        memory=True,
+    )
+
+    seq_set_left = py_trees.composites.Sequence(
+        name="Set left side",
+        memory=True,
+    )
+
+    check_is_left = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check is left side",
+        check=py_trees.common.ComparisonExpression(
+            variable=IS_LEFT_KEY,
+            value=True,
+            operator=operator.eq,
+        ),
+    )
+
+    seq_set_left.add_children(
+        [
+            check_is_left,
+            py_trees.behaviours.SetBlackboardVariable(
+                name="Seq set create func left side",
+                variable_name=_CREATE_POSE_FUNC_KEY,
+                variable_value=_create_slalom_left_pose,
+                overwrite=True,
+            ),
+        ]
+    )
+
+    sel_left_right.add_children(
+        [
+            seq_set_left,
+            py_trees.behaviours.SetBlackboardVariable(
+                name="Set set create func right side",
+                variable_name=_CREATE_POSE_FUNC_KEY,
+                variable_value=_create_slalom_right_pose,
+                overwrite=True,
+            ),
+        ]
     )
 
     goto_pass_through = goto.FromConstant(
@@ -308,8 +410,7 @@ def create_slalom_root():
 
     root.add_children(
         [
-            write_is_left,
-            # seq_move_and_cluster,
+            sel_left_right,
             move_and_cluster_par,
             seq_check_transforms,
             select_movement_strategy,

@@ -78,7 +78,7 @@ def create_torpedo_root():
         service_name="/auv4/choice/get_is_fish",
         service_type=Trigger,
         service_request=Trigger.Request(),
-        key_response=fk(_CHOICE_KEY),
+        key_response=_CHOICE_KEY,
     )
 
     srv_enable_detections = py_trees_ros.service_clients.FromConstant(

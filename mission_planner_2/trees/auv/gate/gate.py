@@ -131,21 +131,22 @@ def create_gate_root():
 
     seq_try_left_side = py_trees.composites.Sequence(name="Try left side", memory=True)
 
+    # TODO: change to xor func shorten this
     check_is_left = py_trees.behaviours.CheckBlackboardVariableValues(
         name="Check if left side",
         checks=[
             py_trees.common.ComparisonExpression(
-                variable=fk(_CHOICE_KEY),
+                variable=_CHOICE_KEY,
                 value=True,
-                operator=lambda x, y: operator.__eq__(x.success, y),
+                operator=lambda x, y: operator.eq(x.success, y),
             ),
             py_trees.common.ComparisonExpression(
-                variable=fk(_GATE_ORIENTATION_KEY),
+                variable=_GATE_ORIENTATION_KEY,
                 value="fish_shark",
-                operator=lambda x, y: operator.__eq__(x.data, y),
+                operator=lambda x, y: operator.eq(x.data, y),
             ),
         ],
-        operator=operator.__eq__,
+        operator=operator.eq,
     )
 
     write_is_left = py_trees.behaviours.SetBlackboardVariable(
