@@ -8,7 +8,6 @@ from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
 from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
@@ -23,7 +22,7 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.trees.auv.bins.bin_selector import create_bin_selector_root
+from mission_planner_2.trees.auv.bins.choice_selector import create_choice_selector_root
 from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
@@ -32,10 +31,10 @@ fk = full_key_generator(NAMESPACE)
 ######################### UPDATE CONSTANTS HERE #########################
 VISION_SERVER_TOPIC = "/auv4/bin/manage_nodes"
 
-TOGGLE_TEMPLATE_TOPIC = "/auv4/bin/image_matching/toggle_template"
+TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
 TEMPLATE_NAME = "Task03_DropBRUVS.png"
 ROTATED_TEMPLATE_NAME = "Task03_DropBRUVS_Rotated.png"
-POINT_CORRESPONDENCES_TOPIC = "/auv4/bin/image_matching/point_correspondences"
+POINT_CORRESPONDENCES_TOPIC = "/auv4/bot_cam/image_matching/point_correspondences"
 
 CAMERA_FRAME = "auv4/bot_cam_optical"
 TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_optical"
@@ -45,15 +44,14 @@ TEMPLATE_FRAME_YOLO = "bin/yolo"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 
 ACTUATION_UINT = UInt8(data=6)
-ACTUATION_INPUT_TOPIC = "/auv4/actuation/input"
 
 CLUSTERING_DURATION = 20
 STABILIZE_CONTROLS_DURATION = 10.0
 
 FISH_BIN_FRAME = "bin/fish"
 SHARK_BIN_FRAME = "bin/shark"
-FISH_BIN_ROTATED_FRAME = "bin/fish/rotated"
-SHARK_BIN_ROTATED_FRAME = "bin/shark/rotated"
+ROTATED_FISH_BIN_FRAME = "bin/fish/rotated"
+ROTATED_SHARK_BIN_FRAME = "bin/shark/rotated"
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -64,6 +62,133 @@ _POINTS_1_KEY = fk("points_1")
 _POINTS_2_KEY = fk("points_2")
 _START_VISION_KEY = fk("bin_start_vision")
 _STOP_VISION_KEY = fk("bin_stop_vision")
+_IS_ROTATED_KEY = fk("is_rotated")
+_CLUSTERING_GOAL_KEY = fk("clustering_goal")
+_BIN_ENABLE_DETECTIONS_KEY = fk("bin_enable_detections")
+_BIN_ROTATED_ENABLE_DETECTIONS_KEY = fk("bin_rotated_enable_detections")
+_BIN_CORRECT_DETECTIONS_REQ_KEY = fk("enable_correct_detections_req")
+_BIN_CORRECT_ENABLE_DETECTIONS_KEY = fk("bin_correct_enable_detections")
+_BIN_DISABLE_DETECTIONS_KEY = fk("bin_disable_detections")
+
+
+def create_template_selector_root() -> py_trees.composites.Selector:
+    sel_template_selector_root = py_trees.composites.Selector(
+        name="Template selector root",
+        memory=True,
+    )
+
+    seq_unrotated = py_trees.composites.Sequence(
+        name="Seq unrotated set up",
+        memory=True,
+    )
+
+    seq_rotate = py_trees.composites.Sequence(
+        name="Seq rotated set up",
+        memory=True,
+    )
+
+    # Step 1: Check if need to rotate, returns true if need to rotate
+    set_if_not_rotate = DynamicSetBlackboard(
+        name="Set is_rotated",
+        key=[_POINTS_1_KEY, _POINTS_2_KEY],
+        update_key=_IS_ROTATED_KEY,
+        func=lambda p1, p2: len(p1.data) > len(p2.data),
+    )
+
+    check_if_rotated = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check if is_rotated",
+        check=py_trees.common.ComparisonExpression(
+            variable=_IS_ROTATED_KEY,
+            value=True,
+            operator=operator.eq,
+        ),
+    )
+
+    set_enable_detections_req = py_trees.behaviours.SetBlackboardVariable(
+        name="Set enable detections request",
+        variable_name=_BIN_CORRECT_DETECTIONS_REQ_KEY,
+        variable_value=IMPoseEstimatorToggleTemplate.Request(
+            enabled=True,
+            camera_frame_id=CAMERA_FRAME,
+            template_name=TEMPLATE_NAME,
+        ),
+        overwrite=True,
+    )
+
+    set_clustering_goal = py_trees.behaviours.SetBlackboardVariable(
+        name="Set clustering goal",
+        variable_name=_CLUSTERING_GOAL_KEY,
+        variable_value=create_clustering_goal(
+            in_children=TEMPLATE_FRAME_OPTICAL,
+            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+            duration=CLUSTERING_DURATION,
+            use_cache=False,
+        ),
+        overwrite=True,
+    )
+
+    sel_update_selection = create_choice_selector_root(
+        choice_key=_CHOICE_KEY,
+        pose_key=_POSE_KEY,
+        fish_bin_frame=FISH_BIN_FRAME,
+        shark_bin_frame=SHARK_BIN_FRAME,
+    )
+
+    seq_unrotated.add_children(
+        [
+            set_if_not_rotate,
+            check_if_rotated,
+            set_enable_detections_req,
+            set_clustering_goal,
+            sel_update_selection,
+        ]
+    )
+
+    set_rotated_enable_detections_req = py_trees.behaviours.SetBlackboardVariable(
+        name="Set enable detections request (rotated)",
+        variable_name=_BIN_CORRECT_DETECTIONS_REQ_KEY,
+        variable_value=IMPoseEstimatorToggleTemplate.Request(
+            enabled=True,
+            camera_frame_id=CAMERA_FRAME,
+            template_name=ROTATED_TEMPLATE_NAME,
+        ),
+        overwrite=True,
+    )
+
+    set_rotated_clustering_goal = py_trees.behaviours.SetBlackboardVariable(
+        name="Set clustering goal (rotated)",
+        variable_name=_CLUSTERING_GOAL_KEY,
+        variable_value=create_clustering_goal(
+            in_children=ROTATED_TEMPLATE_FRAME_OPTICAL,
+            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+            duration=CLUSTERING_DURATION,
+            use_cache=False,
+        ),
+        overwrite=True,
+    )
+
+    sel_rotated_update_selection = create_choice_selector_root(
+        choice_key=_CHOICE_KEY,
+        pose_key=_POSE_KEY,
+        fish_bin_frame=ROTATED_FISH_BIN_FRAME,
+        shark_bin_frame=ROTATED_SHARK_BIN_FRAME,
+    )
+
+    seq_rotate.add_children(
+        [
+            set_rotated_clustering_goal,
+            set_rotated_enable_detections_req,
+            sel_rotated_update_selection,
+        ]
+    )
+
+    sel_template_selector_root.add_children(
+        children=[
+            seq_unrotated,
+            seq_rotate,
+        ],
+    )
+    return sel_template_selector_root
 
 
 def create_bin_root():
@@ -97,12 +222,8 @@ def create_bin_root():
             operator=lambda x, y: operator.eq(x.success, y),
         ),
     )
-    # Step 1: Stabilise before starting
-    timer_stabilise = py_trees.timers.Timer(
-        "Stabilise before task", duration=STABILIZE_CONTROLS_DURATION
-    )
 
-    # Step 2: Cluster transforms for initial orientation using YOLO
+    # Step 1: Cluster transforms for initial orientation using YOLO
     action_cluster_first = py_trees_ros.action_clients.FromConstant(
         name="Cluster transforms for orientation",
         action_type=ClusterTf,
@@ -115,17 +236,15 @@ def create_bin_root():
         ),
     )
 
-    # Step 3: Navigate to bin centre
+    # Step 2: Navigate to bin centre
     goto_bin_centre = goto.FromConstant(
         name="Goto bin centre",
         pose=create_stamped_pose("bin/centre"),
     )
 
-    stabilise_before_matching = py_trees.timers.Timer(
-        "Stabilise before matching", duration=STABILIZE_CONTROLS_DURATION
-    )
+    stabilise = py_trees.timers.Timer("Stabilise", duration=STABILIZE_CONTROLS_DURATION)
 
-    # Step 4: Enable image matching detections
+    # Step 3: Enable image matching detections
     srv_enable_detections = py_trees_ros.service_clients.FromConstant(
         name="Enable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
@@ -135,22 +254,22 @@ def create_bin_root():
             camera_frame_id=CAMERA_FRAME,
             template_name=TEMPLATE_NAME,
         ),
-        key_response=fk("bin_enable_detections"),
+        key_response=_BIN_ENABLE_DETECTIONS_KEY,
     )
 
-    # Step 5: Verify enable succeeded
+    # Step 4: Verify enable succeeded
     check_enable_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Verify enable succeeded",
         check=py_trees.common.ComparisonExpression(
-            variable=fk("bin_enable_detections"),
+            variable=_BIN_ENABLE_DETECTIONS_KEY,
             value=True,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
     )
 
-    # Step 6a: Get first set of point correspondences
+    # Step 5a: Get first set of point correspondences
     sub_get_points_first = py_trees_ros.subscribers.ToBlackboard(
-        name="Get points first",
+        name="Get points",
         topic_name=POINT_CORRESPONDENCES_TOPIC,
         topic_type=PointCorrespondencesStamped,
         qos_profile=qos_profile_sensor_data,
@@ -159,11 +278,12 @@ def create_bin_root():
             fk("object_frame_id_1"): "object_frame_id",
         },
     )
+
     # Check whether the point correspondences are for the newly
     # set template and not from a previous task.
     check_point_correspondences_first = (
         py_trees.behaviours.CheckBlackboardVariableValue(
-            name="Check point correspondences first",
+            name="Check point correspondences",
             check=py_trees.common.ComparisonExpression(
                 variable=fk("object_frame_id_1"),
                 value=TEMPLATE_FRAME_OPTICAL,
@@ -171,24 +291,27 @@ def create_bin_root():
             ),
         )
     )
-    sub_get_points_first_sequence = py_trees.composites.Sequence(
-        name="Try unrotated template",
+
+    seq_get_points_first = py_trees.composites.Sequence(
+        name="Seq unrotated template",
         memory=True,
     )
-    sub_get_points_first_sequence.add_children(
+
+    seq_get_points_first.add_children(
         children=[
             sub_get_points_first,
             check_point_correspondences_first,
         ],
     )
+
     sub_get_points_first_sequence_retry = py_trees.decorators.Retry(
-        name="Retry get points first",
-        child=sub_get_points_first_sequence,
+        name="Try unrotated template",
+        child=seq_get_points_first,
         num_failures=100,
     )
 
     srv_enable_detections_rotated = py_trees_ros.service_clients.FromConstant(
-        name="Enable detections",
+        name="Enable detections (rotated)",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(
@@ -196,21 +319,21 @@ def create_bin_root():
             camera_frame_id=CAMERA_FRAME,
             template_name=ROTATED_TEMPLATE_NAME,
         ),
-        key_response=fk("bin_rotated_enable_detections"),
+        key_response=_BIN_ROTATED_ENABLE_DETECTIONS_KEY,
     )
 
     check_enable_succeeded_rotated = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify enable succeeded",
+        name="Verify enable succeeded (rotated)",
         check=py_trees.common.ComparisonExpression(
-            variable=fk("bin_rotated_enable_detections"),
+            variable=_BIN_ROTATED_ENABLE_DETECTIONS_KEY,
             value=True,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
     )
 
-    # Step 6b: Get second set of point correspondences
+    # Step 5b: Get second set of point correspondences
     sub_get_points_second = py_trees_ros.subscribers.ToBlackboard(
-        name="Get points second",
+        name="Get points (rotated)",
         topic_name=POINT_CORRESPONDENCES_TOPIC,
         topic_type=PointCorrespondencesStamped,
         qos_profile=qos_profile_sensor_data,
@@ -219,11 +342,12 @@ def create_bin_root():
             fk("object_frame_id_2"): "object_frame_id",
         },
     )
+
     # Check whether the point correspondences are for the newly
     # set template and not from a previous task.
     check_point_correspondences_second = (
         py_trees.behaviours.CheckBlackboardVariableValue(
-            name="Check point correspondences second",
+            name="Check point correspondences (rotated)",
             check=py_trees.common.ComparisonExpression(
                 variable=fk("object_frame_id_2"),
                 value=ROTATED_TEMPLATE_FRAME_OPTICAL,
@@ -231,94 +355,39 @@ def create_bin_root():
             ),
         )
     )
-    sub_get_points_second_sequence = py_trees.composites.Sequence(
-        name="Get points second sequence",
+
+    seq_get_points_rotated = py_trees.composites.Sequence(
+        name="Seq rotated template",
         memory=True,
     )
-    sub_get_points_second_sequence.add_children(
+
+    seq_get_points_rotated.add_children(
         children=[
             sub_get_points_second,
             check_point_correspondences_second,
         ],
     )
+
     sub_get_points_second_sequence_retry = py_trees.decorators.Retry(
         name="Try rotated template",
-        child=sub_get_points_second_sequence,
+        child=seq_get_points_rotated,
         num_failures=100,
     )
 
-    def create_enable_req(points_1, points_2):
-        if len(points_1.data) > len(points_2.data):
-            template_name = TEMPLATE_NAME
-        else:
-            template_name = ROTATED_TEMPLATE_NAME
-
-        return IMPoseEstimatorToggleTemplate.Request(
-            enabled=True,
-            camera_frame_id=CAMERA_FRAME,
-            template_name=template_name,
-        )
-
-    def create_correct_clustering_goal(points_1, points_2):
-        if len(points_1.data) > len(points_2.data):
-            template_frame = TEMPLATE_FRAME_OPTICAL
-        else:
-            template_frame = ROTATED_TEMPLATE_FRAME_OPTICAL
-
-        return create_clustering_goal(
-            in_children=template_frame,
-            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
-            duration=CLUSTERING_DURATION,
-            use_cache=False,
-        )
-
-    set_enable_detections_req = DynamicSetBlackboard(
-        name="Set enable detections request",
-        key=[_POINTS_1_KEY, _POINTS_2_KEY],
-        update_key=fk("enable_detections_req"),
-        func=create_enable_req,
-    )
-
-    set_clustering_goal = DynamicSetBlackboard(
-        name="Set clustering goal",
-        key=[_POINTS_1_KEY, _POINTS_2_KEY],
-        update_key=fk("clustering_goal"),
-        func=create_correct_clustering_goal,
-    )
-
-    # Step 7: Get fish/shark choice
-    srv_choose_fish = py_trees_ros.service_clients.FromConstant(
-        name="Get choice",
-        service_name="/auv4/choice/get_is_fish",
-        service_type=Trigger,
-        service_request=Trigger.Request(),
-        key_response=_CHOICE_KEY,
-    )
-
-    # Step 8: Update pose selection based on choice
-    sel_update_selection = create_bin_selector_root(
-        choice_key=_CHOICE_KEY,
-        pose_key=_POSE_KEY,
-        points1_key=_POINTS_1_KEY,
-        points2_key=_POINTS_2_KEY,
-        fish_bin_frame=FISH_BIN_FRAME,
-        shark_bin_frame=SHARK_BIN_FRAME,
-        fish_bin_rotated_frame=FISH_BIN_ROTATED_FRAME,
-        shark_bin_rotated_frame=SHARK_BIN_ROTATED_FRAME,
-    )
+    sel_update_template = create_template_selector_root()
 
     srv_enable_correct_detections = py_trees_ros.service_clients.FromBlackboard(
         "Enable correct detection template",
         service_type=IMPoseEstimatorToggleTemplate,
         service_name=TOGGLE_TEMPLATE_TOPIC,
-        key_request=fk("enable_detections_req"),
-        key_response=fk("bin_correct_enable_detections"),
+        key_request=_BIN_CORRECT_DETECTIONS_REQ_KEY,
+        key_response=_BIN_CORRECT_ENABLE_DETECTIONS_KEY,
     )
 
     check_enable_succeeded_correct = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify enable succeeded",
+        name="Verify enable correct succeeded",
         check=py_trees.common.ComparisonExpression(
-            variable=fk("bin_correct_enable_detections"),
+            variable=_BIN_CORRECT_ENABLE_DETECTIONS_KEY,
             value=True,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
@@ -353,7 +422,7 @@ def create_bin_root():
     # Step 12: Fire first dropper
     pub_fire_dropper_first = py_trees_ros.publishers.FromBlackboard(
         name="Fire dropper first",
-        topic_name=ACTUATION_INPUT_TOPIC,
+        topic_name="/auv4/actuation/input",
         topic_type=UInt8,
         qos_profile=qos_profile_system_default,
         blackboard_variable=fk("bin_actuation"),
@@ -362,7 +431,7 @@ def create_bin_root():
     # Step 14: Fire second dropper
     pub_fire_dropper_second = py_trees_ros.publishers.FromBlackboard(
         name="Fire dropper second",
-        topic_name=ACTUATION_INPUT_TOPIC,
+        topic_name="/auv4/actuation/input",
         topic_type=UInt8,
         qos_profile=qos_profile_system_default,
         blackboard_variable=fk("bin_actuation"),
@@ -374,14 +443,14 @@ def create_bin_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
-        key_response=fk("bin_disable_detections"),
+        key_response=_BIN_DISABLE_DETECTIONS_KEY,
     )
 
     # Step 16: Verify disable succeeded
     check_disable_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Verify disable succeeded",
         check=py_trees.common.ComparisonExpression(
-            variable=fk("bin_disable_detections"),
+            variable=_BIN_DISABLE_DETECTIONS_KEY,
             value=False,
             operator=lambda x, y: operator.eq(x.new_state, y),
         ),
@@ -411,17 +480,14 @@ def create_bin_root():
             check_start_vision_succeeded,
             action_cluster_first,
             goto_bin_centre,
-            stabilise_before_matching,
+            stabilise,
             srv_enable_detections,
             check_enable_succeeded,
             sub_get_points_first_sequence_retry,
             srv_enable_detections_rotated,
             check_enable_succeeded_rotated,
             sub_get_points_second_sequence_retry,
-            set_enable_detections_req,
-            set_clustering_goal,
-            srv_choose_fish,
-            sel_update_selection,
+            sel_update_template,
             srv_enable_correct_detections,
             check_enable_succeeded_correct,
             action_cluster_second,
@@ -441,7 +507,7 @@ def create_bin_root():
     # Build root sequence
     seq_bin_root.add_children(
         children=[
-            # timer_stabilise,
+            # create_move_to_bin_task_root(),
             seq_drop_into_bin,
         ]
     )
