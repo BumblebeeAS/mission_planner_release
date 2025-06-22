@@ -1,12 +1,17 @@
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
+from lifecycle_msgs.srv import ChangeState
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
+from mission_planner_2.commons.detection_utils import (
+    create_end_vision_req,
+    create_start_vision_req,
+)
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -22,6 +27,8 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
+VISION_SERVER_TOPIC = "/auv4/octagon/manage_nodes"
+
 CAMERA_FRAME = "auv4/front_cam_optical"
 
 LADLE_1_FRAME = "ladle_1"
@@ -60,6 +67,8 @@ _CHOICE_KEY = fk("choice")
 _GO_SURFACE_FRAME_KEY = fk("go_surface_frame")
 _ACTIVATE_GRABBER_KEY = fk("activate_grabber")
 _HALF_CLOSE_GRABBER_KEY = fk("half_close_grabber")
+_START_VISION_KEY = fk("bin_start_vision")
+_STOP_VISION_KEY = fk("bin_stop_vision")
 
 
 # TODO might have btr way to do this im just lz to type same thing so many times
@@ -90,6 +99,22 @@ def create_octagon_root():
     seq_cup = py_trees.composites.Sequence(
         name="Cup Sequence",
         memory=True,
+    )
+
+    srv_start_vision = py_trees_ros.service_clients.FromConstant(
+        name="Start vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_start_vision_req(),
+        key_response=_START_VISION_KEY,
+    )
+    check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify start vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=_START_VISION_KEY,
+            value=True,
+            operator=lambda x, y: x.success == y,
+        ),
     )
 
     srv_get_choice = py_trees_ros.service_clients.FromConstant(
@@ -344,6 +369,22 @@ def create_octagon_root():
         pose=create_stamped_pose(frame_id="auv4/base_link_ned", yaw=180.0),
     )
 
+    srv_end_vision = py_trees_ros.service_clients.FromConstant(
+        name="End vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_end_vision_req(),
+        key_response=_STOP_VISION_KEY,
+    )
+    check_end_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify end vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=_STOP_VISION_KEY,
+            value=True,
+            operator=lambda x, y: x.success == y,
+        ),
+    )
+
     seq_spoon.add_children(
         children=[
             cluster_spoon,
@@ -385,6 +426,8 @@ def create_octagon_root():
     root.add_children(
         children=[
             srv_get_choice,
+            srv_start_vision,
+            check_start_vision_succeeded,
             set_activate_grabber,
             set_half_close_grabber,
             pub_activate_grabber,
@@ -397,6 +440,8 @@ def create_octagon_root():
                 "Stabilise after first rotation", duration=STABILIZE_DURATION
             ),
             goto_rotation_cup,
+            srv_end_vision,
+            check_end_vision_succeeded,
         ]
     )
 

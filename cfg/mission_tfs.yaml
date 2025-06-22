@@ -40,6 +40,19 @@ tfs:
     yaw: 0.0
     parent_frame_id: "torpedo_1/shark"
     child_frame_id: "torpedo_1/shark/shoot"
+
+  - name: torpedo_centre
+    # Translation (x, y, z in meters)
+    # From top left corner of torpedo board, x right, y down
+    x: 0.3
+    y: 0.3
+    z: 0.0
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: 0.0 # in degrees
+    # Frame IDs
+    parent_frame_id: "torpedo/yolo/clustered"
+    child_frame_id: "torpedo/centre"
   ######################### TORPEDO 2 TFS #########################
   - name: torpedo_2_fish
     # Translation (x, y, z in meters)

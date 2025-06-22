@@ -6,7 +6,10 @@ from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from mission_planner_2.commons import cache_tf
+from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -22,9 +25,6 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.trees.auv.bins.bin_selector import create_bin_selector_root
 from mission_planner_2.trees.auv.goto import goto
-from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -62,6 +62,8 @@ _CHOICE_KEY = fk("choice")
 _POSE_KEY = fk("pose")
 _POINTS_1_KEY = fk("points_1")
 _POINTS_2_KEY = fk("points_2")
+_START_VISION_KEY = fk("bin_start_vision")
+_STOP_VISION_KEY = fk("bin_stop_vision")
 
 
 def create_bin_root():
@@ -85,12 +87,12 @@ def create_bin_root():
         service_name=VISION_SERVER_TOPIC,
         service_type=ChangeState,
         service_request=create_start_vision_req(),
-        key_response=fk("bin_start_vision"),
+        key_response=_START_VISION_KEY,
     )
     check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Verify start vision pipeline succeeded",
         check=py_trees.common.ComparisonExpression(
-            variable=fk("bin_start_vision"),
+            variable=_START_VISION_KEY,
             value=True,
             operator=lambda x, y: operator.eq(x.success, y),
         ),
@@ -391,12 +393,12 @@ def create_bin_root():
         service_name=VISION_SERVER_TOPIC,
         service_type=ChangeState,
         service_request=create_end_vision_req(),
-        key_response=fk("bin_end_vision"),
+        key_response=_STOP_VISION_KEY,
     )
     check_end_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Verify end vision pipeline succeeded",
         check=py_trees.common.ComparisonExpression(
-            variable=fk("bin_end_vision"),
+            variable=_STOP_VISION_KEY,
             value=True,
             operator=lambda x, y: operator.eq(x.success, y),
         ),

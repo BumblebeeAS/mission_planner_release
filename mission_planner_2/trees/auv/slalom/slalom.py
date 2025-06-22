@@ -3,7 +3,15 @@ import operator
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
+from lifecycle_msgs.srv import ChangeState
+from rclpy.qos import qos_profile_system_default
+from std_srvs.srv import SetBool
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
+from mission_planner_2.commons.detection_utils import (
+    create_end_vision_req,
+    create_start_vision_req,
+)
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -18,13 +26,14 @@ from mission_planner_2.trees.auv.slalom.channel_movement import (
     create_channel_movement_two_root,
     create_channel_movement_zero_root,
 )
-from rclpy.qos import qos_profile_system_default
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ########################## UPDATE CONSTANTS HERE #########################
+VISION_SERVER_TOPIC = "/auv4/slalom/manage_nodes"
+DEPTH_ANYTHING_SERVER_TOPIC = "/auv4/slalom/manage_components"
+
 BASE_LINK_FRAME = "auv4/base_link_ned"
 WORLD_FRAME = "world_ned"
 CHANNEL_PAIR_ZERO_FRAME = "slalom_layer_0"
@@ -63,6 +72,10 @@ _CHANNEL_TWO_KEY = fk("channel_pair_two_tf")
 _CREATE_POSE_FUNC_KEY = fk("create_pose_func")
 # key for missing transforms
 _MISSING_TRANSFORMS_KEY = fk("missing_transforms")
+_START_VISION_KEY = fk("slalom_start_vision")
+_STOP_VISION_KEY = fk("slalom_stop_vision")
+_START_COMPONENTS_KEY = fk("slalom_start_components")
+_STOP_COMPONENTS_KEY = fk("slalom_stop_components")
 
 
 def _create_slalom_left_pose(frame_id: str):
@@ -113,6 +126,47 @@ def create_slalom_root():
     root = py_trees.composites.Sequence(
         name="Slalom Task",
         memory=True,
+    )
+
+    srv_start_vision = py_trees_ros.service_clients.FromConstant(
+        name="Start vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_start_vision_req(),
+        key_response=_START_VISION_KEY,
+    )
+    check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify start vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=_START_VISION_KEY,
+            value=True,
+            operator=lambda x, y: operator.eq(x.success, y),
+        ),
+    )
+
+    srv_load_depth_anything = py_trees_ros.service_clients.FromConstant(
+        name="Start depth anything",
+        service_name=DEPTH_ANYTHING_SERVER_TOPIC,
+        service_type=SetBool,
+        service_request=SetBool.Request(data=True),
+        key_response=_START_COMPONENTS_KEY,
+    )
+    check_start_depth_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify start depth anything succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=_START_COMPONENTS_KEY,
+            value=True,
+            operator=lambda x, y: operator.eq(x.success, y),
+        ),
+    )
+
+    dynamic_set_create_pose_func = DynamicSetBlackboard(
+        name="Set set create func correct side",
+        key=IS_LEFT_KEY,
+        update_key=_CREATE_POSE_FUNC_KEY,
+        func=lambda is_left: (
+            _create_slalom_left_pose if is_left else _create_slalom_right_pose
+        ),
     )
 
     # TODO: Update the frame and pose to move to (consider doing it similar to octagon task search seq)
@@ -362,69 +416,61 @@ def create_slalom_root():
         ],
     )
 
-    sel_left_right = py_trees.composites.Selector(
-        name="Left or right side",
-        memory=True,
-    )
-
-    seq_set_left = py_trees.composites.Sequence(
-        name="Set left side",
-        memory=True,
-    )
-
-    check_is_left = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check is left side",
-        check=py_trees.common.ComparisonExpression(
-            variable=IS_LEFT_KEY,
-            value=True,
-            operator=operator.eq,
-        ),
-    )
-
-    seq_set_left.add_children(
-        [
-            check_is_left,
-            py_trees.behaviours.SetBlackboardVariable(
-                name="Seq set create func left side",
-                variable_name=_CREATE_POSE_FUNC_KEY,
-                variable_value=_create_slalom_left_pose,
-                overwrite=True,
-            ),
-        ]
-    )
-
-    sel_left_right.add_children(
-        [
-            seq_set_left,
-            py_trees.behaviours.SetBlackboardVariable(
-                name="Set set create func right side",
-                variable_name=_CREATE_POSE_FUNC_KEY,
-                variable_value=_create_slalom_right_pose,
-                overwrite=True,
-            ),
-        ]
-    )
-
     goto_pass_through = goto.FromConstant(
         "Pass through gate",
         pose=create_stamped_pose("auv4/base_link_ned", position_x=2.0),
     )
 
+    srv_end_vision = py_trees_ros.service_clients.FromConstant(
+        name="End vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_end_vision_req(),
+        key_response=_STOP_VISION_KEY,
+    )
+    check_end_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify end vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=_STOP_VISION_KEY,
+            value=True,
+            operator=lambda x, y: operator.eq(x.success, y),
+        ),
+    )
+
+    srv_unload_depth_anything = py_trees_ros.service_clients.FromConstant(
+        name="Stop depth anything",
+        service_name=DEPTH_ANYTHING_SERVER_TOPIC,
+        service_type=SetBool,
+        service_request=SetBool.Request(data=False),
+        key_response=_STOP_COMPONENTS_KEY,
+    )
+    check_end_depth_anything_succeeded = (
+        py_trees.behaviours.CheckBlackboardVariableValue(
+            name="Verify end depth anything succeeded",
+            check=py_trees.common.ComparisonExpression(
+                variable=_STOP_COMPONENTS_KEY,
+                value=True,
+                operator=lambda x, y: operator.eq(x.success, y),
+            ),
+        )
+    )
+
     root.add_children(
         [
-            DynamicSetBlackboard(
-                name="Set set create func correct side",
-                key=IS_LEFT_KEY,
-                update_key=_CREATE_POSE_FUNC_KEY,
-                func=lambda is_left: (
-                    _create_slalom_left_pose if is_left else _create_slalom_right_pose
-                ),
-            ),
+            srv_start_vision,
+            check_start_vision_succeeded,
+            srv_load_depth_anything,
+            check_start_depth_succeeded,
+            dynamic_set_create_pose_func,
             move_and_cluster_par,
             seq_check_transforms,
             select_movement_strategy,
             py_trees.timers.Timer(name="timer", duration=10.0),
             goto_pass_through,
+            srv_end_vision,
+            check_end_vision_succeeded,
+            srv_unload_depth_anything,
+            check_end_depth_anything_succeeded,
         ]
     )
 

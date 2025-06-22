@@ -4,15 +4,23 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
+from lifecycle_msgs.srv import ChangeState
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
+from mission_planner_2.commons.detection_utils import (
+    create_end_vision_req,
+    create_start_vision_req,
+)
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_clustering_goal
+from mission_planner_2.commons.pose_utils import (
+    create_clustering_goal,
+    create_stamped_pose,
+)
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.tf_selector import create_tf_selector_root
 
@@ -21,6 +29,8 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
+VISION_SERVER_TOPIC = "/auv4/torpedo/manage_nodes"
+
 TOGGLE_TEMPLATE_TOPIC = "/auv4/front_cam/image_matching/toggle_template"
 TEMPLATE_NAME = "Task04_Tagging_02.png"
 
@@ -29,6 +39,8 @@ TEMPLATE_FRAME_OPTICAL = "Task04_Tagging_02_optical"
 TEMPLATE_FRAME_OPTICAL_CLUSTERED = "torpedo_2/clustered"
 TORPEDO_SHOOTER_TOP_FRAME = "auv4/torpedo_shooter_top"
 TORPEDO_SHOOTER_BOT_FRAME = "auv4/torpedo_shooter_bot"
+TEMPLATE_FRAME_YOLO = "torpedo/yolo"
+TEMPLATE_FRAME_YOLO_CLUSTERED = "torpedo/yolo/clustered"
 
 TOP_TORP_UINT = UInt8(data=2)
 BTM_TORP_UINT = UInt8(data=4)
@@ -42,6 +54,8 @@ STABILIZE_DURATION = 10
 _CHOICE_KEY = fk("choice")
 _POSE_KEY = fk("pose")
 _GO_BACK_POSE_KEY = fk("go_back_pose")
+_START_VISION_KEY = fk("torp_start_vision")
+_STOP_VISION_KEY = fk("torp_stop_vision")
 
 
 def create_torpedo_root():
@@ -71,6 +85,45 @@ def create_torpedo_root():
     seq_launch_torpedo = py_trees.composites.Sequence(
         name="Launch torpedo",
         memory=True,
+    )
+
+    srv_start_vision = py_trees_ros.service_clients.FromConstant(
+        name="Start vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_start_vision_req(),
+        key_response=_START_VISION_KEY,
+    )
+
+    check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify start vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=_START_VISION_KEY,
+            value=True,
+            operator=lambda x, y: x.success == y,
+        ),
+    )
+
+    cluster_board_centre = py_trees_ros.action_clients.FromConstant(
+        name="Cluster centre",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_children=TEMPLATE_FRAME_YOLO,
+            out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
+            duration=CLUSTER_DURATION,
+            use_cache=False,
+        ),
+    )
+
+    goto_torp_centre = goto.FromConstant(
+        name="Goto torp centre",
+        pose=create_stamped_pose("torpedo/centre"),
+    )
+
+    stabilise_before_matching = py_trees.timers.Timer(
+        name="Stabilise before match",
+        duration=STABILIZE_DURATION,
     )
 
     srv_get_choice = py_trees_ros.service_clients.FromConstant(
@@ -204,9 +257,30 @@ def create_torpedo_root():
         ),
     )
 
+    srv_end_vision = py_trees_ros.service_clients.FromConstant(
+        name="End vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_end_vision_req(),
+        key_response=_STOP_VISION_KEY,
+    )
+    check_end_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify end vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=_STOP_VISION_KEY,
+            value=True,
+            operator=lambda x, y: operator.eq(x.success, y),
+        ),
+    )
+
     seq_launch_torpedo.add_children(
         children=[
             srv_get_choice,
+            srv_start_vision,
+            check_start_vision_succeeded,
+            cluster_board_centre,
+            goto_torp_centre,
+            stabilise_before_matching,
             srv_enable_detections,
             check_enable_succeeded,
             set_torp_top,
@@ -224,6 +298,8 @@ def create_torpedo_root():
             pub_fire_second,
             srv_disable_detections,
             check_disable_succeeded,
+            srv_end_vision,
+            check_end_vision_succeeded,
         ],
     )
 

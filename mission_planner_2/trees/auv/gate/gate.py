@@ -3,11 +3,16 @@ import operator
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
+from lifecycle_msgs.srv import ChangeState
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import cache_tf
+from mission_planner_2.commons.detection_utils import (
+    create_end_vision_req,
+    create_start_vision_req,
+)
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -22,6 +27,8 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
+VISION_SERVER_TOPIC = "/auv4/gate/manage_nodes"
+
 CLUSTERING_DURATION = 20
 STABILIZE_DURATION = 10.0
 
@@ -45,6 +52,8 @@ _GATE_ORIENTATION_KEY = fk("orientation")
 _GATE_LEFT_POSE_KEY = fk("gate_left_pose")
 _GATE_RIGHT_POSE_KEY = fk("gate_right_pose")
 _IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
+_START_VISION_KEY = fk("gate_start_vision")
+_STOP_VISION_KEY = fk("gate_stop_vision")
 
 
 def create_gate_root():
@@ -61,6 +70,21 @@ def create_gate_root():
     seq_gate_root = py_trees.composites.Sequence(
         name="Gate root",
         memory=True,
+    )
+    srv_start_vision = py_trees_ros.service_clients.FromConstant(
+        name="Start vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_start_vision_req(),
+        key_response=_START_VISION_KEY,
+    )
+    check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify start vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=_START_VISION_KEY,
+            value=True,
+            operator=lambda x, y: operator.eq(x.success, y),
+        ),
     )
 
     # Step 2: Move towards gate
@@ -193,10 +217,27 @@ def create_gate_root():
     )
     goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
 
+    srv_end_vision = py_trees_ros.service_clients.FromConstant(
+        name="End vision pipeline",
+        service_name=VISION_SERVER_TOPIC,
+        service_type=ChangeState,
+        service_request=create_end_vision_req(),
+        key_response=_STOP_VISION_KEY,
+    )
+    check_end_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Verify end vision pipeline succeeded",
+        check=py_trees.common.ComparisonExpression(
+            variable=_STOP_VISION_KEY,
+            value=True,
+            operator=lambda x, y: operator.eq(x.success, y),
+        ),
+    )
     # Assemble tree in execution order
     seq_gate_root.add_children(
         children=[
             # goto_towards_gate,
+            srv_start_vision,
+            check_start_vision_succeeded,
             action_cluster_gate,
             cache_tf_left,
             cache_tf_right,
@@ -207,6 +248,8 @@ def create_gate_root():
             sel_gate_side,
             timer_stabilize_final,
             goto_through_gate,
+            srv_end_vision,
+            check_end_vision_succeeded,
         ]
     )
 
