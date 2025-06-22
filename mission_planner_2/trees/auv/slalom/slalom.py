@@ -3,9 +3,6 @@ import operator
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
-from rclpy.qos import qos_profile_system_default
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -21,6 +18,8 @@ from mission_planner_2.trees.auv.slalom.channel_movement import (
     create_channel_movement_two_root,
     create_channel_movement_zero_root,
 )
+from rclpy.qos import qos_profile_system_default
+from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -60,8 +59,10 @@ IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 _CHANNEL_ZERO_KEY = fk("channel_pair_zero_tf")
 _CHANNEL_ONE_KEY = fk("channel_pair_one_tf")
 _CHANNEL_TWO_KEY = fk("channel_pair_two_tf")
-_CREATE_POSE_FUNC_KEY = fk("create_pose_func")  # key for pose creation function
-_MISSING_TRANSFORMS_KEY = fk("missing_transforms")  # key for missing transforms
+# key for pose creation function
+_CREATE_POSE_FUNC_KEY = fk("create_pose_func")
+# key for missing transforms
+_MISSING_TRANSFORMS_KEY = fk("missing_transforms")
 
 
 def _create_slalom_left_pose(frame_id: str):
@@ -320,11 +321,12 @@ def create_slalom_root():
     )
 
     # helper function to check num missing tfs
-    check = lambda num_missing: py_trees.common.ComparisonExpression(
-        variable=_MISSING_TRANSFORMS_KEY,
-        value=num_missing,
-        operator=operator.eq,
-    )
+    def check(num_missing):
+        return py_trees.common.ComparisonExpression(
+            variable=_MISSING_TRANSFORMS_KEY,
+            value=num_missing,
+            operator=operator.eq,
+        )
 
     check_missing_transforms_one = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Check missing zero transforms",
@@ -410,7 +412,14 @@ def create_slalom_root():
 
     root.add_children(
         [
-            sel_left_right,
+            DynamicSetBlackboard(
+                name="Set set create func correct side",
+                key=IS_LEFT_KEY,
+                update_key=_CREATE_POSE_FUNC_KEY,
+                func=lambda is_left: (
+                    _create_slalom_left_pose if is_left else _create_slalom_right_pose
+                ),
+            ),
             move_and_cluster_par,
             seq_check_transforms,
             select_movement_strategy,

@@ -2,7 +2,6 @@ from typing import Literal
 
 import py_trees
 from geometry_msgs.msg import TransformStamped
-
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -76,7 +75,7 @@ def create_channel_movement_one_root(
         tf_two: TransformStamped,
         dist_threshold: float = 3.0,
     ) -> Literal["one", "two"]:
-        delta_z = abs(tf_one.transform.translation.z - tf_two.position.z)
+        delta_z = abs(tf_one.transform.translation.z - tf_two.transform.translation.z)
 
         return "two" if delta_z < dist_threshold else "one"
 

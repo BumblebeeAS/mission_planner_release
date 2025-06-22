@@ -17,6 +17,8 @@ from mission_planner_2.trees.auv.torpedo.move_to_task import (
 )
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
+IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
+
 
 def create_mother():
     root = py_trees.composites.Sequence(
@@ -41,10 +43,19 @@ def create_mother():
     # TODO: see if need a move to gate here to go closer to do the return task
     return_root = create_return_root()
 
+    # TODO: PURELY FOR TESTING
+    set_is_left = py_trees.behaviours.SetBlackboardVariable(
+        name="Set is left for test",
+        variable_name=IS_LEFT_KEY,
+        variable_value=True,
+        overwrite=True
+    )
+
     root.add_children(
         [
+            set_is_left,
             # gate_root,
-            move_to_slalom,
+            # move_to_slalom,
             slalom_root,
             # move_to_bin,
             # bin_root,
