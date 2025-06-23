@@ -15,9 +15,10 @@ import py_trees_ros
 from bb_controls_msgs.action import Locomotion
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 from geometry_msgs.msg import PoseStamped
-from mission_planner_2.commons.blackboard import convert_to_safe_name
 from numpy import rad2deg
 from transforms3d.euler import quat2euler
+
+from mission_planner_2.commons.blackboard import convert_to_safe_name
 
 
 class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
@@ -131,7 +132,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
             key="request",
             access=py_trees.common.Access.READ,
             remap_to=py_trees.blackboard.Blackboard.absolute_name(
-                namespace=namespace,
+                namespace="/",
                 key=pose_key,
             ),
         )
