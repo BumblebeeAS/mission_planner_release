@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+import traceback
 
 import rclpy
 import yaml
@@ -35,36 +36,37 @@ class MissionTfPublisher(Node):
                 config = yaml.safe_load(file)
 
             tfs_config = config.get("tfs", [])
-
-            if not tfs_config:
-                self.get_logger().warn("No transforms found in config file")
-                return
-
             static_transforms = []
 
             for tf_config in tfs_config:
                 transform = self.create_transform_from_config(tf_config)
-                if transform:
-                    static_transforms.append(transform)
+                static_transforms.append(transform)
 
-            if static_transforms:
-                self.tf_static_broadcaster.sendTransform(static_transforms)
+            self.tf_static_broadcaster.sendTransform(static_transforms)
+            self.get_logger().info(
+                f"Published {len(static_transforms)} static transforms"
+            )
+
+            for tf in static_transforms:
                 self.get_logger().info(
-                    f"Published {len(static_transforms)} static transforms"
+                    f"Published {tf.header.frame_id} -> {tf.child_frame_id}"
                 )
-                for tf in static_transforms:
-                    self.get_logger().info(
-                        f"Published {tf.header.frame_id} -> {tf.child_frame_id}"
-                    )
-            else:
-                self.get_logger().warn("No valid transforms to publish")
 
         except FileNotFoundError:
-            self.get_logger().error(f"Config file not found: {config_file_path}")
-        except yaml.YAMLError as e:
-            self.get_logger().error(f"Error parsing YAML file: {e}")
-        except Exception as e:
-            self.get_logger().error(f"Error loading transforms: {e}")
+            self.get_logger().error(
+                f"Config file not found: {config_file_path}. Traceback:\n{traceback.format_exc()}"
+            )
+            raise
+        except yaml.YAMLError:
+            self.get_logger().error(
+                f"Error parsing YAML file. Traceback:\n{traceback.format_exc()}"
+            )
+            raise
+        except Exception:
+            self.get_logger().error(
+                f"Error loading transforms. Traceback:\n{traceback.format_exc()}"
+            )
+            raise
 
     def create_transform_from_config(self, tf_config):
         """Create a TransformStamped message from tf configuration."""
@@ -97,9 +99,11 @@ class MissionTfPublisher(Node):
 
             return transform
 
-        except Exception as e:
-            self.get_logger().error(f"Error creating transform from config: {e}")
-            return None
+        except Exception:
+            self.get_logger().error(
+                f"Error creating transform from config. Traceback:\n{traceback.format_exc()}"
+            )
+            raise
 
 
 def main(args=None):
@@ -110,8 +114,6 @@ def main(args=None):
         rclpy.spin(mission_tf_publisher)
     except KeyboardInterrupt:
         pass
-    except Exception as e:
-        print(f"Error: {e}")
     finally:
         rclpy.shutdown()
 
