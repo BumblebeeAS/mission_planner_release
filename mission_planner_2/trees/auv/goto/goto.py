@@ -455,7 +455,7 @@ class FromConstant(FromBlackboard):
             key="request",
             access=py_trees.common.Access.WRITE,
             remap_to=py_trees.blackboard.Blackboard.absolute_name(
-                namespace=namespace,
+                namespace="/",
                 key=pose_key,
             ),
         )
