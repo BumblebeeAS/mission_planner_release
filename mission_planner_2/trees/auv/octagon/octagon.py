@@ -2,10 +2,6 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
@@ -21,30 +17,33 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
+from rclpy.qos import qos_profile_system_default
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-VISION_SERVER_TOPIC = "/auv4/octagon/manage_nodes"
+VISION_SERVER_TOPIC = "/auv4/trash/manage_nodes"
 
 CAMERA_FRAME = "auv4/front_cam_optical"
 
-LADLE_1_FRAME = "ladle_1"
-LADLE_1_FRAME_CLUSTERED = "ladle_1/clustered"
-BOTTLE_1_FRAME = "bottle_1"
-BOTTLE_1_FRAME_CLUSTERED = "bottle_1/clustered"
+LADLE_1_FRAME = "ladle_0"
+LADLE_1_FRAME_CLUSTERED = "ladle_0/clustered"
+BOTTLE_1_FRAME = "bottle_0"
+BOTTLE_1_FRAME_CLUSTERED = "bottle_0/clustered"
 
-LADLE_2_FRAME = "ladle_2"
-LADLE_2_FRAME_CLUSTERED = "ladle_2/clustered"
-BOTTLE_2_FRAME = "bottle_2"
-BOTTLE_2_FRAME_CLUSTERED = "bottle_2/clustered"
+LADLE_2_FRAME = "ladle_1"
+LADLE_2_FRAME_CLUSTERED = "ladle_1/clustered"
+BOTTLE_2_FRAME = "bottle_1"
+BOTTLE_2_FRAME_CLUSTERED = "bottle_1/clustered"
 
-LADLE_BASKET_FRAME = "ladle_basket"
-LADLE_BASKET_FRAME_CLUSTERED = "ladle_basket/clustered"
-BOTTLE_BASKET_FRAME = "bottle_basket"
-BOTTLE_BASKET_FRAME_CLUSTERED = "bottle_basket/clustered"
+LADLE_BASKET_FRAME = "yellow_bucket"
+LADLE_BASKET_FRAME_CLUSTERED = "yellow_bucket/clustered"
+BOTTLE_BASKET_FRAME = "pink_bucket"
+BOTTLE_BASKET_FRAME_CLUSTERED = "pink_bucket/clustered"
 
 FISH_FRAME = "trash/fish"
 SHARK_FRAME = "trash/shark"
@@ -186,7 +185,11 @@ def create_octagon_root():
         key=_CHOICE_KEY,
         update_key=_GO_SURFACE_FRAME_KEY,
         overwrite=True,
-        func=lambda choice: FISH_VIEW_FRAME if choice.success else SHARK_VIEW_FRAME,
+        func=lambda choice: (
+            create_stamped_pose(FISH_VIEW_FRAME)
+            if choice.success
+            else create_stamped_pose(SHARK_VIEW_FRAME)
+        ),
     )
 
     # TODO: if the two objects end up to be very similar logic almost the same can put in a sub tree for now this is easier to test each one
@@ -208,6 +211,7 @@ def create_octagon_root():
         name="Go to spoon",
         pose=create_stamped_pose(
             frame_id=LADLE_1_FRAME_CLUSTERED,
+            position_z=-0.1,
         ),
     )
 
@@ -255,9 +259,9 @@ def create_octagon_root():
 
     # resurface before start of cup
     # TODO: may need to recluster the surface pose when surface for pts (goto_surface_spoon)
-    goto_surface_reset = goto.FromBlackboard(
+    goto_surface_reset = goto.FromConstant(
         name="Go to surface reset",
-        pose_key=_GO_SURFACE_FRAME_KEY,
+        pose=create_stamped_pose(_GO_SURFACE_FRAME_KEY),
         anchor_frame_name="auv4/base_link_ned",
     )
 
