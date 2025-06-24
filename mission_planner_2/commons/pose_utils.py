@@ -7,6 +7,7 @@ from bb_perception_msgs.action import ClusterTf
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped
 from transforms3d.euler import euler2quat
+from bb_controls_msgs.srv import Limits
 
 
 def create_stamped_pose(
@@ -194,3 +195,46 @@ def create_slalom_clustering_goal(duration=20, min_cluster_size=10, min_samples=
         min_cluster_size=min_cluster_size,
         min_samples=min_samples,
     )
+
+# AUV4 Limit Defaults from the current params_auv4.yaml in controls
+MAX_XY_VEL = 0.5
+MAX_XY_ACC = 1.0
+MAX_XY_JERK = 1.5
+MAX_Z_VEL = 0.2
+MAX_Z_ACC = 1.0
+MAX_Z_JERK = 1.5
+MAX_YAW_VEL = 0.3
+MAX_YAW_ACC = 0.5
+MAX_YAW_JERK = 0.5
+
+def create_limits_srv_request(
+    max_xy_vel=MAX_XY_VEL,
+    max_xy_acc=MAX_XY_ACC,
+    max_xy_jerk=MAX_XY_JERK,
+    max_z_vel=MAX_Z_VEL,
+    max_z_acc=MAX_Z_ACC,
+    max_z_jerk=MAX_Z_JERK,
+    max_yaw_vel=MAX_YAW_VEL,
+    max_yaw_acc=MAX_YAW_ACC,
+    max_yaw_jerk=MAX_YAW_JERK,
+):
+
+    """
+    Generates a Limit request to be sent over to controls. Only need
+    to define what you want changed. An empty call will return a request with default values
+    from params_auv4.yaml
+    """
+
+    request = Limits.Request()
+    request.max_xy_vel = max_xy_vel
+    request.max_xy_acc = max_xy_acc
+    request.max_xy_jerk = max_xy_jerk
+    request.max_z_vel = max_z_vel
+    request.max_z_acc = max_z_acc    
+    request.max_z_jerk = max_z_jerk
+    request.max_yaw_vel = max_yaw_vel
+    request.max_yaw_acc = max_yaw_acc
+    request.max_yaw_jerk = max_yaw_jerk
+
+    return request
+
