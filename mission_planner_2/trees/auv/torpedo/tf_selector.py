@@ -1,12 +1,11 @@
 import operator
 
 import py_trees
-
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 
-FISH_HOLE_FRAME = "torpedo_2/fish"
-SHARK_HOLE_FRAME = "torpedo_2/shark"
+FISH_SHOOT_FRAME = "torpedo_1/fish/shoot"
+SHARK_SHOOT_FRAME = "torpedo_1/shark/shoot"
 
 
 def create_tf_selector_root(
@@ -54,51 +53,33 @@ def create_tf_selector_root(
     cache_tf_fish = cache_tf.ToBlackboard(
         name="Cache tf fish",
         variable_name=go_back_pose_key,
-        start=FISH_HOLE_FRAME,
+        start=FISH_SHOOT_FRAME,
         end="auv4/base_link_ned",
     )
 
     cache_tf_shark = cache_tf.ToBlackboard(
         name="Cache tf shark",
         variable_name=go_back_pose_key,
-        start=SHARK_HOLE_FRAME,
+        start=SHARK_SHOOT_FRAME,
         end="auv4/base_link_ned",
     )
 
     set_pose_fish = py_trees.behaviours.SetBlackboardVariable(
         name="Set hole target pose",
         variable_name=pose_key,
-        variable_value=create_stamped_pose(FISH_HOLE_FRAME),
+        variable_value=create_stamped_pose(FISH_SHOOT_FRAME),
         overwrite=True,
     )
 
     set_pose_shark = py_trees.behaviours.SetBlackboardVariable(
         name="Set hole target pose",
         variable_name=pose_key,
-        variable_value=create_stamped_pose(SHARK_HOLE_FRAME),
+        variable_value=create_stamped_pose(SHARK_SHOOT_FRAME),
         overwrite=True,
     )
 
-    seq_fish_setup.add_children(
-        [
-            check_is_fish,
-            cache_tf_fish,
-            set_pose_fish,
-        ]
-    )
-
-    seq_shark_setup.add_children(
-        [
-            cache_tf_shark,
-            set_pose_shark,
-        ]
-    )
-
-    sel_tf_root.add_children(
-        [
-            seq_fish_setup,
-            seq_shark_setup,
-        ]
-    )
+    seq_fish_setup.add_children([check_is_fish, cache_tf_fish, set_pose_fish])
+    seq_shark_setup.add_children([cache_tf_shark, set_pose_shark])
+    sel_tf_root.add_children([seq_fish_setup, seq_shark_setup])
 
     return sel_tf_root
