@@ -194,10 +194,10 @@ def create_octagon_root():
     cluster_spoon = py_trees_ros.actions.ActionClient(
         name="Cluster spoon",
         action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
+        action_name="/auv4/cluster_tf_multi",
         action_goal=create_clustering_goal(
-            in_children=LADLE_1_FRAME,
-            out_children=LADLE_1_FRAME_CLUSTERED,
+            in_children=[LADLE_1_FRAME, LADLE_2_FRAME],
+            out_children=[LADLE_1_FRAME_CLUSTERED, LADLE_2_FRAME_CLUSTERED],
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
@@ -229,7 +229,7 @@ def create_octagon_root():
     cluster_spoon_basket = py_trees_ros.action_clients.FromConstant(
         name="Cluster spoon basket",
         action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
+        action_name="/auv4/cluster_tf_multi",
         action_goal=create_clustering_goal(
             in_children=LADLE_BASKET_FRAME,
             out_children=LADLE_BASKET_FRAME_CLUSTERED,
@@ -279,10 +279,10 @@ def create_octagon_root():
     cluster_cup = py_trees_ros.actions.ActionClient(
         name="Cluster cup",
         action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
+        action_name="/auv4/cluster_tf_multi",
         action_goal=create_clustering_goal(
-            in_children=BOTTLE_1_FRAME,
-            out_children=BOTTLE_1_FRAME_CLUSTERED,
+            in_children=[BOTTLE_1_FRAME, BOTTLE_2_FRAME],
+            out_children=[BOTTLE_1_FRAME_CLUSTERED, BOTTLE_2_FRAME_CLUSTERED],
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
