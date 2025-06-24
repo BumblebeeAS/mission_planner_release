@@ -1,7 +1,13 @@
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
+from lifecycle_msgs.srv import ChangeState
 
+from mission_planner_2.commons import checked_service
+from mission_planner_2.commons.detection_utils import (
+    create_end_vision_req,
+    create_start_vision_req,
+)
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -16,6 +22,8 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
+VISION_SERVER_TOPIC = "/auv4/gate_back/manage_nodes"
+
 CLUSTERING_DURATION = 15
 STABILIZE_DURATION = 5.0
 
@@ -34,6 +42,15 @@ def create_return_root():
     seq_return_root = py_trees.composites.Sequence(
         name="Return root",
         memory=True,
+    )
+
+    srv_start_vision = checked_service.FromConstant(
+        name="Start vision",
+        service_type=ChangeState,
+        service_name=VISION_SERVER_TOPIC,
+        service_request=create_start_vision_req(),
+        key_response=fk("gate_start_vision"),
+        check_func=lambda x: x.success,
     )
 
     # Step 1: Move towards gate
@@ -71,14 +88,25 @@ def create_return_root():
     )
     goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
 
+    srv_end_vision = checked_service.FromConstant(
+        name="End vision",
+        service_type=ChangeState,
+        service_name=VISION_SERVER_TOPIC,
+        service_request=create_end_vision_req(),
+        key_response=fk("gate_end_vision"),
+        check_func=lambda x: x.success,
+    )
+
     # Assemble tree in execution order
     seq_return_root.add_children(
         children=[
+            srv_start_vision,
             goto_after_gate,
             action_cluster_gate,
             goto_after_gate_center,
             timer_stabilize,
             goto_through_gate,
+            srv_end_vision,
         ]
     )
 

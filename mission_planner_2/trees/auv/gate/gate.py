@@ -27,7 +27,7 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-VISION_SERVER_TOPIC = "/auv4/gate/manage_nodes"
+VISION_SERVER_TOPIC = "/auv4/gate_front/manage_nodes"
 
 CLUSTERING_DURATION = 20
 STABILIZE_DURATION = 10.0
