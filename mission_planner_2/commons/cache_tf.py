@@ -30,7 +30,7 @@ import rclpy.qos
 import tf2_ros
 from builtin_interfaces.msg import Time
 from rclpy.qos import qos_profile_system_default
-from transforms3d.euler import quat2euler
+from tf_transformations import euler_from_quaternion
 
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 
@@ -233,7 +233,7 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
             Pose stamped in BASE_LINK_FRAME coordinates representing the
             navigation target for reaching end_frame
         """
-        roll, pitch, yaw = quat2euler(
+        roll, pitch, yaw = euler_from_quaternion(
             [
                 tf.transform.rotation.x,
                 tf.transform.rotation.y,

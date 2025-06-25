@@ -3,11 +3,11 @@ Common pose utilities for mission_planner_2.
 """
 
 import numpy as np
+from bb_controls_msgs.srv import Limits
 from bb_perception_msgs.action import ClusterTf
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped
-from transforms3d.euler import euler2quat
-from bb_controls_msgs.srv import Limits
+from tf_transformations import quaternion_from_euler
 
 
 def create_stamped_pose(
@@ -53,13 +53,12 @@ def create_stamped_pose(
         pitch = np.radians(pitch)
         yaw = np.radians(yaw)
 
-    quat = euler2quat(roll, pitch, yaw, "sxyz")
+    quat = quaternion_from_euler(roll, pitch, yaw)
 
-    # Extract components in ROS order (x, y, z, w)
-    pose_stamped.pose.orientation.x = quat[1]
-    pose_stamped.pose.orientation.y = quat[2]
-    pose_stamped.pose.orientation.z = quat[3]
-    pose_stamped.pose.orientation.w = quat[0]
+    pose_stamped.pose.orientation.x = quat[0]
+    pose_stamped.pose.orientation.y = quat[1]
+    pose_stamped.pose.orientation.z = quat[2]
+    pose_stamped.pose.orientation.w = quat[3]
 
     return pose_stamped
 
