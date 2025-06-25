@@ -11,6 +11,7 @@ from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 from tf_transformations import euler_from_quaternion
+from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 
 import py_trees_ros
 from mission_planner_2.commons import cache_tf
@@ -258,29 +259,6 @@ def create_bin_root():
         start="auv4/base_link_ned",
         end="bin/centre",
     )
-
-    def find_acute_angle(pose: PoseStamped) -> PoseStamped:
-        r, p, y = euler_from_quaternion(
-            [
-                pose.pose.orientation.x,
-                pose.pose.orientation.y,
-                pose.pose.orientation.z,
-                pose.pose.orientation.w,
-            ]
-        )
-
-        y = y - np.pi if y > np.pi / 2 else y
-
-        return create_stamped_pose(
-            frame_id=pose.header.frame_id,
-            position_x=pose.pose.position.x,
-            position_y=pose.pose.position.y,
-            position_z=pose.pose.position.z,
-            roll=r,
-            pitch=p,
-            yaw=y,
-            use_radians=True,
-        )
 
     calculate_acute_pose = DynamicSetBlackboard(
         name="Calculate acute pose to bin centre",
