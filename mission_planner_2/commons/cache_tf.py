@@ -250,4 +250,5 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
             roll=roll,
             pitch=pitch,
             yaw=yaw,
+            use_radians=True,
         )

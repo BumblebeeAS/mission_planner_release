@@ -18,6 +18,7 @@ def create_stamped_pose(
     roll=0.0,
     pitch=0.0,
     yaw=0.0,
+    use_radians=False,
 ):
     """
     Create a PoseStamped message with the given parameters.
@@ -27,9 +28,10 @@ def create_stamped_pose(
         position_x (float): X position component
         position_y (float): Y position component
         position_z (float): Z position component
-        roll (float): Roll angle in degrees
-        pitch (float): Pitch angle in degrees
-        yaw (float): Yaw angle in degrees
+        roll (float): Roll angle
+        pitch (float): Pitch angle
+        yaw (float): Yaw angle
+        use_radians (bool): If True, roll, pitch, and yaw are interpreted as radians.
 
     Returns:
         PoseStamped: A PoseStamped message with the specified parameters
@@ -46,12 +48,12 @@ def create_stamped_pose(
     pose_stamped.pose.position.z = position_z
 
     # Convert from degrees to radians
-    roll_rad = np.radians(roll)
-    pitch_rad = np.radians(pitch)
-    yaw_rad = np.radians(yaw)
+    if not use_radians:
+        roll = np.radians(roll)
+        pitch = np.radians(pitch)
+        yaw = np.radians(yaw)
 
-    # Note: transforms3d uses (w, x, y, z) format, but ROS uses (x, y, z, w)
-    quat = euler2quat(roll_rad, pitch_rad, yaw_rad, "sxyz")
+    quat = euler2quat(roll, pitch, yaw, "sxyz")
 
     # Extract components in ROS order (x, y, z, w)
     pose_stamped.pose.orientation.x = quat[1]
