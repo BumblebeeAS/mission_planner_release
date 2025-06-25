@@ -1,15 +1,19 @@
 import operator
 
+import numpy as np
 import py_trees
-import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
+from geometry_msgs.msg import PoseStamped
 from lifecycle_msgs.srv import ChangeState
 from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
+from tf_transformations import euler_from_quaternion
 
+import py_trees_ros
+from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -70,6 +74,8 @@ _BIN_ROTATED_ENABLE_DETECTIONS_KEY = fk("bin_rotated_enable_detections")
 _BIN_CORRECT_DETECTIONS_REQ_KEY = fk("enable_correct_detections_req")
 _BIN_CORRECT_ENABLE_DETECTIONS_KEY = fk("bin_correct_enable_detections")
 _BIN_DISABLE_DETECTIONS_KEY = fk("bin_disable_detections")
+_BIN_CENTRE_TF_KEY = fk("bin_centre_tf")
+_BIN_CENTRE_ACUTE_POSE_KEY = fk("bin_centre_acute_pose")
 
 
 def create_template_selector_root() -> py_trees.composites.Selector:
@@ -207,6 +213,15 @@ def create_bin_root():
         memory=True,
     )
 
+    # Step -1: Get fish choice
+    srv_get_fish_choice = py_trees_ros.service_clients.FromConstant(
+        name="Get fish choice",
+        service_type=Trigger,
+        service_name="/auv4/choice/get_is_fish",
+        service_request=Trigger.Request(),
+        key_response=_CHOICE_KEY,
+    )
+
     # Step 0: Enable vision pipeline
     srv_start_vision = py_trees_ros.service_clients.FromConstant(
         name="Start vision pipeline",
@@ -237,10 +252,47 @@ def create_bin_root():
         ),
     )
 
+    extract_tf = cache_tf.ToBlackboard(
+        name="Extract movement to bin centre",
+        variable_name=_BIN_CENTRE_TF_KEY,
+        start="auv4/base_link_ned",
+        end="bin/centre",
+    )
+
+    def find_acute_angle(pose: PoseStamped) -> PoseStamped:
+        r, p, y = euler_from_quaternion(
+            [
+                pose.pose.orientation.x,
+                pose.pose.orientation.y,
+                pose.pose.orientation.z,
+                pose.pose.orientation.w,
+            ]
+        )
+
+        y = y - np.pi if y > np.pi / 2 else y
+
+        return create_stamped_pose(
+            frame_id=pose.header.frame_id,
+            position_x=pose.pose.position.x,
+            position_y=pose.pose.position.y,
+            position_z=pose.pose.position.z,
+            roll=r,
+            pitch=p,
+            yaw=y,
+            use_radians=True,
+        )
+
+    calculate_acute_pose = DynamicSetBlackboard(
+        name="Calculate acute pose to bin centre",
+        key=_BIN_CENTRE_TF_KEY,
+        update_key=_BIN_CENTRE_ACUTE_POSE_KEY,
+        func=find_acute_angle,
+    )
+
     # Step 2: Navigate to bin centre
-    goto_bin_centre = goto.FromConstant(
+    goto_bin_centre = goto.FromBlackboard(
         name="Goto bin centre",
-        pose=create_stamped_pose("bin/centre"),
+        pose_key=_BIN_CENTRE_ACUTE_POSE_KEY,
     )
 
     stabilise = py_trees.timers.Timer("Stabilise", duration=STABILIZE_CONTROLS_DURATION)
@@ -477,9 +529,12 @@ def create_bin_root():
     # Build main drop sequence
     seq_drop_into_bin.add_children(
         children=[
+            srv_get_fish_choice,
             srv_start_vision,
             check_start_vision_succeeded,
             action_cluster_first,
+            extract_tf,
+            calculate_acute_pose,
             goto_bin_centre,
             stabilise,
             srv_enable_detections,
