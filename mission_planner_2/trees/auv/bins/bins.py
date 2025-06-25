@@ -31,10 +31,10 @@ fk = full_key_generator(NAMESPACE)
 ######################### UPDATE CONSTANTS HERE #########################
 VISION_SERVER_TOPIC = "/auv4/bin/manage_nodes"
 
-TOGGLE_TEMPLATE_TOPIC = "/auv4/bot_cam/image_matching/toggle_template"
+TOGGLE_TEMPLATE_TOPIC = "/auv4/bin/image_matching/toggle_template"
 TEMPLATE_NAME = "Task03_DropBRUVS.png"
 ROTATED_TEMPLATE_NAME = "Task03_DropBRUVS_Rotated.png"
-POINT_CORRESPONDENCES_TOPIC = "/auv4/bot_cam/image_matching/point_correspondences"
+POINT_CORRESPONDENCES_TOPIC = "/auv4/bin/image_matching/point_correspondences"
 
 CAMERA_FRAME = "auv4/bot_cam_optical"
 TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_optical"
