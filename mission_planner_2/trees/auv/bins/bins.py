@@ -8,6 +8,7 @@ from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
 from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
