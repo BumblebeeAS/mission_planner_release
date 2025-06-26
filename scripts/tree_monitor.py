@@ -3,7 +3,6 @@
 import py_trees
 from py_trees_ros import conversions, utilities
 from py_trees_ros_interfaces.msg import BehaviourTree
-from py_trees_ros_interfaces.srv import OpenSnapshotStream, CloseSnapshotStream
 from unique_identifier_msgs.msg import UUID
 
 import rclpy
@@ -14,26 +13,15 @@ from std_msgs.msg import String
 class TreeMonitor(Node):
     """
     Prototype node for flashing a different LED colour based on currently executing behavior.
-
-    Run this node **strictly after** running the behavior tree.
     """
     def __init__(self):
         super().__init__("tree_monitor")
 
         self.led_pub = self.create_publisher(String, "led/input", 10)
 
-        self.open_client = self.create_client(
-            OpenSnapshotStream, 
-            "/tree/snapshot_streams/open"
-        )
-
-        future = self.open_client.call_async(OpenSnapshotStream.Request(topic_name="led"))
-        rclpy.spin_until_future_complete(self, future)
-        response: OpenSnapshotStream.Response = future.result()
-
         self.snapshot_sub = self.create_subscription(
             BehaviourTree,
-            response.topic_name,
+            "/tree/snapshots",
             self.snapshot_callback,
             utilities.qos_profile_latched()
         )
@@ -98,6 +86,8 @@ def main(args=None):
         node.get_logger().info("stopped")
     except Exception as e:
         node.get_logger().fatal(f"stopped with exception: {e}")
+    finally:
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
