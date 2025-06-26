@@ -36,15 +36,14 @@ def main():
         console.loginfo(console.yellow + "interrupted" + console.reset)
     except SystemExit:
         console.loginfo(console.yellow + "exiting" + console.reset)
-        rclpy.shutdown()
     except Exception as e:
         console.logfatal(
             console.red + "exception occurred: {}".format(e) + console.reset
         )
-        rclpy.shutdown()
     finally:
         console.loginfo(console.reset + "cleaning up")
         tree.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":
