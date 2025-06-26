@@ -2,6 +2,7 @@ import operator
 
 import numpy as np
 import py_trees
+import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
@@ -11,9 +12,7 @@ from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 from tf_transformations import euler_from_quaternion
-from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 
-import py_trees_ros
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
@@ -29,6 +28,7 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.bins.choice_selector import create_choice_selector_root
+from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
@@ -58,6 +58,11 @@ FISH_BIN_FRAME = "bin/fish"
 SHARK_BIN_FRAME = "bin/shark"
 ROTATED_FISH_BIN_FRAME = "bin/fish/rotated"
 ROTATED_SHARK_BIN_FRAME = "bin/shark/rotated"
+
+FISH_BIN_VIEW_FRAME = "bin/fish/view"
+SHARK_BIN_VIEW_FRAME = "bin/shark/view"
+FISH_BIN_VIEW_ROTATED_FRAME = "bin/fish/rotated/view"
+SHARK_BIN_VIEW_ROTATED_FRAME = "bin/shark/rotated/view"
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -138,8 +143,8 @@ def create_template_selector_root() -> py_trees.composites.Selector:
     sel_update_selection = create_choice_selector_root(
         choice_key=_CHOICE_KEY,
         pose_key=_POSE_KEY,
-        fish_bin_frame=FISH_BIN_FRAME,
-        shark_bin_frame=SHARK_BIN_FRAME,
+        fish_bin_frame=FISH_BIN_VIEW_FRAME,
+        shark_bin_frame=SHARK_BIN_VIEW_FRAME,
     )
 
     seq_unrotated.add_children(
@@ -178,8 +183,8 @@ def create_template_selector_root() -> py_trees.composites.Selector:
     sel_rotated_update_selection = create_choice_selector_root(
         choice_key=_CHOICE_KEY,
         pose_key=_POSE_KEY,
-        fish_bin_frame=ROTATED_FISH_BIN_FRAME,
-        shark_bin_frame=ROTATED_SHARK_BIN_FRAME,
+        fish_bin_frame=FISH_BIN_VIEW_ROTATED_FRAME,
+        shark_bin_frame=SHARK_BIN_VIEW_ROTATED_FRAME,
     )
 
     seq_rotate.add_children(
@@ -257,7 +262,7 @@ def create_bin_root():
         name="Extract movement to bin centre",
         variable_name=_BIN_CENTRE_TF_KEY,
         start="auv4/base_link_ned",
-        end="bin/centre",
+        end="bin/centre/view",
     )
 
     calculate_acute_pose = DynamicSetBlackboard(

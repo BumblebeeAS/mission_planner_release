@@ -134,41 +134,74 @@ tfs:
     # translation (x, y, z in meters)
     x: 0.1524
     y: 0.3048
-    z: -0.5
+    z: 0.0
     roll: 0.0 # in degrees
     pitch: 0.0 # in degrees
     yaw: -90.0 # in degrees
     # frame ids
     parent_frame_id: "bin/yolo/clustered"
     child_frame_id: "bin/centre"
+  - name: bin_center_view
+    # translation (x, y, z in meters)
+    x: 0.0
+    y: 0.0
+    z: -0.5
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: 0.0 # in degrees
+    # frame ids
+    parent_frame_id: "bin/centre"
+    child_frame_id: "bin/centre/view"
   - name: bin_fish
     # translation (x, y, z in meters)
     x: 0.1524
     y: 0.4568
-    z: -0.5
+    z: 0.0
     roll: 0.0 # in degrees
     pitch: 0.0 # in degrees
     yaw: -90.0 # in degrees
     # frame ids
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/fish"
+  - name: bin_fish_view
+    # translation (x, y, z in meters)
+    x: 0.0
+    y: 0.0
+    z: -0.5
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: 0.0 # in degrees
+    # frame ids
+    parent_frame_id: "bin/fish"
+    child_frame_id: "bin/fish/view" 
   - name: bin_shark
     # translation (x, y, z in meters)
     x: 0.1524
     y: 0.1524
-    z: -0.5
+    z: 0.0
     roll: 0.0 # in degrees
     pitch: 0.0 # in degrees
     yaw: -90.0 # in degrees
     # frame ids
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/shark"
+  - name: bin_shark_view
+    # translation (x, y, z in meters)
+    x: 0.0
+    y: 0.0
+    z: -0.5
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: 0.0 # in degrees
+    # frame ids
+    parent_frame_id: "bin/shark"
+    child_frame_id: "bin/shark/view"
   # TODO: need check if can just swap them
   - name: bin_shark_rotated
     # translation (x, y, z in meters)
     x: 0.1524
     y: 0.4568
-    z: -0.5
+    z: 0.0
     roll: 0.0 # in degrees
     pitch: 0.0 # in degrees
     yaw: -90.0 # in degrees
@@ -179,13 +212,35 @@ tfs:
     # translation (x, y, z in meters)
     x: 0.1524
     y: 0.1524
-    z: -0.5
+    z: 0.0
     roll: 0.0 # in degrees
     pitch: 0.0 # in degrees
     yaw: -90.0 # in degrees
     # frame ids
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/fish/rotated"
+  - name: bin_shark_rotated_view
+    # translation (x, y, z in meters)
+    x: 0.0
+    y: 0.0
+    z: -0.5
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: 0.0 # in degrees
+    # frame ids
+    parent_frame_id: "bin/shark/rotated"
+    child_frame_id: "bin/shark/rotated/view"
+  - name: bin_fish_rotated_view
+    # translation (x, y, z in meters)
+    x: 0.0
+    y: 0.0
+    z: -0.5
+    roll: 0.0 # in degrees
+    pitch: 0.0 # in degrees
+    yaw: 0.0 # in degrees
+    # frame ids
+    parent_frame_id: "bin/fish/rotated"
+    child_frame_id: "bin/fish/rotated/view"
     ######################### SLALOM TFS #########################
     # No Missing Transforms
     # One Missing Transform
