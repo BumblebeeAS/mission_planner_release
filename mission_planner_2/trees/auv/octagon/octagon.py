@@ -2,6 +2,10 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
+from rclpy.qos import qos_profile_system_default
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
@@ -17,9 +21,6 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
-from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -259,9 +260,9 @@ def create_octagon_root():
 
     # resurface before start of cup
     # TODO: may need to recluster the surface pose when surface for pts (goto_surface_spoon)
-    goto_surface_reset = goto.FromConstant(
+    goto_surface_reset = goto.FromBlackboard(
         name="Go to surface reset",
-        pose=create_stamped_pose(_GO_SURFACE_FRAME_KEY),
+        pose_key=_GO_SURFACE_FRAME_KEY,
         anchor_frame_name="auv4/base_link_ned",
     )
 
