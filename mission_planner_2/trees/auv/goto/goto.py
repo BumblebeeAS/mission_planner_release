@@ -5,19 +5,20 @@
 Behaviours for ROS services
 """
 
+import time
 import uuid
 from typing import Callable
 
 import action_msgs
 import action_msgs.msg as action_msgs
 import py_trees
-import py_trees_ros
 from bb_controls_msgs.action import Locomotion
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 from geometry_msgs.msg import PoseStamped
 from numpy import rad2deg
 from transforms3d.euler import quat2euler
 
+import py_trees_ros
 from mission_planner_2.commons.blackboard import convert_to_safe_name
 
 
@@ -171,6 +172,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         self.result_message = None
         self.result_status = None
         self.result_status_string = None
+        self.is_goal_sent = False
 
         try:
             if self.service_client.service_is_ready():
@@ -205,7 +207,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         # also checks if the attr has been set to True which implies that the send_goal_req has been
         # run to completion
         # this ensures that the call to send_goal_request has completed
-        if not hasattr(self, "is_goal_sent") and not self.is_goal_sent:
+        if not self.is_goal_sent:
             return py_trees.common.Status.RUNNING
 
         # no race condition cuz is RW WR either way the code wont break
@@ -370,14 +372,6 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         resp = fut.result()
         if not resp.tf_success:
             return
-        self.goal_handle = None
-        self.send_goal_future = None
-        self.get_result_future = None
-
-        self.result_message = None
-        self.result_status = None
-        self.result_status_string = None
-        self.is_goal_sent = False
 
         goal = self._gen_goal(resp.output_poses, self.specified_heading)
 
@@ -460,3 +454,168 @@ class FromConstant(FromBlackboard):
             ),
         )
         self.blackboard.set(name="request", value=pose)
+
+
+class NFromBlackboard(FromBlackboard):
+    def __init__(
+        self,
+        name: str,
+        pose_key: str,
+        anchor_frame_name="auv4/base_link_ned",
+        specified_heading: bool = True,
+        generate_feedback_message=None,
+        wait_for_server_timeout_sec=-3,
+        wait_for_service_timeout_sec=-3,
+        wait_between_moves_sec=10.0,
+    ):
+
+        super().__init__(
+            name,
+            pose_key=pose_key,
+            anchor_frame_name=anchor_frame_name,
+            specified_heading=specified_heading,
+            generate_feedback_message=generate_feedback_message,
+            wait_for_server_timeout_sec=wait_for_server_timeout_sec,
+            wait_for_service_timeout_sec=wait_for_service_timeout_sec,
+        )
+
+        self.wait_between_moves_sec = wait_between_moves_sec
+        self._waiting = False
+        self._wait_start_time = None
+
+    # setup remains unchanged as it is just linking to the pose conversion service
+
+    def _start_goal(self):
+        self.logger.debug(
+            "{}.initialise() or sending {} goal".format(
+                self.qualified_name, self.current_idx
+            )
+        )
+
+        # Temporary variable
+        self.service_future = None
+
+        # None declarations from super.initialise
+        self.goal_handle = None
+        self.send_goal_future = None
+        self.get_result_future = None
+
+        self.result_message = None
+        self.result_status = None
+        self.result_status_string = None
+
+        try:
+            if (
+                self.service_client.service_is_ready()
+                and self.current_idx < self.num_poses
+            ):
+                self.service_future = self.service_client.call_async(
+                    self._gen_srv_req(self.poses_list[self.current_idx])
+                )
+            self.feedback_message = "sent first service request"
+            self.service_future.add_done_callback(super()._srv_done_callback)
+        except (KeyError, TypeError):
+            pass
+
+    # change initialise abit because the service request is one pose
+    def initialise(self):
+        """
+        Reset internal variables and start new request
+
+        We dont call the action clients initialise here so we have to handle resetting the vars
+        """
+        # Read the list of poses to go through
+        self.poses_list = self.blackboard.get("request")
+        if not isinstance(self.poses_list, list):
+            self.poses_list = [self.poses_list]
+        self.num_poses = len(self.poses_list)
+        self.current_idx = 0
+        self._start_goal()
+
+    # in update, we check shit, if not all poses complete, start a new goal
+    def update(self):
+        """
+        Check whether if underlying service server has succeeded, is running,
+        or has cancelled/aborted and map these to behaviour return states
+        """
+        self.logger.debug("{}.update()".format(self.qualified_name))
+
+        # New waiting state before moves
+        if self._waiting:
+            elapsed = time.monotonic() - self._wait_start_time
+            if elapsed < self.wait_between_moves_sec:
+                self.feedback_message = (
+                    f"waiting {self.wait_between_moves_sec:.2f} before the next move"
+                )
+            else:
+                self._waiting = False
+                self._wait_start_time = None
+                self._start_goal()
+            return py_trees.common.Status.RUNNING
+
+        if self.service_future is None:
+            # No request on blackboard or wrong request type or unready server
+            self.feedback_message = "no service request to send"
+            return py_trees.common.Status.FAILURE
+        elif not self.service_future.done():
+            # service has been called but has yet to return a result
+            return py_trees.common.Status.RUNNING
+
+        # at this point service is done
+        if not self.service_future.result().tf_success:
+            return py_trees.common.Status.FAILURE
+
+        # check that in the callback attached the new attr has been set
+        # also checks if the attr has been set to True which implies that the send_goal_req has been
+        # run to completion
+        # this ensures that the call to send_goal_request has completed
+        if not self.is_goal_sent:
+            return py_trees.common.Status.RUNNING
+
+        # no race condition cuz is RW WR either way the code wont break
+        if self.send_goal_future is None:
+            self.feedback_message = "no goal to send"
+            return py_trees.common.Status.FAILURE
+        if self.goal_handle is not None and not self.goal_handle.accepted:
+            # goal was rejected
+            self.feedback_message = "goal rejected"
+            return py_trees.common.Status.FAILURE
+        if self.result_status is None:
+            return py_trees.common.Status.RUNNING
+        elif not self.get_result_future.done():
+            # should never get here
+            self.node.get_logger().warn(
+                "got result, but future not yet done [{}]".format(self.qualified_name)
+            )
+            return py_trees.common.Status.RUNNING
+        else:
+            self.node.get_logger().debug("goal result [{}]".format(self.qualified_name))
+            self.node.get_logger().debug(
+                "  status: {}".format(self.result_status_string)
+            )
+            self.node.get_logger().debug("  message: {}".format(self.result_message))
+            if (
+                self.result_status == action_msgs.GoalStatus.STATUS_SUCCEEDED
+                and self.current_idx == self.num_poses - 1
+            ):
+                self.feedback_message = f"all {self.num_poses} moves success"
+                return py_trees.common.Status.SUCCESS
+            elif (
+                self.result_status == action_msgs.GoalStatus.STATUS_SUCCEEDED
+                and self.current_idx < self.num_poses
+            ):  # noqa
+                self.feedback_message = (
+                    f"successfully completed move to pose {self.current_idx}"
+                )
+                self.current_idx += 1
+
+                # Start waiting before next move
+                if self.wait_between_moves_sec > 0.0:
+                    self._waiting = True
+                    self._wait_start_time = time.monotonic()
+                else:
+                    self._start_goal()
+                return py_trees.common.Status.RUNNING
+            else:
+                self.feedback_message = "failed"
+                return py_trees.common.Status.FAILURE
