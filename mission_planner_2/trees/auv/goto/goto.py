@@ -15,11 +15,11 @@ import py_trees
 from bb_controls_msgs.action import Locomotion
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 from geometry_msgs.msg import PoseStamped
+from mission_planner_2.commons.blackboard import convert_to_safe_name
 from numpy import rad2deg
 from transforms3d.euler import quat2euler
 
 import py_trees_ros
-from mission_planner_2.commons.blackboard import convert_to_safe_name
 
 
 class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
@@ -106,6 +106,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         generate_feedback_message: Callable | None = None,
         wait_for_server_timeout_sec: int = -3,
         wait_for_service_timeout_sec: int = -3,
+        ignore_depth: bool = False,
     ):
         # FIXME: this convert to safe name seems useless @advaypakhale
         namespace = py_trees.blackboard.Blackboard.absolute_name(
@@ -139,6 +140,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         )
 
         self.service_client = None
+        self.ignore_depth = ignore_depth
 
     def setup(self, **kwargs):
         """
@@ -283,7 +285,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
 
         # Set the required fields
         goal_msg.move_rel = False
-        goal_msg.depth_rel = False
+        goal_msg.depth_rel = self.ignore_depth
         goal_msg.heading_rel = False
 
         try:
@@ -313,7 +315,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
 
             forward_setpoints.append(output_pose.position.x)
             sidemove_setpoints.append(output_pose.position.y)
-            depth_setpoints.append(output_pose.position.z)
+            depth_setpoints.append(0.0 if self.ignore_depth else output_pose.position.z)
             heading_setpoints.append(yaw)
 
         # Set the setpoints
@@ -424,6 +426,7 @@ class FromConstant(FromBlackboard):
         generate_feedback_message=None,
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
+        ignore_depth: bool = False,
     ):
         if not isinstance(pose, list):
             pose = [pose]
@@ -443,6 +446,7 @@ class FromConstant(FromBlackboard):
             generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
+            ignore_depth=ignore_depth,
         )
 
         self.blackboard.register_key(
@@ -467,6 +471,7 @@ class NFromBlackboard(FromBlackboard):
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
         wait_between_moves_sec=10.0,
+        ignore_depth: bool = False,
     ):
 
         super().__init__(
@@ -477,6 +482,7 @@ class NFromBlackboard(FromBlackboard):
             generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
+            ignore_depth=ignore_depth,
         )
 
         self.wait_between_moves_sec = wait_between_moves_sec
