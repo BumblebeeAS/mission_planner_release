@@ -12,7 +12,7 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 
-def create_move_to_slalom_task_root():
+def create_move_to_slalom_task_root(world_coords: dict):
     """
     Create the root of the slalom tree.
     """
@@ -29,7 +29,13 @@ def create_move_to_slalom_task_root():
     )
     """
     slalom_init_pose = create_stamped_pose(
-        "world_ned", position_x=0.0, position_y=0.0, position_z=0.3, yaw=0.0
+        "world_ned",
+        position_x=world_coords["x"],
+        position_y=world_coords["y"],
+        position_z=world_coords["z"],
+        roll=world_coords["roll"],
+        pitch=world_coords["pitch"],
+        yaw=world_coords["yaw"],
     )
 
     move_to_slalom = goto.FromConstant(

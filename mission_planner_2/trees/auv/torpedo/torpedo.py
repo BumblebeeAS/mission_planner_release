@@ -27,7 +27,7 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-SELECTED_TEMPLATE = 1
+SELECTED_TEMPLATE = 1  # MUST be 1 or 2
 
 VISION_SERVER_TOPIC = "/auv4/torpedo/manage_nodes"
 TOGGLE_TEMPLATE_TOPIC = "/auv4/torpedo/image_matching/toggle_template"

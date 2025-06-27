@@ -4,7 +4,7 @@ from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 
 
-def create_move_to_bin_task_root() -> py_trees.behaviour.Behaviour:
+def create_move_to_bin_task_root(world_coords: dict) -> py_trees.behaviour.Behaviour:
     """
     Create the root of the bin tree.
     """
@@ -14,7 +14,13 @@ def create_move_to_bin_task_root() -> py_trees.behaviour.Behaviour:
     )
 
     bin_init_pose = create_stamped_pose(
-        "world_ned", position_x=0.0, position_y=0.0, position_z=0.8, yaw=0.0
+        "world_ned",
+        position_x=world_coords["x"],
+        position_y=world_coords["y"],
+        position_z=world_coords["z"],
+        roll=world_coords["roll"],
+        pitch=world_coords["pitch"],
+        yaw=world_coords["yaw"],
     )
 
     move_to_bin = goto.FromConstant("move to bin", bin_init_pose)

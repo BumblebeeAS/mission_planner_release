@@ -18,6 +18,38 @@ from mission_planner_2.trees.auv.torpedo.move_to_task import (
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
 IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
+WORLD_NED_COORDS_SLALOM = {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.3,
+    "roll": 0.0,
+    "pitch": 0.0,
+    "yaw": 0.0,
+}
+WORLD_NED_COORDS_BIN = {
+    "x": 6.0,
+    "y": 0.0,
+    "z": 0.3,
+    "roll": 0.0,
+    "pitch": 0.0,
+    "yaw": 0.0,
+}
+WORLD_NED_COORDS_TORPEDO = {
+    "x": 6.0,
+    "y": 0.6,
+    "z": 0.3,
+    "roll": 0.0,
+    "pitch": 0.0,
+    "yaw": 0.0,
+}
+WORLD_NED_COORDS_OCTAGON = {
+    "x": 6.0,
+    "y": 1.2,
+    "z": 0.3,
+    "roll": 0.0,
+    "pitch": 0.0,
+    "yaw": 0.0,
+}
 
 
 def create_mother():
@@ -28,16 +60,16 @@ def create_mother():
 
     gate_root = create_gate_root()
 
-    move_to_slalom = create_move_to_slalom_task_root()
+    move_to_slalom = create_move_to_slalom_task_root(WORLD_NED_COORDS_SLALOM)
     slalom_root = create_slalom_root()
 
-    move_to_bin = create_move_to_bin_task_root()
+    move_to_bin = create_move_to_bin_task_root(WORLD_NED_COORDS_BIN)
     bin_root = create_bin_root()
 
-    move_to_torpedo = create_move_to_torpedo_task_root()
+    move_to_torpedo = create_move_to_torpedo_task_root(WORLD_NED_COORDS_TORPEDO)
     torpedo_root = create_torpedo_root()
 
-    move_to_octagon = create_move_to_octagon_task_root()
+    move_to_octagon = create_move_to_octagon_task_root(WORLD_NED_COORDS_OCTAGON)
     octagon_root = create_octagon_root()
 
     # TODO: see if need a move to gate here to go closer to do the return task
@@ -48,7 +80,7 @@ def create_mother():
         name="Set is left for test",
         variable_name=IS_LEFT_KEY,
         variable_value=True,
-        overwrite=True
+        overwrite=True,
     )
 
     root.add_children(
