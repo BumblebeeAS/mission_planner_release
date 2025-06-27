@@ -38,9 +38,9 @@ FORWARD_DISTANCE = 3.0
 CAMERA_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_YOLO = "gate"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
-GATE_CENTRE_FRAME = "gate/centre"
-GATE_LEFT_FRAME = "gate/left"
-GATE_RIGHT_FRAME = "gate/right"
+GATE_CENTRE_FRAME = "gate/centre/view"
+GATE_LEFT_FRAME = "gate/left/view"
+GATE_RIGHT_FRAME = "gate/right/view"
 
 GATE_ORIENTATION_TOPIC = "/auv4/gate/shark_fish"
 #########################################################################

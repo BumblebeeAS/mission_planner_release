@@ -47,14 +47,10 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(FILES
-  launch/main.launch.py
-  DESTINATION share/${PROJECT_NAME}/launch
-)
-
-install(FILES
-  cfg/mission_tfs.yaml
-  DESTINATION share/${PROJECT_NAME}/cfg
+install(DIRECTORY
+  cfg
+  launch
+  DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import math
 import traceback
+from typing import Any, Dict, List
 
 import rclpy
 import yaml
@@ -13,45 +14,56 @@ from tf_transformations import quaternion_from_euler
 class MissionTfPublisher(Node):
     def __init__(self):
         super().__init__("mission_tf_publisher")
+        self.declare_parameter("static_tf_file", "")
+        self.declare_parameter("dynamic_tf_file", "")
+        self.declare_parameter("default_suffix", "view")
 
-        self.declare_parameter("config_file", "")
-        config_file_path = (
-            self.get_parameter("config_file").get_parameter_value().string_value
+        static_config_path = (
+            self.get_parameter("static_tf_file").get_parameter_value().string_value
+        )
+        dynamic_config_path = (
+            self.get_parameter("dynamic_tf_file").get_parameter_value().string_value
+        )
+        self.default_suffix = (
+            self.get_parameter("default_suffix").get_parameter_value().string_value
         )
 
-        if not config_file_path:
+        if not static_config_path and not dynamic_config_path:
             self.get_logger().error(
-                "Config file path not provided! Use --ros-args -p config_file:=<path>"
+                "No config files provided! Use --ros-args -p static_tf_file:=<path> "
+                "and/or -p dynamic_tf_file:=<path>"
             )
             return
 
         self.tf_static_broadcaster = StaticTransformBroadcaster(self)
 
-        self.load_and_publish_transforms(config_file_path)
+        all_transforms = []
 
-    def load_and_publish_transforms(self, config_file_path):
-        """Load transforms from YAML config and publish them."""
-        try:
-            with open(config_file_path, "r") as file:
-                config = yaml.safe_load(file)
+        # Load and process static transforms
+        if static_config_path:
+            static_transforms = self.load_static_transforms(static_config_path)
+            all_transforms.extend(static_transforms)
 
-            tfs_config = config.get("tfs", [])
-            static_transforms = []
+        # Load and process dynamic transforms
+        if dynamic_config_path:
+            dynamic_transforms = self.load_dynamic_transforms(dynamic_config_path)
+            all_transforms.extend(dynamic_transforms)
 
-            for tf_config in tfs_config:
-                transform = self.create_transform_from_config(tf_config)
-                static_transforms.append(transform)
-
-            self.tf_static_broadcaster.sendTransform(static_transforms)
-            self.get_logger().info(
-                f"Published {len(static_transforms)} static transforms"
-            )
-
-            for tf in static_transforms:
+        # Publish all transforms
+        if all_transforms:
+            self.tf_static_broadcaster.sendTransform(all_transforms)
+            self.get_logger().info(f"Published {len(all_transforms)} static transforms")
+            for tf in all_transforms:
                 self.get_logger().info(
                     f"Published {tf.header.frame_id} -> {tf.child_frame_id}"
                 )
 
+    def load_config_file(self, config_file_path: str) -> Dict[str, Any]:
+        """Load and parse YAML config file."""
+        try:
+            with open(config_file_path, "r") as file:
+                config = yaml.safe_load(file)
+            return config
         except FileNotFoundError:
             self.get_logger().error(
                 f"Config file not found: {config_file_path}. Traceback:\n{traceback.format_exc()}"
@@ -59,27 +71,124 @@ class MissionTfPublisher(Node):
             raise
         except yaml.YAMLError:
             self.get_logger().error(
-                f"Error parsing YAML file. Traceback:\n{traceback.format_exc()}"
+                f"Error parsing YAML file: {config_file_path}. Traceback:\n{traceback.format_exc()}"
             )
             raise
         except Exception:
             self.get_logger().error(
-                f"Error loading transforms. Traceback:\n{traceback.format_exc()}"
+                f"Error loading config file: {config_file_path}. Traceback:\n{traceback.format_exc()}"
             )
             raise
 
-    def create_transform_from_config(self, tf_config):
-        """Create a TransformStamped message from tf configuration."""
+    def load_static_transforms(self, config_file_path: str) -> List[TransformStamped]:
+        """Load transforms from static YAML config and return them."""
         try:
-            roll_rad = math.radians(tf_config["roll"])
-            pitch_rad = math.radians(tf_config["pitch"])
-            yaw_rad = math.radians(tf_config["yaw"])
+            config = self.load_config_file(config_file_path)
+            static_transforms = []
 
-            x = tf_config["x"]
-            y = tf_config["y"]
-            z = tf_config["z"]
-            parent_frame = tf_config["parent_frame_id"]
-            child_frame = tf_config["child_frame_id"]
+            for _, transforms_list in config.items():
+                for tf_config in transforms_list:
+                    transform = self.create_static_transform(tf_config)
+                    static_transforms.append(transform)
+
+            self.get_logger().info(f"Loaded {len(static_transforms)} static transforms")
+            return static_transforms
+
+        except Exception:
+            self.get_logger().error(
+                f"Error loading static transforms. Traceback:\n{traceback.format_exc()}"
+            )
+            raise
+
+    def load_dynamic_transforms(self, config_file_path: str) -> List[TransformStamped]:
+        """Load transforms from dynamic YAML config and return them."""
+        try:
+            config = self.load_config_file(config_file_path)
+            dynamic_transforms = []
+
+            for _, dynamic_configs in config.items():
+                for dynamic_config in dynamic_configs:
+                    transforms = self.create_dynamic_transforms(dynamic_config)
+                    dynamic_transforms.extend(transforms)
+
+            self.get_logger().info(
+                f"Loaded {len(dynamic_transforms)} dynamic transforms"
+            )
+            return dynamic_transforms
+
+        except Exception:
+            self.get_logger().error(
+                f"Error loading dynamic transforms. Traceback:\n{traceback.format_exc()}"
+            )
+            raise
+
+    def create_static_transform(self, tf_config: Dict[str, Any]) -> TransformStamped:
+        """Create a TransformStamped message from static tf configuration."""
+        try:
+            return self.create_transform(
+                x=tf_config["x"],
+                y=tf_config["y"],
+                z=tf_config["z"],
+                roll=tf_config["roll"],
+                pitch=tf_config["pitch"],
+                yaw=tf_config["yaw"],
+                parent_frame=tf_config["parent_frame_id"],
+                child_frame=tf_config["child_frame_id"],
+            )
+        except Exception:
+            self.get_logger().error(
+                f"Error creating static transform from config: {tf_config}. Traceback:\n{traceback.format_exc()}"
+            )
+            raise
+
+    def create_dynamic_transforms(
+        self, dynamic_config: Dict[str, Any]
+    ) -> List[TransformStamped]:
+        """Create TransformStamped messages from dynamic configuration."""
+        try:
+            transforms = []
+            parents = dynamic_config.get("parents", [])
+
+            suffix = dynamic_config.get("suffix", self.default_suffix)
+
+            for parent_frame in parents:
+                child_frame = f"{parent_frame}/{suffix}"
+                transform = self.create_transform(
+                    x=dynamic_config["x"],
+                    y=dynamic_config["y"],
+                    z=dynamic_config["z"],
+                    roll=dynamic_config["roll"],
+                    pitch=dynamic_config["pitch"],
+                    yaw=dynamic_config["yaw"],
+                    parent_frame=parent_frame,
+                    child_frame=child_frame,
+                )
+                transforms.append(transform)
+
+            return transforms
+
+        except Exception:
+            self.get_logger().error(
+                f"Error creating dynamic transforms from config: {dynamic_config}. Traceback:\n{traceback.format_exc()}"
+            )
+            raise
+
+    def create_transform(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        roll: float,
+        pitch: float,
+        yaw: float,
+        parent_frame: str,
+        child_frame: str,
+    ) -> TransformStamped:
+        """Create a TransformStamped message from transform parameters."""
+        try:
+            roll_rad = math.radians(roll)
+            pitch_rad = math.radians(pitch)
+            yaw_rad = math.radians(yaw)
 
             transform = TransformStamped()
             transform.header.stamp = self.get_clock().now().to_msg()
@@ -91,7 +200,6 @@ class MissionTfPublisher(Node):
             transform.transform.translation.z = float(z)
 
             quaternion = quaternion_from_euler(roll_rad, pitch_rad, yaw_rad)
-
             transform.transform.rotation.x = quaternion[0]
             transform.transform.rotation.y = quaternion[1]
             transform.transform.rotation.z = quaternion[2]
@@ -101,14 +209,13 @@ class MissionTfPublisher(Node):
 
         except Exception:
             self.get_logger().error(
-                f"Error creating transform from config. Traceback:\n{traceback.format_exc()}"
+                f"Error creating transform. Traceback:\n{traceback.format_exc()}"
             )
             raise
 
 
 def main(args=None):
     rclpy.init(args=args)
-
     try:
         mission_tf_publisher = MissionTfPublisher()
         rclpy.spin(mission_tf_publisher)

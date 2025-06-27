@@ -6,7 +6,6 @@ from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
-from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -50,8 +49,8 @@ FISH_FRAME = "trash/fish"
 SHARK_FRAME = "trash/shark"
 FISH_FRAME_CLUSTERED = "trash/fish/clustered"
 SHARK_FRAME_CLUSTERED = "trash/shark/clustered"
-FISH_VIEW_FRAME = "trash/fish/view"
-SHARK_VIEW_FRAME = "trash/shark/view"
+FISH_VIEW_FRAME = "trash/fish/clustered/view"
+SHARK_VIEW_FRAME = "trash/shark/clustered/view"
 
 ACTIVATE_GRABBER = UInt8(data=0)
 HALF_CLOSE_GRABBER = UInt8(data=3)

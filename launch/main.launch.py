@@ -8,34 +8,46 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 
 def generate_launch_description():
-    declare_params_file = DeclareLaunchArgument(
-        "params_file",
-        default_value=PathJoinSubstitution(
-            [FindPackageShare("mission_planner_2"), "cfg", "mission_tfs.yaml"]
+    launch_objects = [
+        DeclareLaunchArgument(
+            "static_tf_file",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("mission_planner_2"), "cfg", "static_tfs.yaml"]
+            ),
         ),
-    )
+        DeclareLaunchArgument(
+            "dynamic_tf_file",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("mission_planner_2"), "cfg", "dynamic_tfs.yaml"]
+            ),
+        ),
+        DeclareLaunchArgument(
+            "default_suffix",
+            default_value="view",
+        ),
+    ]
 
-    mission_tf_node = Node(
-        package="mission_planner_2",
-        executable="mission_tfs.py",
-        name="mission_tf_publisher",
-        parameters=[{"config_file": LaunchConfiguration("params_file")}],
-        output="screen",
-    )
+    nodes = [
+        Node(
+            package="mission_planner_2",
+            executable="mission_tfs.py",
+            name="mission_tf_publisher",
+            parameters=[
+                {
+                    "static_tf_file": LaunchConfiguration("static_tf_file"),
+                    "dynamic_tf_file": LaunchConfiguration("dynamic_tf_file"),
+                    "default_suffix": LaunchConfiguration("default_suffix"),
+                }
+            ],
+            output="screen",
+        ),
+        Node(
+            package="mission_planner_2",
+            executable="choice_server",
+            name="rs25_choice_server",
+            namespace="auv4",
+            output="screen",
+        ),
+    ]
 
-    service_node = Node(
-        package="mission_planner_2",
-        executable="choice_server",
-        name="rs25_choice_server",
-        namespace="auv4",
-        output="screen",
-    )
-
-    ld = LaunchDescription()
-
-    ld.add_action(declare_params_file)
-
-    ld.add_action(mission_tf_node)
-    ld.add_action(service_node)
-
-    return ld
+    return LaunchDescription(launch_objects + nodes)
