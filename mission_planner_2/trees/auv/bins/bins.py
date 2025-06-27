@@ -49,6 +49,7 @@ TEMPLATE_FRAME_OPTICAL_CLUSTERED = "bin/clustered"
 TEMPLATE_FRAME_YOLO = "bin/yolo"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 
+ACTUATION_TOPIC = "/auv4/actuation/dropper"
 ACTUATION_UINT = UInt8(data=6)
 
 CLUSTERING_DURATION = 20
@@ -456,24 +457,22 @@ def create_bin_root():
     )
 
     # Step 12: Fire first dropper
-    pub_fire_dropper_first = py_trees_ros.publishers.FromBlackboard(
+    pub_fire_dropper_first = py_trees_ros.service_clients.FromConstant(
         name="Fire dropper first",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable=fk("bin_actuation"),
+        service_name=ACTUATION_TOPIC,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
     )
 
-    # Step 14: Fire second dropper
-    pub_fire_dropper_second = py_trees_ros.publishers.FromBlackboard(
+    # Step 13: Fire second dropper
+    pub_fire_dropper_second = py_trees_ros.service_clients.FromConstant(
         name="Fire dropper second",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable=fk("bin_actuation"),
+        service_name=ACTUATION_TOPIC,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
     )
 
-    # Step 15: Disable detections
+    # Step 14: Disable detections
     srv_disable_detections = py_trees_ros.service_clients.FromConstant(
         name="Disable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
@@ -482,7 +481,7 @@ def create_bin_root():
         key_response=_BIN_DISABLE_DETECTIONS_KEY,
     )
 
-    # Step 16: Verify disable succeeded
+    # Step 15: Verify disable succeeded
     check_disable_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Verify disable succeeded",
         check=py_trees.common.ComparisonExpression(
@@ -492,7 +491,7 @@ def create_bin_root():
         ),
     )
 
-    # Step 17: End vision pipeline
+    # Step 16: End vision pipeline
     srv_end_vision = py_trees_ros.service_clients.FromConstant(
         name="End vision pipeline",
         service_name=VISION_SERVER_TOPIC,
@@ -534,7 +533,7 @@ def create_bin_root():
             stabilise_before_dropping,
             set_dropper_actuation,
             pub_fire_dropper_first,
-            py_trees.timers.Timer(name="Wait between drops", duration=2.0),
+            py_trees.timers.Timer(name="Wait between drops", duration=3.0),
             pub_fire_dropper_second,
             srv_disable_detections,
             check_disable_succeeded,

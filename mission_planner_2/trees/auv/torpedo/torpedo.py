@@ -5,8 +5,6 @@ import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.detection_utils import (
@@ -29,21 +27,18 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
+SELECTED_TEMPLATE = 1
+
 VISION_SERVER_TOPIC = "/auv4/torpedo/manage_nodes"
-
-TOGGLE_TEMPLATE_TOPIC = "/auv4/front_cam/image_matching/toggle_template"
-TEMPLATE_NAME = "Task04_Tagging_02.png"
-
+TOGGLE_TEMPLATE_TOPIC = "/auv4/torpedo/image_matching/toggle_template"
 CAMERA_FRAME = "auv4/front_cam_optical"
-TEMPLATE_FRAME_OPTICAL = "Task04_Tagging_02_optical"
-TEMPLATE_FRAME_OPTICAL_CLUSTERED = "torpedo_2/clustered"
 TORPEDO_SHOOTER_TOP_FRAME = "auv4/torpedo_shooter_top"
 TORPEDO_SHOOTER_BOT_FRAME = "auv4/torpedo_shooter_bot"
 TEMPLATE_FRAME_YOLO = "torpedo/yolo"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "torpedo/yolo/clustered"
 
-TOP_TORP_UINT = UInt8(data=2)
-BTM_TORP_UINT = UInt8(data=4)
+ACTUATION_TOPIC_TOP = "/auv4/actuation/torpedo/top"
+ACTUATION_TOPIC_BOT = "/auv4/actuation/torpedo/bot"
 
 CLUSTER_DURATION = 10
 STABILIZE_DURATION = 10
@@ -76,6 +71,20 @@ def create_torpedo_root():
     ros2 run tf2_ros static_transform_publisher -3.3 0 -0.9 0 0 1.57 world fake_det # usually the pose the detection gives
     ros2 run tf2_ros static_transform_publisher 0.3 0 0.6 0 1.57 1.57 fake_det hole
     """
+    if SELECTED_TEMPLATE == 1:
+        template_name = "Task04_Tagging_01.png"
+        template_frame_optical = "Task04_Tagging_01_optical"
+        template_frame_optical_clustered = "torpedo_1/clustered"
+        fish_shoot_frame = "torpedo_1/fish/shoot"
+        shark_shoot_frame = "torpedo_1/shark/shoot"
+    elif SELECTED_TEMPLATE == 2:
+        template_name = "Task04_Tagging_02.png"
+        template_frame_optical = "Task04_Tagging_02_optical"
+        template_frame_optical_clustered = "torpedo_2/clustered"
+        fish_shoot_frame = "torpedo_2/fish/shoot"
+        shark_shoot_frame = "torpedo_2/shark/shoot"
+    else:
+        raise ValueError("Invalid template selected, must be 1 or 2")
 
     seq_torpedo_root = py_trees.composites.Sequence(
         name="Torpedo root",
@@ -118,7 +127,7 @@ def create_torpedo_root():
 
     goto_torp_centre = goto.FromConstant(
         name="Goto torp centre",
-        pose=create_stamped_pose("torpedo/centre"),
+        pose=create_stamped_pose("torpedo/centre/view"),
     )
 
     stabilise_before_matching = py_trees.timers.Timer(
@@ -139,7 +148,7 @@ def create_torpedo_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True, template_name=TEMPLATE_NAME
+            enabled=True, template_name=template_name
         ),
         key_response=fk("torpedo_enable_detections"),
     )
@@ -154,20 +163,13 @@ def create_torpedo_root():
         ),
     )
 
-    set_torp_top = py_trees.behaviours.SetBlackboardVariable(
-        name="Set top torpedo actuation",
-        variable_name=fk("torpedo_actuation"),
-        variable_value=TOP_TORP_UINT,
-        overwrite=True,
-    )
-
     cluster_first = py_trees_ros.action_clients.FromConstant(
         name="Cluster the transforms before first shot",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
-            in_children=TEMPLATE_FRAME_OPTICAL,
-            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+            in_children=template_frame_optical,
+            out_children=template_frame_optical_clustered,
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
@@ -179,6 +181,8 @@ def create_torpedo_root():
         pose_key=_POSE_KEY,
         go_back_pose_key=_GO_BACK_POSE_KEY,
         is_first=True,
+        fish_shoot_frame=fish_shoot_frame,
+        shark_shoot_frame=shark_shoot_frame,
     )
 
     goto_target_first = goto.FromBlackboard(
@@ -187,12 +191,11 @@ def create_torpedo_root():
         anchor_frame_name=TORPEDO_SHOOTER_TOP_FRAME,
     )
 
-    pub_fire_first = py_trees_ros.publishers.FromBlackboard(
+    fire_first = py_trees_ros.service_clients.FromConstant(
         name="Fire first torpedo",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable=fk("torpedo_actuation"),
+        service_type=Trigger,
+        service_name=ACTUATION_TOPIC_TOP,
+        service_request=Trigger.Request(),
     )
 
     goto_back_centre = goto.FromBlackboard(
@@ -200,20 +203,13 @@ def create_torpedo_root():
         pose_key=_GO_BACK_POSE_KEY,
     )
 
-    set_torp_bottom = py_trees.behaviours.SetBlackboardVariable(
-        name="Set bottom torpedo actuation",
-        variable_name=fk("torpedo_actuation"),
-        variable_value=BTM_TORP_UINT,
-        overwrite=True,
-    )
-
     cluster_second = py_trees_ros.action_clients.FromConstant(
         name="Cluster the transforms before second shot",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
-            in_children=TEMPLATE_FRAME_OPTICAL,
-            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+            in_children=template_frame_optical,
+            out_children=template_frame_optical_clustered,
             duration=CLUSTER_DURATION,
             use_cache=False,
         ),
@@ -224,6 +220,8 @@ def create_torpedo_root():
         pose_key=_POSE_KEY,
         go_back_pose_key=_GO_BACK_POSE_KEY,
         is_first=False,
+        fish_shoot_frame=fish_shoot_frame,
+        shark_shoot_frame=shark_shoot_frame,
     )
 
     goto_target_second = goto.FromBlackboard(
@@ -232,12 +230,11 @@ def create_torpedo_root():
         anchor_frame_name=TORPEDO_SHOOTER_BOT_FRAME,
     )
 
-    pub_fire_second = py_trees_ros.publishers.FromBlackboard(
+    fire_second = py_trees_ros.service_clients.FromConstant(
         name="Fire second torpedo",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable=fk("torpedo_actuation"),
+        service_type=Trigger,
+        service_name=ACTUATION_TOPIC_BOT,
+        service_request=Trigger.Request(),
     )
 
     srv_disable_detections = py_trees_ros.service_clients.FromConstant(
@@ -283,19 +280,17 @@ def create_torpedo_root():
             stabilise_before_matching,
             srv_enable_detections,
             check_enable_succeeded,
-            set_torp_top,
             cluster_first,
             sel_tf_first,
             goto_target_first,
-            py_trees.timers.Timer("Wait between firings", duration=STABILIZE_DURATION),
-            pub_fire_first,
+            py_trees.timers.Timer("Wait before fire", duration=STABILIZE_DURATION),
+            fire_first,
             goto_back_centre,
-            set_torp_bottom,
             cluster_second,
             sel_tf_second,
             goto_target_second,
-            py_trees.timers.Timer("Wait between firings", duration=STABILIZE_DURATION),
-            pub_fire_second,
+            py_trees.timers.Timer("Wait before fire", duration=STABILIZE_DURATION),
+            fire_second,
             srv_disable_detections,
             check_disable_succeeded,
             srv_end_vision,

@@ -1,11 +1,9 @@
 import operator
 
 import py_trees
+
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-
-FISH_SHOOT_FRAME = "torpedo_1/fish/shoot"
-SHARK_SHOOT_FRAME = "torpedo_1/shark/shoot"
 
 
 def create_tf_selector_root(
@@ -13,6 +11,8 @@ def create_tf_selector_root(
     pose_key: str = "pose",
     go_back_pose_key: str = "go_back_pose",
     is_first: bool = True,
+    fish_shoot_frame: str = "torpedo_1/fish/shoot",
+    shark_shoot_frame: str = "torpedo_1/shark/shoot",
 ) -> py_trees.composites.Selector:
     """
     Create the root node of the TF selector tree.
@@ -53,28 +53,28 @@ def create_tf_selector_root(
     cache_tf_fish = cache_tf.ToBlackboard(
         name="Cache tf fish",
         variable_name=go_back_pose_key,
-        start=FISH_SHOOT_FRAME,
+        start=fish_shoot_frame,
         end="auv4/base_link_ned",
     )
 
     cache_tf_shark = cache_tf.ToBlackboard(
         name="Cache tf shark",
         variable_name=go_back_pose_key,
-        start=SHARK_SHOOT_FRAME,
+        start=shark_shoot_frame,
         end="auv4/base_link_ned",
     )
 
     set_pose_fish = py_trees.behaviours.SetBlackboardVariable(
         name="Set hole target pose",
         variable_name=pose_key,
-        variable_value=create_stamped_pose(FISH_SHOOT_FRAME),
+        variable_value=create_stamped_pose(fish_shoot_frame),
         overwrite=True,
     )
 
     set_pose_shark = py_trees.behaviours.SetBlackboardVariable(
         name="Set hole target pose",
         variable_name=pose_key,
-        variable_value=create_stamped_pose(SHARK_SHOOT_FRAME),
+        variable_value=create_stamped_pose(shark_shoot_frame),
         overwrite=True,
     )
 

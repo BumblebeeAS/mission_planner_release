@@ -1,4 +1,27 @@
 tfs:
+  ######################### TORPEDO (COMMON) TFS #########################
+  - name: torpedo_centre
+    # Translation (x, y, z in meters)
+    # From top left corner of torpedo board, x right, y down
+    x: 0.3
+    y: 0.3
+    z: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+    # Frame IDs
+    parent_frame_id: "torpedo/yolo/clustered"
+    child_frame_id: "torpedo/centre"
+  - name: torpedo_centre_view
+    x: 0.0
+    y: 0.0
+    z: -0.6
+    roll: -90.0
+    pitch: -90.0
+    yaw: 0.0
+    # Frame IDs
+    parent_frame_id: "torpedo/centre"
+    child_frame_id: "torpedo/centre/view"
   ######################### TORPEDO 1 TFS #########################
   - name: torpedo_1_fish
     # Translation (x, y, z in meters)
@@ -14,7 +37,7 @@ tfs:
   - name: torpedo_1_fish_shoot
     x: 0.0
     y: 0.0
-    z: -0.4
+    z: -0.6
     roll: -90.0
     pitch: -90.0
     yaw: 0.0
@@ -34,25 +57,12 @@ tfs:
   - name: torpedo_1_shark_shoot
     x: 0.0
     y: 0.0
-    z: -0.4
+    z: -0.6
     roll: -90.0
     pitch: -90.0
     yaw: 0.0
     parent_frame_id: "torpedo_1/shark"
     child_frame_id: "torpedo_1/shark/shoot"
-
-  - name: torpedo_centre
-    # Translation (x, y, z in meters)
-    # From top left corner of torpedo board, x right, y down
-    x: 0.3
-    y: 0.3
-    z: 0.0
-    roll: 0.0 # in degrees
-    pitch: 0.0 # in degrees
-    yaw: 0.0 # in degrees
-    # Frame IDs
-    parent_frame_id: "torpedo/yolo/clustered"
-    child_frame_id: "torpedo/centre"
   ######################### TORPEDO 2 TFS #########################
   - name: torpedo_2_fish
     # Translation (x, y, z in meters)
@@ -69,7 +79,7 @@ tfs:
   - name: torpedo_2_fish_shoot
     x: 0.0
     y: 0.0
-    z: -0.4
+    z: -0.6
     roll: -90.0
     pitch: -90.0
     yaw: 0.0
@@ -89,7 +99,7 @@ tfs:
   - name: torpedo_2_shark_shoot
     x: 0.0
     y: 0.0
-    z: -0.4
+    z: -0.6
     roll: -90.0
     pitch: -90.0
     yaw: 0.0
@@ -301,7 +311,7 @@ tfs:
   - name: torpedo_top
     x: -0.07819
     y: -0.11
-    z: -0.03017
+    z: 0.06983
     roll: 0.0
     pitch: 0.0
     yaw: 0.0
@@ -310,7 +320,7 @@ tfs:
   - name: torpedo_bot
     x: -0.07819
     y: -0.11
-    z: -0.02017
+    z: 0.06983
     roll: 0.0
     pitch: 0.0
     yaw: 0.0
