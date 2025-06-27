@@ -2,6 +2,7 @@ from typing import Literal
 
 import py_trees
 from geometry_msgs.msg import TransformStamped
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -14,7 +15,6 @@ fk = full_key_generator(NAMESPACE)
 
 ########################## UPDATE CONSTANTS HERE #########################
 # TODO: i think this was for non waypoint ver if dn can remove
-WAIT_BETWEEN_MOVES = 10.0
 TRANSFORM_CHECK_TIMEOUT = 5.0
 #########################################################################
 
@@ -27,6 +27,7 @@ def create_channel_movement_zero_root(
     slalom_frame_one_clustered: str = "slalom_layer_1/clustered",
     slalom_frame_two_clustered: str = "slalom_layer_2/clustered",
     create_func_key: str = "create_pose_func",
+    wait_between_moves_sec: float = 4.0,
 ):
     root = py_trees.composites.Sequence(
         name="Channel Movement 0 missing",
@@ -45,10 +46,11 @@ def create_channel_movement_zero_root(
         ],
     )
 
-    goto_zero_missing = goto.FromBlackboard(
+    goto_zero_missing = goto.NFromBlackboard(
         name="Goto Channel Movement 0 Missing",
         pose_key=_POSE_LIST_KEY,
         specified_heading=False,
+        wait_between_moves_sec=wait_between_moves_sec,
     )
 
     root.add_children(
@@ -69,6 +71,7 @@ def create_channel_movement_one_root(
     slalom_one_from_zero_hardcoded: str = "slalom_layer_1/hardcoded",
     slalom_two_from_one_hardcoded: str = "slalom_layer_2/hardcoded",
     create_func_key: str = "create_pose_func",
+    wait_between_moves_sec: float = 4.0,
 ):
     def check_tf_dist(
         tf_one: TransformStamped,
@@ -135,10 +138,11 @@ def create_channel_movement_one_root(
         ],
     )
 
-    goto_one_missing = goto.FromBlackboard(
+    goto_one_missing = goto.NFromBlackboard(
         name="Goto Channel Movement 1 Missing",
         pose_key=_POSE_LIST_KEY,
         specified_heading=False,
+        wait_between_moves_sec=wait_between_moves_sec,
     )
 
     seq_missing_layer_one.add_children(
@@ -171,6 +175,7 @@ def create_channel_movement_two_root(
     slalom_one_from_zero_hardcoded: str = "slalom_layer_1/hardcoded",
     slalom_two_from_one_hardcoded: str = "slalom_layer_2/hardcoded",
     create_func_key: str = "create_pose_func",
+    wait_between_moves_sec: float = 4.0,
 ):
     root = py_trees.composites.Sequence(
         name="Channel Movement 2 missing",
@@ -189,10 +194,11 @@ def create_channel_movement_two_root(
         ],
     )
 
-    goto_two_missing = goto.FromBlackboard(
+    goto_two_missing = goto.NFromBlackboard(
         name="Goto Channel Movement 2 missing",
         pose_key=_POSE_LIST_KEY,
         specified_heading=False,
+        wait_between_moves_sec=wait_between_moves_sec,
     )
 
     root.add_children(

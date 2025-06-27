@@ -49,7 +49,7 @@ SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
 
 TRANSFORM_TIMEOUT_DURATION = 5.0
 CLUSTER_VIEW_DURATION = 40
-
+WAIT_BETWEEN_MOVES_SEC = 4.0
 """
 For sim.
 FIRST_VIEW = {"position_x": 6.0, "position_y": -0.8, "position_z": 1.0, "yaw": -90.0}
@@ -357,6 +357,7 @@ def create_slalom_root():
         slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
         slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
         create_func_key=_CREATE_POSE_FUNC_KEY,
+        wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
     )
     move_channel_two = create_channel_movement_one_root(
         slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
@@ -366,12 +367,14 @@ def create_slalom_root():
         slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
         slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
         create_func_key=_CREATE_POSE_FUNC_KEY,
+        wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
     )
     move_channel_three = create_channel_movement_two_root(
         slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
         slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
         slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
         create_func_key=_CREATE_POSE_FUNC_KEY,
+        wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
     )
 
     # helper function to check num missing tfs
