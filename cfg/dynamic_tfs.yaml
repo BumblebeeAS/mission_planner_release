@@ -76,3 +76,13 @@ octagon:
     z: -1.0
     roll: -90.0
     pitch: -90.0
+  - name: item_view
+    parents:
+      - "ladle_0/clustered"
+      - "ladle_1/clustered"
+      - "bottle_0/clustered"
+      - "bottle_1/clustered"
+      - "yellow_bucket/clustered"
+      - "pink_bucket/clustered"
+    z: -0.1
+    yaw: -90.0

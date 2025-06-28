@@ -12,14 +12,14 @@ from typing import Callable
 import action_msgs
 import action_msgs.msg as action_msgs
 import py_trees
+import py_trees_ros
 from bb_controls_msgs.action import Locomotion
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 from geometry_msgs.msg import PoseStamped
-from mission_planner_2.commons.blackboard import convert_to_safe_name
 from numpy import rad2deg
 from transforms3d.euler import quat2euler
 
-import py_trees_ros
+from mission_planner_2.commons.blackboard import convert_to_safe_name
 
 
 class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
@@ -625,3 +625,80 @@ class NFromBlackboard(FromBlackboard):
             else:
                 self.feedback_message = "failed"
                 return py_trees.common.Status.FAILURE
+
+
+class NFromConstant(NFromBlackboard):
+    """
+    Interface to communicate with controls `Locomotion Action server` using a list of constant poses.
+
+    Instead of reading a pose from the blackboard, this behavior uses a list of poses provided at initialization.
+
+    Example usage:
+    ```python
+    from mission_planner_2.trees.auv.goto import goto
+
+    root.add_children(
+        [
+            goto.NFromConstant(
+                name="goto_points",
+                parent_namespace="/auv4/mission_1",
+                poses=[_create_pose(0, 0, 0), _create_pose(1, 1, 1)]
+            ),
+        ]
+    )
+    ```
+
+    Args:
+        name (str): The name of the behaviour.
+        parent_namespace (str): The namespace of the parent behaviour
+        poses (list[PoseStamped]): The list of constant poses to use for the goto action.
+        key_action (str): The key of the blackboard variable for the action goal.
+        generate_feedback_message (callable, optional): A callable to generate feedback messages.
+        wait_for_server_timeout_sec (float): Timeout for waiting for the action server to be ready.
+        wait_for_service_timeout_sec (float): Timeout for waiting for the service to be ready.
+        anchor_frame_name (str): The name of the frame that is to be brought to the target.
+    """
+
+    def __init__(
+        self,
+        name,
+        poses: list[PoseStamped],
+        anchor_frame_name="auv4/base_link_ned",
+        specified_heading: bool = True,
+        generate_feedback_message=None,
+        wait_for_server_timeout_sec=-3,
+        wait_for_service_timeout_sec=-3,
+        wait_between_moves_sec=10.0,
+        ignore_depth: bool = False,
+    ):
+        if not isinstance(poses, list):
+            poses = [poses]
+
+        namespace = py_trees.blackboard.Blackboard.absolute_name(
+            "/", convert_to_safe_name(name)
+        )
+        pose_key = py_trees.blackboard.Blackboard.absolute_name(
+            namespace, f"pose_{str(uuid.uuid4()).replace('-', '')}"
+        )
+
+        super().__init__(
+            name=name,
+            pose_key=pose_key,
+            anchor_frame_name=anchor_frame_name,
+            specified_heading=specified_heading,
+            generate_feedback_message=generate_feedback_message,
+            wait_for_server_timeout_sec=wait_for_server_timeout_sec,
+            wait_for_service_timeout_sec=wait_for_service_timeout_sec,
+            wait_between_moves_sec=wait_between_moves_sec,
+            ignore_depth=ignore_depth,
+        )
+
+        self.blackboard.register_key(
+            key="request",
+            access=py_trees.common.Access.WRITE,
+            remap_to=py_trees.blackboard.Blackboard.absolute_name(
+                namespace="/",
+                key=pose_key,
+            ),
+        )
+        self.blackboard.set(name="request", value=poses)

@@ -1,17 +1,14 @@
 import operator
 
-import numpy as np
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
-from geometry_msgs.msg import PoseStamped
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
+from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
-from tf_transformations import euler_from_quaternion
 
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -23,10 +20,7 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import (
-    create_clustering_goal,
-    create_stamped_pose,
-)
+from mission_planner_2.commons.pose_utils import create_clustering_goal
 from mission_planner_2.trees.auv.bins.choice_selector import create_choice_selector_root
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.goto import goto
