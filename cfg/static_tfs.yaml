@@ -2,150 +2,69 @@ torpedo:
   - name: torpedo_centre
     x: 0.3
     y: 0.3
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "torpedo/yolo/clustered"
     child_frame_id: "torpedo/centre"
-  - name: torpedo_1_fish
-    x: 0.408
-    y: 0.391
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
-    parent_frame_id: "torpedo_1/clustered"
-    child_frame_id: "torpedo_1/fish"
-  - name: torpedo_1_shark
-    x: 0.268
-    y: 0.09
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
-    parent_frame_id: "torpedo_1/clustered"
-    child_frame_id: "torpedo_1/shark"
-  - name: torpedo_2_fish
-    x: 0.429
-    y: 0.084
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
-    parent_frame_id: "torpedo_2/clustered"
-    child_frame_id: "torpedo_2/fish"
-  - name: torpedo_2_shark
-    x: 0.319
-    y: 0.336
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
-    parent_frame_id: "torpedo_2/clustered"
-    child_frame_id: "torpedo_2/shark"
+  - name: torpedo_1_yolo
+    parent_frame_id: "torpedo/yolo/clustered"
+    child_frame_id: "torpedo_1/yolo"
+  - name: torpedo_2_yolo
+    parent_frame_id: "torpedo/yolo/clustered"
+    child_frame_id: "torpedo_2/yolo"
 gate:
   - name: gate_centre
     x: 1.5
-    y: 0.0
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "gate/clustered"
     child_frame_id: "gate/centre"
   - name: gate_left
     x: -0.75
-    y: 0.0
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "gate/centre"
     child_frame_id: "gate/left"
   - name: gate_right
     x: 0.75
-    y: 0.0
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "gate/centre"
     child_frame_id: "gate/right"
 bin:
   - name: bin_center
     x: 0.1524
     y: 0.3048
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "bin/yolo/clustered"
     child_frame_id: "bin/centre"
   - name: bin_fish
     x: 0.1524
     y: 0.4568
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/fish"
   - name: bin_shark
     x: 0.1524
     y: 0.1524
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/shark"
   - name: bin_fish_rotated
     x: 0.1524
     y: 0.1524
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/fish/rotated"
   - name: bin_shark_rotated
     x: 0.1524
     y: 0.4568
-    z: 0.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/shark/rotated"
 slalom:
   # One Missing Transform
   - name: slalom_layer_2_from_1_hardcoded
     x: 1.00
-    y: 0.0
     z: 2.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "slalom_layer_1/clustered"
     child_frame_id: "slalom_layer_2/hardcoded"
   # Two Missing Transforms
   - name: slalom_layer_1_from_0_hardcoded
     x: -0.50
-    y: 0.0
     z: 2.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "slalom_layer_0/clustered"
     child_frame_id: "slalom_layer_1/hardcoded"
   - name: slalom_layer_2_from_1_hardcoded_hardcoded # forgive my naming sins
     x: 1.00
-    y: 0.0
     z: 2.0
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "slalom_layer_1/hardcoded"
     child_frame_id: "slalom_layer_2/hardcoded/hardcoded"
 urdf:
@@ -153,26 +72,17 @@ urdf:
     x: -0.07819
     y: -0.11
     z: 0.06983
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/torpedo_shooter_top"
   - name: torpedo_bot
     x: -0.07819
     y: -0.11
     z: 0.06983
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/torpedo_shooter_bot"
   - name: dropper
     x: -0.14964
     y: -0.093029
     z: 0.06985
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/dropper"

@@ -126,12 +126,12 @@ class MissionTfPublisher(Node):
         """Create a TransformStamped message from static tf configuration."""
         try:
             return self.create_transform(
-                x=tf_config["x"],
-                y=tf_config["y"],
-                z=tf_config["z"],
-                roll=tf_config["roll"],
-                pitch=tf_config["pitch"],
-                yaw=tf_config["yaw"],
+                x=tf_config.get("x", 0.0),
+                y=tf_config.get("y", 0.0),
+                z=tf_config.get("z", 0.0),
+                roll=tf_config.get("roll", 0.0),
+                pitch=tf_config.get("pitch", 0.0),
+                yaw=tf_config.get("yaw", 0.0),
                 parent_frame=tf_config["parent_frame_id"],
                 child_frame=tf_config["child_frame_id"],
             )
@@ -154,12 +154,12 @@ class MissionTfPublisher(Node):
             for parent_frame in parents:
                 child_frame = f"{parent_frame}/{suffix}"
                 transform = self.create_transform(
-                    x=dynamic_config["x"],
-                    y=dynamic_config["y"],
-                    z=dynamic_config["z"],
-                    roll=dynamic_config["roll"],
-                    pitch=dynamic_config["pitch"],
-                    yaw=dynamic_config["yaw"],
+                    x=dynamic_config.get("x", 0.0),
+                    y=dynamic_config.get("y", 0.0),
+                    z=dynamic_config.get("z", 0.0),
+                    roll=dynamic_config.get("roll", 0.0),
+                    pitch=dynamic_config.get("pitch", 0.0),
+                    yaw=dynamic_config.get("yaw", 0.0),
                     parent_frame=parent_frame,
                     child_frame=child_frame,
                 )

@@ -1,45 +1,63 @@
 torpedo:
+  - name: torpedo_1_fish
+    suffix: fish
+    parents:
+      - "torpedo_1"
+      - "torpedo_1/yolo"
+    x: 0.408
+    y: 0.391
+  - name: torpedo_1_shark
+    suffix: shark
+    parents:
+      - "torpedo_1"
+      - "torpedo_1/yolo"
+    x: 0.268
+    y: 0.09
+  - name: torpedo_2_fish
+    suffix: fish
+    parents:
+      - "torpedo_2"
+      - "torpedo_2/yolo"
+    x: 0.429
+    y: 0.084
+  - name: torpedo_2_shark
+    suffix: shark
+    parents:
+      - "torpedo_2"
+      - "torpedo_2/yolo"
+    x: 0.319
+    y: 0.336
   - name: centre_view
     parents:
       - "torpedo/centre"
-    x: 0.0
-    y: 0.0
     z: -0.6
     roll: -90.0
     pitch: -90.0
-    yaw: 0.0
   - name: shoot_view
     parents:
       - "torpedo_1/fish"
       - "torpedo_1/shark"
       - "torpedo_2/fish"
       - "torpedo_2/shark"
-    x: 0.0
-    y: 0.0
     z: -0.6
     roll: -90.0
     pitch: -90.0
-    yaw: 0.0
 gate:
   - name: centre_view
     parents:
       - "gate/centre"
-    x: 0.0
     y: 1.0
     z: -2.0
     roll: -90.0
     pitch: -90.0
-    yaw: 0.0
   - name: left_right_view
     parents:
       - "gate/left"
       - "gate/right"
-    x: 0.0
     y: 1.0
     z: -1.0
     roll: -90.0
     pitch: -90.0
-    yaw: 0.0
 bin:
   - name: top_view
     parents:
@@ -48,20 +66,13 @@ bin:
       - "bin/shark"
       - "bin/fish/rotated"
       - "bin/shark/rotated"
-    x: 0.0
-    y: 0.0
     z: -0.5
-    roll: 0.0
-    pitch: 0.0
     yaw: -90.0
 octagon:
   - name: trash_view
     parents:
       - "trash/fish/clustered"
       - "trash/shark/clustered"
-    x: 0.0
-    y: 0.0
     z: -1.0
     roll: -90.0
     pitch: -90.0
-    yaw: 0.0

@@ -74,13 +74,13 @@ def create_torpedo_root():
     if SELECTED_TEMPLATE == 1:
         template_name = "Task04_Tagging_01.png"
         template_frame_optical = "Task04_Tagging_01_optical"
-        template_frame_optical_clustered = "torpedo_1/clustered"
+        template_frame_optical_clustered = "torpedo_1"
         fish_shoot_frame = "torpedo_1/fish/view"
         shark_shoot_frame = "torpedo_1/shark/view"
     elif SELECTED_TEMPLATE == 2:
         template_name = "Task04_Tagging_02.png"
         template_frame_optical = "Task04_Tagging_02_optical"
-        template_frame_optical_clustered = "torpedo_2/clustered"
+        template_frame_optical_clustered = "torpedo_2"
         fish_shoot_frame = "torpedo_2/fish/view"
         shark_shoot_frame = "torpedo_2/shark/view"
     else:
