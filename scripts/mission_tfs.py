@@ -52,7 +52,9 @@ class MissionTfPublisher(Node):
         # Publish all transforms
         if all_transforms:
             self.tf_static_broadcaster.sendTransform(all_transforms)
-            self.get_logger().info(f"Published {len(all_transforms)} static transforms")
+            self.get_logger().info(
+                f"Published {len(all_transforms)} mission transforms"
+            )
             for tf in all_transforms:
                 self.get_logger().info(
                     f"Published {tf.header.frame_id} -> {tf.child_frame_id}"
