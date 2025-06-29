@@ -2,10 +2,6 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -21,7 +17,12 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.bottle import create_bottle_root
+from mission_planner_2.trees.auv.octagon.helpers import view_frame_func
 from mission_planner_2.trees.auv.octagon.ladle import create_ladle_root
+from mission_planner_2.trees.auv.octagon.tf_checker import create_tf_checker_root
+from rclpy.qos import qos_profile_system_default
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -58,7 +59,9 @@ SHARK_FRAME = "trash/shark"
 FISH_FRAME_CLUSTERED = "trash/fish/clustered"
 SHARK_FRAME_CLUSTERED = "trash/shark/clustered"
 FISH_VIEW_FRAME = "trash/fish/clustered/view"
+FISH_VIEW_FRAME_HARDCODED = "trash/fish/clustered/view/hardcoded"
 SHARK_VIEW_FRAME = "trash/shark/clustered/view"
+SHARK_VIEW_FRAME_HARDCODED = "trash/shark/clustered/view/hardcoded"
 
 ACTIVATE_GRABBER = UInt8(data=0)
 HALF_CLOSE_GRABBER = UInt8(data=3)
@@ -76,6 +79,8 @@ _ACTIVATE_GRABBER_KEY = fk("activate_grabber")
 _HALF_CLOSE_GRABBER_KEY = fk("half_close_grabber")
 _START_VISION_KEY = fk("bin_start_vision")
 _STOP_VISION_KEY = fk("bin_stop_vision")
+_FISH_TF_KEY = fk("fish_tf")
+_SHARK_TF_KEY = fk("shark_tf")
 
 
 def create_octagon_root():
@@ -84,11 +89,6 @@ def create_octagon_root():
     """
     root = py_trees.composites.Sequence(
         name="Octagon Root",
-        memory=True,
-    )
-
-    seq_cup = py_trees.composites.Sequence(
-        name="Cup Sequence",
         memory=True,
     )
 
@@ -177,15 +177,19 @@ def create_octagon_root():
         ]
     )
 
+    symbol_tf_checker = create_tf_checker_root(
+        frames=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
+        update_keys=[_FISH_TF_KEY, _SHARK_TF_KEY],
+        fallback_val=[FISH_VIEW_FRAME_HARDCODED, SHARK_VIEW_FRAME_HARDCODED],
+    )
+
     dynamic_set_surface_pose_frame = DynamicSetBlackboard(
         name="select surface frame",
-        key=_CHOICE_KEY,
+        key=[_CHOICE_KEY, _FISH_TF_KEY, _SHARK_TF_KEY],
         update_key=_GO_SURFACE_FRAME_KEY,
         overwrite=True,
-        func=lambda choice: (
-            create_stamped_pose(FISH_VIEW_FRAME)
-            if choice.success
-            else create_stamped_pose(SHARK_VIEW_FRAME)
+        func=lambda choice, fish_tf, shark_tf: view_frame_func(
+            choice, fish_tf, shark_tf, FISH_VIEW_FRAME, SHARK_VIEW_FRAME
         ),
     )
 
@@ -282,6 +286,7 @@ def create_octagon_root():
             set_half_close_grabber,
             pub_activate_grabber,
             par_search_tag,
+            symbol_tf_checker,
             dynamic_set_surface_pose_frame,
             seq_spoon,
             cluster_reset_symbols_1,

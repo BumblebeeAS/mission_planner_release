@@ -67,6 +67,15 @@ slalom:
     z: 2.0
     parent_frame_id: "slalom_layer_1/hardcoded"
     child_frame_id: "slalom_layer_2/hardcoded/hardcoded"
+octagon:
+  - name: symbols_hardcoded_shark
+    yaw: 180.0
+    parent_frame_id: "trash/fish/clustered/view"
+    child_frame_id: "trash/shark/clustered/view/hardcoded"
+  - name: symbols_hardcoded_fish
+    yaw: 180.0
+    parent_frame_id: "trash/shark/clustered/view"
+    child_frame_id: "trash/fish/clustered/view/hardcoded"
 urdf:
   - name: torpedo_top
     x: -0.07819
