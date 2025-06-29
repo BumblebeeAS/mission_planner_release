@@ -4,11 +4,10 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_system_default
+from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -104,24 +103,6 @@ def create_gate_root():
         ),
     )
 
-    # Step 4a: Cache transform for gate/left
-    cache_tf_left = cache_tf.ToBlackboard(
-        name="Cache left transform",
-        variable_name=_GATE_LEFT_POSE_KEY,
-        start=GATE_CENTRE_FRAME,
-        end=GATE_LEFT_FRAME,
-        qos_profile=qos_profile_system_default,
-    )
-
-    # Step 4b: Cache transform for gate/right
-    cache_tf_right = cache_tf.ToBlackboard(
-        name="Cache right transform",
-        variable_name=_GATE_RIGHT_POSE_KEY,
-        start=GATE_CENTRE_FRAME,
-        end=GATE_RIGHT_FRAME,
-        qos_profile=qos_profile_system_default,
-    )
-
     # Step 5: Move to picture position
     goto_see_pictures = goto.FromConstant(
         "Goto picture position", create_stamped_pose(GATE_CENTRE_FRAME)
@@ -146,7 +127,7 @@ def create_gate_root():
         name="Get shark fish orientation",
         topic_name=GATE_ORIENTATION_TOPIC,
         topic_type=String,
-        qos_profile=qos_profile_system_default,
+        qos_profile=qos_profile_sensor_data,
         blackboard_variables={_GATE_ORIENTATION_KEY: None},
     )
 
@@ -180,9 +161,9 @@ def create_gate_root():
         overwrite=True,
     )
 
-    goto_left_approach = goto.FromBlackboard(
+    goto_left_approach = goto.FromConstant(
         name="Goto left approach",
-        pose_key=_GATE_LEFT_POSE_KEY,
+        pose=create_stamped_pose(GATE_LEFT_FRAME),
     )
 
     seq_go_right_side = py_trees.composites.Sequence(name="Go right side", memory=True)
@@ -194,9 +175,9 @@ def create_gate_root():
         overwrite=True,
     )
 
-    goto_right_approach = goto.FromBlackboard(
+    goto_right_approach = goto.FromConstant(
         name="Goto right approach",
-        pose_key=_GATE_RIGHT_POSE_KEY,
+        pose=create_stamped_pose(GATE_RIGHT_FRAME),
     )
 
     seq_go_right_side.add_children(children=[write_not_is_left, goto_right_approach])
@@ -239,8 +220,6 @@ def create_gate_root():
             srv_start_vision,
             check_start_vision_succeeded,
             action_cluster_gate,
-            cache_tf_left,
-            cache_tf_right,
             goto_see_pictures,
             timer_stabilize_main,
             srv_get_fish_choice,
