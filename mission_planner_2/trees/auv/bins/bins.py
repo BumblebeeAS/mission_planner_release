@@ -21,9 +21,12 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_clustering_goal
+from mission_planner_2.commons.pose_utils import (
+    create_clustering_goal,
+    within_threshold,
+)
 from mission_planner_2.trees.auv.bins.choice_selector import create_choice_selector_root
-from mission_planner_2.trees.auv.bins.helpers import find_acute_angle, within_threshold
+from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
