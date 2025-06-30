@@ -76,7 +76,7 @@ def FromConstant(
     if yaw_threshold is None:
         yaw_threshold = 370.0
 
-    action_cluster = py_trees_ros.action_clients.FromConstant(
+    action_cluster_first = py_trees_ros.action_clients.FromConstant(
         name="Cluster transforms",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
@@ -93,6 +93,13 @@ def FromConstant(
 
     wait = py_trees.timers.Timer(
         name="Wait between clusters", duration=stabilization_duration
+    )
+
+    action_cluster_again = py_trees_ros.action_clients.FromConstant(
+        name="Cluster transforms",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=clustering_goal,
     )
 
     extract_xyz_tf = cache_tf.ToBlackboard(
@@ -127,13 +134,13 @@ def FromConstant(
         ),
     )
 
-    main_seq = py_trees.composites.Sequence(
+    retry_seq = py_trees.composites.Sequence(
         "Cluster and move sequence",
         memory=True,
         children=[
-            action_cluster,
             goto_location,
             wait,
+            action_cluster_again,
             extract_xyz_tf,
             extract_rpy_tf,
             threshold_check,
@@ -141,10 +148,14 @@ def FromConstant(
         ],
     )
 
-    root = py_trees.decorators.Retry(
-        name=name,
-        child=main_seq,
+    retry = py_trees.decorators.Retry(
+        name="Retry",
+        child=retry_seq,
         num_failures=retries,
+    )
+
+    root = py_trees.composites.Sequence(
+        name=name, memory=True, children=[action_cluster_first, retry]
     )
 
     return root
