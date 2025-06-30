@@ -27,6 +27,40 @@ Adapted from: https://github.com/splintered-reality/py_trees_ros/blob/devel/py_t
 
 import py_trees
 import rclpy.qos
+from rclpy.qos import qos_profile_system_default
+
+##############################################################################
+# Behaviours
+##############################################################################
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+#
+##############################################################################
+# Description
+##############################################################################
+
+"""
+Behaviour to cache a transform relationship as a pose for future navigation.
+
+This behavior captures the spatial relationship between trajectory waypoints at a specific
+moment in time, storing it as a pose that can be used later for navigation commands.
+This is particularly useful when transform lookups may become inaccurate due to latency
+in perception (e.g., clustering, inability to see object from new position, delays etc.).
+
+The primary use case is to cache transform data when it's most accurate, then use the
+cached pose for subsequent goto operations, decoupling navigation from real-time
+transform accuracy.
+
+Adapted from: https://github.com/splintered-reality/py_trees_ros/blob/devel/py_trees_ros/transforms.py
+"""
+
+##############################################################################
+# Imports
+##############################################################################
+
+import py_trees
+import rclpy.qos
 import tf2_ros
 from builtin_interfaces.msg import Time
 from rclpy.qos import qos_profile_system_default
@@ -252,3 +286,104 @@ class ToBlackboard(py_trees.behaviour.Behaviour):
             yaw=yaw,
             use_radians=True,
         )
+
+
+class ToBlackboardFromBlackboard(py_trees.behaviour.Behaviour):
+    def __init__(
+        self,
+        name: str,
+        variable_name: str,
+        target_frame_key: str,
+        source_frame_key: str,
+        qos_profile: rclpy.qos.QoSProfile = qos_profile_system_default,
+        static_qos_profile: rclpy.qos.QoSProfile | None = None,
+    ):
+        super().__init__(name=name)
+        self.variable_name = variable_name
+        self.blackboard = self.attach_blackboard_client(name)
+        self.blackboard.register_key(
+            key=self.variable_name, access=py_trees.common.Access.WRITE
+        )
+
+        self.blackboard.register_key(
+            key=target_frame_key,
+            access=py_trees.common.Access.READ,
+            remap_to=py_trees.blackboard.Blackboard.absolute_name("/", "target"),
+        )
+
+        self.blackboard.register_key(
+            key=source_frame_key,
+            access=py_trees.common.Access.READ,
+            remap_to=py_trees.blackboard.Blackboard.absolute_name("/", "source"),
+        )
+
+        self.qos_profile = qos_profile
+        self.static_qos_profile = static_qos_profile
+        self.buffer = tf2_ros.Buffer()
+
+    def setup(self, **kwargs):
+        """
+        Initialize the transform listener.
+
+        Args:
+            **kwargs (:obj:`dict`): keyword arguments containing the ROS2 node
+                                  required for transform listening
+
+        Raises:
+            KeyError: if 'node' key is not found in kwargs (required for tf2_ros setup)
+        """
+        try:
+            self.node = kwargs["node"]
+        except KeyError as e:
+            error_message = "didn't find 'node' in setup's kwargs [{}][{}]".format(
+                self.name, self.__class__.__name__
+            )
+            raise KeyError(error_message) from e
+
+        self.listener = tf2_ros.TransformListener(
+            buffer=self.buffer,
+            node=self.node,
+            qos=self.qos_profile,
+            static_qos=self.static_qos_profile,
+        )
+
+    def initialise(self):
+        """
+        Clear the blackboard variable (set to 'None') if using the
+        :attr:`~py_trees.common.ClearingPolicy.ON_INTIALISE` policy.
+        """
+        if self.clearing_policy == py_trees.common.ClearingPolicy.ON_INITIALISE:
+            self.blackboard.set(self.variable_name, None)
+        self.target_frame = self.blackboard.get("target")
+        self.source_frame = self.blackboard.get("source")
+
+    def update(self):
+        """
+        Checks for the latest transform and posts it to the blackboard
+        if available.
+        """
+
+        class get_latest(object):
+            def __init__(self):
+                self.nanoseconds = 0
+
+        if self.buffer.can_transform(
+            target_frame=self.target_frame,
+            source_frame=self.source_frame,
+            time=get_latest(),
+            # timeout=rclpy.duration.Duration(seconds=5)  # don't block
+        ):
+            stamped_transform = self.buffer.lookup_transform(
+                target_frame=self.target_frame,
+                source_frame=self.source_frame,
+                time=get_latest(),
+                # timeout=rclpy.duration.Duration(seconds=5)  # don't block
+            )
+            self.blackboard.set(self.variable_name, stamped_transform)
+            self.feedback_message = "transform saved to {}".format(self.variable_name)
+            return py_trees.common.Status.SUCCESS
+        else:
+            self.feedback_message = "waiting for transform".format(
+                self.target_frame, self.source_frame
+            )
+            return py_trees.common.Status.RUNNING

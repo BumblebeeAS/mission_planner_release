@@ -12,6 +12,7 @@ from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
+from mission_planner_2.commons.cluster_goto import create_goto_cluster_root
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -21,9 +22,8 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import create_clustering_goal
-from mission_planner_2.trees.auv.bins import goto_cluster
 from mission_planner_2.trees.auv.bins.choice_selector import create_choice_selector_root
-from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
+from mission_planner_2.trees.auv.bins.helpers import find_acute_angle, within_threshold
 from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
@@ -65,6 +65,8 @@ SHARK_BIN_VIEW_ROTATED_FRAME = "bin/shark/rotated/view"
 # DONT go move it in the section to be updated
 _CHOICE_KEY = fk("choice")
 _POSE_KEY = fk("pose")
+_GOTO_FRAME_KEY = fk("goto_frame")
+_ANCHOR_FRAME_KEY = fk("anchor_frame")
 _POINTS_1_KEY = fk("points_1")
 _POINTS_2_KEY = fk("points_2")
 _START_VISION_KEY = fk("bin_start_vision")
@@ -139,6 +141,7 @@ def create_template_selector_root() -> py_trees.composites.Selector:
     sel_update_selection = create_choice_selector_root(
         choice_key=_CHOICE_KEY,
         pose_key=_POSE_KEY,
+        goto_frame_key=_GOTO_FRAME_KEY,
         fish_bin_frame=FISH_BIN_VIEW_FRAME,
         shark_bin_frame=SHARK_BIN_VIEW_FRAME,
     )
@@ -179,6 +182,7 @@ def create_template_selector_root() -> py_trees.composites.Selector:
     sel_rotated_update_selection = create_choice_selector_root(
         choice_key=_CHOICE_KEY,
         pose_key=_POSE_KEY,
+        goto_frame_key=_GOTO_FRAME_KEY,
         fish_bin_frame=FISH_BIN_VIEW_ROTATED_FRAME,
         shark_bin_frame=SHARK_BIN_VIEW_ROTATED_FRAME,
     )
@@ -425,28 +429,54 @@ def create_bin_root():
         ),
     )
 
-    retry_cluster_and_move = goto_cluster.FromBlackboard(
-        name="Cluster and move repeatedly",
-        goto_pose_key=_POSE_KEY,
-        clustering_goal_key=_CLUSTERING_GOAL_KEY,
-        distance_threshold=0.05,
-        retries=3,
-        anchor_frame="auv4/dropper",
+    # retry_cluster_and_move = goto_cluster.FromBlackboard(
+    #     name="Cluster and move repeatedly",
+    #     goto_pose_key=_POSE_KEY,
+    #     clustering_goal_key=_CLUSTERING_GOAL_KEY,
+    #     distance_threshold=0.05,
+    #     retries=3,
+    #     anchor_frame="auv4/dropper",
+    # )
+
+    action_cluster_for_goto = py_trees_ros.action_clients.FromBlackboard(
+        name="Cluster transforms for dropping",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        key=_CLUSTERING_GOAL_KEY,
     )
 
-    # action_cluster_second = py_trees_ros.action_clients.FromBlackboard(
-    #     name="Cluster transforms for dropping",
-    #     action_type=ClusterTf,
-    #     action_name="/auv4/cluster_tf",
-    #     key=fk("clustering_goal"),
-    # )
-    #
-    # # Step 10: Align to precise target
-    # goto_align_to_target = goto.FromBlackboard(
-    #     name="Align to target",
-    #     pose_key=_POSE_KEY,
-    #     anchor_frame_name="auv4/dropper",
-    # )
+    action_cluster_for_goto_check = py_trees_ros.action_clients.FromBlackboard(
+        name="Cluster transforms for dropping",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        key=_CLUSTERING_GOAL_KEY,
+    )
+
+    # Step 10: Align to precise target
+    goto_align_to_target = goto.FromBlackboard(
+        name="Align to target",
+        pose_key=_POSE_KEY,
+        anchor_frame_name="auv4/dropper",
+    )
+
+    set_anchor_frame = py_trees.behaviours.SetBlackboardVariable(
+        name="Set anchor frame",
+        variable_name=_ANCHOR_FRAME_KEY,
+        variable_value="auv4/dropper",
+        overwrite=True,
+    )
+
+    seq_goto_cluster = create_goto_cluster_root(
+        cluster_node=action_cluster_for_goto,
+        cluster_node_check=action_cluster_for_goto_check,
+        goto_node=goto_align_to_target,
+        distance_threshold=0.05,
+        retries=3,
+        anchor_frame=_ANCHOR_FRAME_KEY,
+        goto_pose_frame_id=_GOTO_FRAME_KEY,
+        is_from_bb=True,
+        within_threshold=within_threshold,
+    )
 
     stabilise_before_dropping = py_trees.timers.Timer(
         "Stabilise before dropping", duration=STABILIZE_CONTROLS_DURATION
@@ -532,7 +562,9 @@ def create_bin_root():
             sel_update_template,
             srv_enable_correct_detections,
             check_enable_succeeded_correct,
-            retry_cluster_and_move,
+            # retry_cluster_and_move,
+            set_anchor_frame,
+            seq_goto_cluster,
             # action_cluster_second,
             # goto_align_to_target,
             stabilise_before_dropping,

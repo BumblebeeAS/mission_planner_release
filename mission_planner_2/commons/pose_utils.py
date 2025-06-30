@@ -7,7 +7,7 @@ from bb_controls_msgs.srv import Limits
 from bb_perception_msgs.action import ClusterTf
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped
-from tf_transformations import quaternion_from_euler
+from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
 
 def create_stamped_pose(
@@ -197,6 +197,7 @@ def create_slalom_clustering_goal(duration=20, min_cluster_size=10, min_samples=
         min_samples=min_samples,
     )
 
+
 # AUV4 Limit Defaults from the current params_auv4.yaml in controls
 MAX_XY_VEL = 0.5
 MAX_XY_ACC = 1.0
@@ -207,6 +208,7 @@ MAX_Z_JERK = 1.5
 MAX_YAW_VEL = 0.3
 MAX_YAW_ACC = 0.5
 MAX_YAW_JERK = 0.5
+
 
 def create_limits_srv_request(
     max_xy_vel=MAX_XY_VEL,
@@ -219,7 +221,6 @@ def create_limits_srv_request(
     max_yaw_acc=MAX_YAW_ACC,
     max_yaw_jerk=MAX_YAW_JERK,
 ):
-
     """
     Generates a Limit request to be sent over to controls. Only need
     to define what you want changed. An empty call will return a request with default values
@@ -231,7 +232,7 @@ def create_limits_srv_request(
     request.max_xy_acc = max_xy_acc
     request.max_xy_jerk = max_xy_jerk
     request.max_z_vel = max_z_vel
-    request.max_z_acc = max_z_acc    
+    request.max_z_acc = max_z_acc
     request.max_z_jerk = max_z_jerk
     request.max_yaw_vel = max_yaw_vel
     request.max_yaw_acc = max_yaw_acc
@@ -239,3 +240,34 @@ def create_limits_srv_request(
 
     return request
 
+
+def within_threshold(
+    xyz_pose: PoseStamped,
+    rpy_pose: PoseStamped,
+    distance_threshold: float,
+    yaw_threshold: float,
+) -> bool:
+    _, _, y = euler_from_quaternion(
+        [
+            rpy_pose.pose.orientation.x,
+            rpy_pose.pose.orientation.y,
+            rpy_pose.pose.orientation.z,
+            rpy_pose.pose.orientation.w,
+        ]
+    )
+
+    y = np.degrees(y) % 360
+
+    if y > yaw_threshold:
+        return False
+
+    distance = np.sqrt(
+        (xyz_pose.pose.position.x**2)
+        + (xyz_pose.pose.position.y**2)
+        + (xyz_pose.pose.position.z**2)
+    )
+
+    if distance > distance_threshold:
+        return False
+
+    return True
