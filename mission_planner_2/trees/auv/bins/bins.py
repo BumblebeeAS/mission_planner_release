@@ -21,6 +21,7 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import create_clustering_goal
+from mission_planner_2.trees.auv.bins import goto_cluster
 from mission_planner_2.trees.auv.bins.choice_selector import create_choice_selector_root
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.goto import goto
@@ -424,19 +425,28 @@ def create_bin_root():
         ),
     )
 
-    action_cluster_second = py_trees_ros.action_clients.FromBlackboard(
-        name="Cluster transforms for dropping",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        key=fk("clustering_goal"),
+    retry_cluster_and_move = goto_cluster.FromBlackboard(
+        name="Cluster and move repeatedly",
+        goto_pose_key=_POSE_KEY,
+        clustering_goal_key=_CLUSTERING_GOAL_KEY,
+        distance_threshold=0.05,
+        retries=3,
+        anchor_frame="auv4/dropper",
     )
 
-    # Step 10: Align to precise target
-    goto_align_to_target = goto.FromBlackboard(
-        name="Align to target",
-        pose_key=_POSE_KEY,
-        anchor_frame_name="auv4/dropper",
-    )
+    # action_cluster_second = py_trees_ros.action_clients.FromBlackboard(
+    #     name="Cluster transforms for dropping",
+    #     action_type=ClusterTf,
+    #     action_name="/auv4/cluster_tf",
+    #     key=fk("clustering_goal"),
+    # )
+    #
+    # # Step 10: Align to precise target
+    # goto_align_to_target = goto.FromBlackboard(
+    #     name="Align to target",
+    #     pose_key=_POSE_KEY,
+    #     anchor_frame_name="auv4/dropper",
+    # )
 
     stabilise_before_dropping = py_trees.timers.Timer(
         "Stabilise before dropping", duration=STABILIZE_CONTROLS_DURATION
@@ -522,8 +532,9 @@ def create_bin_root():
             sel_update_template,
             srv_enable_correct_detections,
             check_enable_succeeded_correct,
-            action_cluster_second,
-            goto_align_to_target,
+            retry_cluster_and_move,
+            # action_cluster_second,
+            # goto_align_to_target,
             stabilise_before_dropping,
             set_dropper_actuation,
             pub_fire_dropper_first,
