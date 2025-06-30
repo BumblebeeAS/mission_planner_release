@@ -102,6 +102,7 @@ def FromConstant(
         action_goal=clustering_goal,
     )
 
+    # note that cache tf assumes anchor frame is in the same orientation as base_link_ned. In this case, it doesn't matter since all we care about is euclidean distance
     extract_xyz_tf = cache_tf.ToBlackboard(
         name="Cache xyz",
         variable_name=xyz_tf_key,
