@@ -30,6 +30,7 @@ fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
 VISION_SERVER_TOPIC = "/auv4/trash/manage_nodes"
+ACTUATION_TOPIC = "/auv4/actuation/grabber"
 
 CAMERA_FRAME = "auv4/front_cam_optical"
 
@@ -193,9 +194,8 @@ def create_octagon_root():
         ),
     )
 
-    # TODO: if the two objects end up to be very similar logic almost the same can put in a sub tree for now this is easier to test each one
     ################## SPOON PART #################
-    seq_spoon = create_ladle_root(
+    seq_spoon_1 = create_ladle_root(
         ladle_0_frame=LADLE_0_FRAME,
         ladle_1_frame=LADLE_1_FRAME,
         ladle_0_view_frame=LADLE_0_VIEW_FRAME,
@@ -207,6 +207,7 @@ def create_octagon_root():
         ladle_basket_view_frame=LADLE_BASKET_VIEW_FRAME,
         cluster_duration=CLUSTER_DURATION,
         surface_frame_key=_GO_SURFACE_FRAME_KEY,
+        actuation_topic=ACTUATION_TOPIC,
     )
 
     cluster_reset_symbols_1 = py_trees_ros.actions.ActionClient(
@@ -222,19 +223,19 @@ def create_octagon_root():
         ),
     )
 
-    ################## CUP PART #################
-    seq_bottle = create_bottle_root(
-        bottle_0_frame=BOTTLE_0_FRAME,
-        bottle_1_frame=BOTTLE_1_FRAME,
-        bottle_0_view_frame=BOTTLE_0_VIEW_FRAME,
-        bottle_1_view_frame=BOTTLE_1_VIEW_FRAME,
-        bottle_0_frame_clustered=BOTTLE_0_FRAME_CLUSTERED,
-        bottle_1_frame_clustered=BOTTLE_1_FRAME_CLUSTERED,
-        bottle_basket_frame=BOTTLE_BASKET_FRAME,
-        bottle_basket_frame_clustered=BOTTLE_BASKET_FRAME_CLUSTERED,
-        bottle_basket_view_frame=BOTTLE_BASKET_VIEW_FRAME,
+    seq_spoon_2 = create_ladle_root(
+        ladle_0_frame=LADLE_0_FRAME,
+        ladle_1_frame=LADLE_1_FRAME,
+        ladle_0_view_frame=LADLE_0_VIEW_FRAME,
+        ladle_1_view_frame=LADLE_1_VIEW_FRAME,
+        ladle_0_frame_clustered=LADLE_0_FRAME_CLUSTERED,
+        ladle_1_frame_clustered=LADLE_1_FRAME_CLUSTERED,
+        ladle_basket_frame=LADLE_BASKET_FRAME,
+        ladle_basket_frame_clustered=LADLE_BASKET_FRAME_CLUSTERED,
+        ladle_basket_view_frame=LADLE_BASKET_VIEW_FRAME,
         cluster_duration=CLUSTER_DURATION,
         surface_frame_key=_GO_SURFACE_FRAME_KEY,
+        actuation_topic=ACTUATION_TOPIC,
     )
 
     cluster_reset_symbols_2 = py_trees_ros.actions.ActionClient(
@@ -250,15 +251,60 @@ def create_octagon_root():
         ),
     )
 
-    ############### ROTATION PARTS ###############
-    goto_rotation_spoon = goto.FromConstant(
-        name="Go to rotation",
-        pose=create_stamped_pose(frame_id="auv4/base_link_ned", yaw=180.0),
+    ################## CUP PART #################
+    seq_bottle_1 = create_bottle_root(
+        bottle_0_frame=BOTTLE_0_FRAME,
+        bottle_1_frame=BOTTLE_1_FRAME,
+        bottle_0_view_frame=BOTTLE_0_VIEW_FRAME,
+        bottle_1_view_frame=BOTTLE_1_VIEW_FRAME,
+        bottle_0_frame_clustered=BOTTLE_0_FRAME_CLUSTERED,
+        bottle_1_frame_clustered=BOTTLE_1_FRAME_CLUSTERED,
+        bottle_basket_frame=BOTTLE_BASKET_FRAME,
+        bottle_basket_frame_clustered=BOTTLE_BASKET_FRAME_CLUSTERED,
+        bottle_basket_view_frame=BOTTLE_BASKET_VIEW_FRAME,
+        cluster_duration=CLUSTER_DURATION,
+        surface_frame_key=_GO_SURFACE_FRAME_KEY,
+        actuation_topic=ACTUATION_TOPIC,
     )
 
-    goto_rotation_cup = goto.FromConstant(
-        name="Go to rotation",
-        pose=create_stamped_pose(frame_id="auv4/base_link_ned", yaw=180.0),
+    cluster_reset_symbols_3 = py_trees_ros.actions.ActionClient(
+        name="Cluster symbols",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_children=[FISH_FRAME, SHARK_FRAME],
+            out_children=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
+            duration=CLUSTER_DURATION,
+            use_cache=False,
+            persistent=True,
+        ),
+    )
+
+    seq_bottle_2 = create_bottle_root(
+        bottle_0_frame=BOTTLE_0_FRAME,
+        bottle_1_frame=BOTTLE_1_FRAME,
+        bottle_0_view_frame=BOTTLE_0_VIEW_FRAME,
+        bottle_1_view_frame=BOTTLE_1_VIEW_FRAME,
+        bottle_0_frame_clustered=BOTTLE_0_FRAME_CLUSTERED,
+        bottle_1_frame_clustered=BOTTLE_1_FRAME_CLUSTERED,
+        bottle_basket_frame=BOTTLE_BASKET_FRAME,
+        bottle_basket_frame_clustered=BOTTLE_BASKET_FRAME_CLUSTERED,
+        bottle_basket_view_frame=BOTTLE_BASKET_VIEW_FRAME,
+        cluster_duration=CLUSTER_DURATION,
+        surface_frame_key=_GO_SURFACE_FRAME_KEY,
+        actuation_topic=ACTUATION_TOPIC,
+    )
+
+    ############### ROTATION PARTS ###############
+    goto_rotations = goto.NFromConstant(
+        name="Go to rotations",
+        poses=[
+            create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
+            create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
+            create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
+            create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
+        ],
+        wait_between_moves_sec=10.0,
     )
 
     srv_end_vision = py_trees_ros.service_clients.FromConstant(
@@ -288,15 +334,14 @@ def create_octagon_root():
             par_search_tag,
             symbol_tf_checker,
             dynamic_set_surface_pose_frame,
-            seq_spoon,
+            seq_spoon_1,
             cluster_reset_symbols_1,
-            seq_bottle,
+            seq_spoon_2,
             cluster_reset_symbols_2,
-            goto_rotation_spoon,
-            py_trees.timers.Timer(
-                "Stabilise after first rotation", duration=STABILIZE_DURATION
-            ),
-            goto_rotation_cup,
+            seq_bottle_1,
+            cluster_reset_symbols_3,
+            seq_bottle_2,
+            goto_rotations,
             srv_end_vision,
             check_end_vision_succeeded,
         ]

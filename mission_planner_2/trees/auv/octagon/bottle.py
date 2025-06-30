@@ -1,10 +1,6 @@
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
-from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -15,6 +11,17 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
+from mission_planner_2.trees.auv.octagon.helpers import trash_view_frame_func
+from mission_planner_2.trees.auv.octagon.tf_checker import create_tf_checker_root
+from std_srvs.srv import Trigger
+
+NAMESPACE = generate_namespace()
+fk = full_key_generator(NAMESPACE)
+
+_BOTTLE_0_FRAME_KEY = fk("frame_0")
+_BOTTLE_1_FRAME_KEY = fk("frame_1")
+_BASKET_FRAME_KEY = fk("basket")
+_BOTTLE_VIEW_FRAME_KEY = fk("bottle_view")
 
 
 def create_bottle_root(
@@ -29,6 +36,7 @@ def create_bottle_root(
     bottle_basket_view_frame: str = "pink_bucket/clustered/view",
     cluster_duration: int = 5,
     surface_frame_key: str = "go_surface_frame",
+    actuation_topic: str = "/auv4/actuation/grabber",
 ):
     bottle_seq = py_trees.composites.Sequence(
         name="Bottle sequence",
@@ -50,6 +58,16 @@ def create_bottle_root(
         memory=True,
     )
 
+    par_cluster = py_trees.composites.Parallel(
+        name="Cluster parallel (bottle)",
+        policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
+    )
+
+    seq_filter_frames = py_trees.composites.Sequence(
+        name="Filter frames (bottle)",
+        memory=True,
+    )
+
     cluster_bottle = py_trees_ros.actions.ActionClient(
         name="Cluster bottle",
         action_type=ClusterTf,
@@ -62,17 +80,67 @@ def create_bottle_root(
         ),
     )
 
+    cluster_bottle_basket_before_goto = py_trees_ros.action_clients.FromConstant(
+        name="Cluster bottle basket (for filter)",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_children=bottle_basket_frame,
+            out_children=bottle_basket_frame_clustered,
+            duration=cluster_duration,
+            use_cache=False,
+            persistent=True,  # TODO: should use persistent?
+        ),
+    )
+
+    par_cluster.add_children(
+        children=[
+            cluster_bottle,
+            cluster_bottle_basket_before_goto,
+        ]
+    )
+
+    bottle_tf_checker = create_tf_checker_root(
+        frames=[
+            bottle_0_frame_clustered,
+            bottle_1_frame_clustered,
+            bottle_basket_frame_clustered,
+        ],
+        update_keys=[_BOTTLE_0_FRAME_KEY, _BOTTLE_1_FRAME_KEY, _BASKET_FRAME_KEY],
+        fallback_val=[None, None, None],
+    )
+
+    dynamic_set_bottle_pose = DynamicSetBlackboard(
+        name="select bottle frame",
+        key=[_BOTTLE_0_FRAME_KEY, _BOTTLE_1_FRAME_KEY, _BASKET_FRAME_KEY],
+        update_key=_BOTTLE_VIEW_FRAME_KEY,
+        overwrite=True,
+        func=lambda bottle_0_tf, bottle_1_tf, bottle_basket_tf: trash_view_frame_func(
+            tf_0=bottle_0_tf,
+            tf_1=bottle_1_tf,
+            view_frame_0=bottle_0_view_frame,
+            view_frame_1=bottle_1_view_frame,
+            basket_tf=bottle_basket_tf,
+        ),
+    )
+
+    seq_filter_frames.add_children(
+        children=[
+            bottle_tf_checker,
+            dynamic_set_bottle_pose,
+        ]
+    )
+
     goto_bottle = goto.FromConstant(
         name="Go to bottle",
         pose=create_stamped_pose(frame_id=bottle_0_view_frame),
     )
 
-    pub_half_close_grabber = py_trees_ros.publishers.FromBlackboard(
-        name="half close bottle",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable="TODO: yisiong whats it now",
+    pub_half_close_grabber = py_trees_ros.service_clients.FromConstant(
+        name="Close grabber (bottle)",
+        service_name=actuation_topic,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
     )
 
     # now surface with the bottle facing the saved tf
@@ -99,13 +167,11 @@ def create_bottle_root(
         pose=create_stamped_pose(frame_id=bottle_basket_view_frame),
     )
 
-    # TODO: might not need this since only two objects
-    pub_activate_grabber_bottle = py_trees_ros.publishers.FromBlackboard(
-        name="Drop bottle",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable="TODO: yisiong whats it now",
+    pub_activate_grabber_bottle = py_trees_ros.service_clients.FromConstant(
+        name="Open grabber (bottle)",
+        service_name=actuation_topic,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
     )
 
     # resurface before start of bottle
@@ -118,7 +184,8 @@ def create_bottle_root(
 
     seq_pickup_bottle.add_children(
         [
-            cluster_bottle,
+            par_cluster,
+            seq_filter_frames,
             goto_bottle,
             py_trees.timers.Timer(name="Stabilise before pick up", duration=5.0),
             pub_half_close_grabber,

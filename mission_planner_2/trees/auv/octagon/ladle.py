@@ -1,10 +1,6 @@
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
-from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -15,12 +11,17 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
+from mission_planner_2.trees.auv.octagon.helpers import trash_view_frame_func
+from mission_planner_2.trees.auv.octagon.tf_checker import create_tf_checker_root
+from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
-_FRAME_1_KEY = fk("frame_1")
-_FRAME_0_KEY = fk("frame_0")
+_LADLE_0_FRAME_KEY = fk("frame_0")
+_LADLE_1_FRAME_KEY = fk("frame_1")
+_BASKET_FRAME_KEY = fk("basket")
+_LADLE_VIEW_FRAME_KEY = fk("ladle_view")
 
 
 def create_ladle_root(
@@ -35,34 +36,40 @@ def create_ladle_root(
     ladle_basket_view_frame: str = "ladle_basket/clustered/view",
     cluster_duration: int = 5,
     surface_frame_key: str = "go_surface_frame",
+    actuation_topic: str = "/auv4/actuation/grabber",
 ):
-    seq_spoon = py_trees.composites.Sequence(
-        name="Spoon sequence",
+    seq_ladle = py_trees.composites.Sequence(
+        name="ladle sequence",
         memory=True,
     )
 
-    seq_pickup_spoon = py_trees.composites.Sequence(
-        name="Pick up sequence (spoon)",
+    seq_pickup_ladle = py_trees.composites.Sequence(
+        name="Pick up sequence (ladle)",
         memory=True,
     )
 
-    seq_surface_spoon = py_trees.composites.Sequence(
-        name="Surface sequence (spoon)",
+    seq_surface_ladle = py_trees.composites.Sequence(
+        name="Surface sequence (ladle)",
         memory=True,
     )
 
-    seq_drop_spoon = py_trees.composites.Sequence(
-        name="Drop sequence (spoon)",
+    seq_drop_ladle = py_trees.composites.Sequence(
+        name="Drop sequence (ladle)",
         memory=True,
     )
 
     par_cluster = py_trees.composites.Parallel(
-        name="Cluster parallel",
+        name="Cluster parallel (ladle)",
         policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
     )
 
-    cluster_spoon = py_trees_ros.actions.ActionClient(
-        name="Cluster spoon",
+    seq_filter_frames = py_trees.composites.Sequence(
+        name="Filter frames (ladle)",
+        memory=True,
+    )
+
+    cluster_ladle = py_trees_ros.actions.ActionClient(
+        name="Cluster ladle",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf_multi",
         action_goal=create_clustering_goal(
@@ -73,8 +80,8 @@ def create_ladle_root(
         ),
     )
 
-    cluster_spoon_basket_before_goto = py_trees_ros.actions.ActionClient(
-        name="Cluster spoon basket (for filter)",
+    cluster_ladle_basket_before_goto = py_trees_ros.action_clients.FromConstant(
+        name="Cluster ladle basket (for filter)",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
@@ -88,40 +95,74 @@ def create_ladle_root(
 
     par_cluster.add_children(
         children=[
-            cluster_spoon,
-            cluster_spoon_basket_before_goto,
+            cluster_ladle,
+            cluster_ladle_basket_before_goto,
         ]
     )
 
-    # move down to pick up the spoon
-    goto_spoon_xy = goto.FromConstant(
-        name="Go to spoon",
-        pose=create_stamped_pose(frame_id=ladle_0_view_frame),
+    # TODO: assume got basket cluster the fallback handled diferently
+    ladle_tf_checker = create_tf_checker_root(
+        frames=[
+            ladle_0_frame_clustered,
+            ladle_1_frame_clustered,
+            ladle_basket_frame_clustered,
+        ],
+        update_keys=[_LADLE_0_FRAME_KEY, _LADLE_1_FRAME_KEY, _BASKET_FRAME_KEY],
+        fallback_val=[None, None, None],
+    )
+
+    dynamic_set_ladle_pose = DynamicSetBlackboard(
+        name="select ladle frame",
+        key=[_LADLE_0_FRAME_KEY, _LADLE_1_FRAME_KEY, _BASKET_FRAME_KEY],
+        update_key=_LADLE_VIEW_FRAME_KEY,
+        overwrite=True,
+        func=lambda ladle_0_tf, ladle_1_tf, ladle_basket_tf: trash_view_frame_func(
+            tf_0=ladle_0_tf,
+            tf_1=ladle_1_tf,
+            view_frame_0=ladle_0_view_frame,
+            view_frame_1=ladle_1_view_frame,
+            basket_tf=ladle_basket_tf,
+        ),
+    )
+
+    seq_filter_frames.add_children(
+        children=[
+            ladle_tf_checker,
+            dynamic_set_ladle_pose,
+        ]
+    )
+
+    # move down to pick up the ladle
+    # TODO: need an anchor frame?
+    goto_ladle_xy = goto.FromBlackboard(
+        name="Go to ladle",
+        pose_key=_LADLE_VIEW_FRAME_KEY,
         ignore_depth=True,
     )
-    # TODO: need check if this works
-    goto_spoon_z = goto.FromConstant(
-        name="Go down to spoon",
-        pose=create_stamped_pose(frame_id=ladle_0_view_frame),
+
+    # TODO: need an anchor frame!
+    goto_ladle_z = goto.FromBlackboard(
+        name="Go down to ladle",
+        pose_key=_LADLE_VIEW_FRAME_KEY,
     )
 
-    pub_half_close_grabber = py_trees_ros.publishers.FromBlackboard(
-        name="half close spoon",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable="TODO: yisiong whats it now",
+    # TODO: update to checked srv once elec gives feedback
+    pub_half_close_grabber = py_trees_ros.service_clients.FromConstant(
+        name="Close grabber (ladle)",
+        service_name=actuation_topic,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
     )
 
-    # now surface with the spoon facing the saved tf
-    goto_surface_spoon = goto.FromBlackboard(
-        name="Go to surface with spoon",
+    # now surface with the ladle facing the saved tf
+    goto_surface_ladle = goto.FromBlackboard(
+        name="Go to surface with ladle",
         pose_key=surface_frame_key,
         anchor_frame_name="auv4/base_link_ned",
     )
 
-    cluster_spoon_basket = py_trees_ros.action_clients.FromConstant(
-        name="Cluster spoon basket (for drop)",
+    cluster_ladle_basket = py_trees_ros.action_clients.FromConstant(
+        name="Cluster ladle basket (for drop)",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf_multi",
         action_goal=create_clustering_goal(
@@ -133,17 +174,16 @@ def create_ladle_root(
         ),
     )
 
-    goto_spoon_basket = goto.FromConstant(
-        name="Go to spoon basket",
+    goto_ladle_basket = goto.FromConstant(
+        name="Go to ladle basket",
         pose=create_stamped_pose(frame_id=ladle_basket_view_frame),
     )
 
-    pub_activate_grabber_spoon = py_trees_ros.publishers.FromBlackboard(
-        name="Drop spoon",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable="TODO: yisiong whats it now",
+    pub_activate_grabber_ladle = py_trees_ros.service_clients.FromConstant(
+        name="Open grabber (ladle)",
+        service_name=actuation_topic,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
     )
 
     goto_surface_reset = goto.FromBlackboard(
@@ -152,36 +192,37 @@ def create_ladle_root(
         anchor_frame_name="auv4/base_link_ned",
     )
 
-    seq_pickup_spoon.add_children(
+    seq_pickup_ladle.add_children(
         children=[
             par_cluster,
-            goto_spoon_xy,
-            goto_spoon_z,
+            seq_filter_frames,
+            goto_ladle_xy,
+            goto_ladle_z,
             py_trees.timers.Timer("Stabilise before pick up", duration=5.0),
             pub_half_close_grabber,
             py_trees.timers.Timer("Wait after pick up", duration=5.0),
         ]
     )
-    seq_surface_spoon.add_children(
+    seq_surface_ladle.add_children(
         children=[
-            goto_surface_spoon,
-            cluster_spoon_basket,
+            goto_surface_ladle,
+            cluster_ladle_basket,
         ]
     )
-    seq_drop_spoon.add_children(
+    seq_drop_ladle.add_children(
         children=[
-            goto_spoon_basket,
-            pub_activate_grabber_spoon,
+            goto_ladle_basket,
+            pub_activate_grabber_ladle,
             py_trees.timers.Timer("Wait after drop", duration=5.0),
         ]
     )
 
-    seq_spoon.add_children(
+    seq_ladle.add_children(
         children=[
-            seq_pickup_spoon,
-            seq_surface_spoon,
-            seq_drop_spoon,
+            seq_pickup_ladle,
+            seq_surface_ladle,
+            seq_drop_ladle,
             goto_surface_reset,
         ]
     )
-    return seq_spoon
+    return seq_ladle
