@@ -18,6 +18,8 @@ from mission_planner_2.trees.auv.torpedo.move_to_task import (
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
 IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
+BASE_LINK_KEY = "/global/base_link"
+
 WORLD_NED_COORDS_SLALOM = {
     "x": 0.0,
     "y": 0.0,
@@ -58,6 +60,13 @@ def create_mother():
         memory=True,
     )
 
+    set_base_link_frame = py_trees.behaviours.SetBlackboardVariable(
+        name="Set Base Link Frame",
+        variable_name=BASE_LINK_KEY,
+        variable_value="auv4/base_link_ned",
+        overwrite=True,
+    )
+
     gate_root = create_gate_root()
 
     move_to_slalom = create_move_to_slalom_task_root(WORLD_NED_COORDS_SLALOM)
@@ -86,6 +95,7 @@ def create_mother():
     root.add_children(
         [
             set_is_left,
+            set_base_link_frame,
             # gate_root,
             # move_to_slalom,
             slalom_root,

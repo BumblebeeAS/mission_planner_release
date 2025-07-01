@@ -37,8 +37,10 @@ def create_goto_cluster_root(
         name="Wait between clusters", duration=stabilization_duration
     )
 
+    frame = "auv4/base_link_ned" if not is_from_bb else "/global/base_link"
+
     tf_checker = create_tf_checker_root(
-        start_frames=[anchor_frame, "auv4/base_link_ned"],
+        start_frames=[anchor_frame, frame],
         end_frames=[goto_pose_frame_id, goto_pose_frame_id],
         update_keys=[xyz_tf_key, rpy_tf_key],
         fallback_val=[None, None],
