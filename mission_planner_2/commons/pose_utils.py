@@ -6,7 +6,7 @@ import numpy as np
 from bb_controls_msgs.srv import Limits
 from bb_perception_msgs.action import ClusterTf
 from builtin_interfaces.msg import Time
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, TransformStamped
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
 
@@ -242,17 +242,17 @@ def create_limits_srv_request(
 
 
 def within_threshold(
-    xyz_pose: PoseStamped,
-    rpy_pose: PoseStamped,
+    xyz_tf: TransformStamped,
+    rpy_tf: TransformStamped,
     distance_threshold: float,
     yaw_threshold: float,
 ) -> bool:
     _, _, y = euler_from_quaternion(
         [
-            rpy_pose.pose.orientation.x,
-            rpy_pose.pose.orientation.y,
-            rpy_pose.pose.orientation.z,
-            rpy_pose.pose.orientation.w,
+            rpy_tf.transform.rotation.x,
+            rpy_tf.transform.rotation.y,
+            rpy_tf.transform.rotation.z,
+            rpy_tf.transform.rotation.w,
         ]
     )
 
@@ -262,9 +262,9 @@ def within_threshold(
         return False
 
     distance = np.sqrt(
-        (xyz_pose.pose.position.x**2)
-        + (xyz_pose.pose.position.y**2)
-        + (xyz_pose.pose.position.z**2)
+        (xyz_tf.transform.translation.x**2)
+        + (xyz_tf.transform.translation.y**2)
+        + (xyz_tf.transform.translation.z**2)
     )
 
     if distance > distance_threshold:
