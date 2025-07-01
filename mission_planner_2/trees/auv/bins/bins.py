@@ -50,7 +50,7 @@ TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 ACTUATION_TOPIC = "/auv4/actuation/dropper"
 ACTUATION_UINT = UInt8(data=6)
 
-CLUSTERING_DURATION = 20
+CLUSTERING_DURATION = 10
 STABILIZE_CONTROLS_DURATION = 10.0
 
 FISH_BIN_FRAME = "bin/fish"
@@ -573,7 +573,7 @@ def create_bin_root():
             stabilise_before_dropping,
             set_dropper_actuation,
             pub_fire_dropper_first,
-            py_trees.timers.Timer(name="Wait between drops", duration=3.0),
+            py_trees.timers.Timer(name="Wait between drops", duration=3.5),
             pub_fire_dropper_second,
             srv_disable_detections,
             check_disable_succeeded,
