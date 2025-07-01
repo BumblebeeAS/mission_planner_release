@@ -1,12 +1,12 @@
-import operator
-
 import py_trees
-import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
 from std_srvs.srv import Trigger
 
+import py_trees_ros
+from mission_planner_2.commons import checked_service
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -20,7 +20,6 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.torpedo.tf_selector import create_tf_selector_root
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -37,6 +36,8 @@ TORPEDO_SHOOTER_BOT_FRAME = "auv4/torpedo_shooter_bot"
 TEMPLATE_FRAME_YOLO = "torpedo/yolo"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "torpedo/yolo/clustered"
 
+CENTRE_VIEW_FRAME = "torpedo/centre/view"
+
 ACTUATION_TOPIC_TOP = "/auv4/actuation/torpedo/top"
 ACTUATION_TOPIC_BOT = "/auv4/actuation/torpedo/bot"
 
@@ -48,7 +49,6 @@ STABILIZE_DURATION = 10
 # DONT go move it in the section to be updated
 _CHOICE_KEY = fk("choice")
 _POSE_KEY = fk("pose")
-_GO_BACK_POSE_KEY = fk("go_back_pose")
 _START_VISION_KEY = fk("torp_start_vision")
 _STOP_VISION_KEY = fk("torp_stop_vision")
 
@@ -127,7 +127,7 @@ def create_torpedo_root():
 
     goto_torp_centre = goto.FromConstant(
         name="Goto torp centre",
-        pose=create_stamped_pose("torpedo/centre/view"),
+        pose=create_stamped_pose(CENTRE_VIEW_FRAME),
     )
 
     stabilise_before_matching = py_trees.timers.Timer(
@@ -143,7 +143,7 @@ def create_torpedo_root():
         key_response=_CHOICE_KEY,
     )
 
-    srv_enable_detections = py_trees_ros.service_clients.FromConstant(
+    srv_enable_detections = checked_service.FromConstant(
         name="Enable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
@@ -151,16 +151,7 @@ def create_torpedo_root():
             enabled=True, template_name=template_name
         ),
         key_response=fk("torpedo_enable_detections"),
-    )
-
-    # check srv call succeeded from the BB
-    check_enable_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check enable succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=fk("torpedo_enable_detections"),
-            value=True,
-            operator=lambda x, y: operator.eq(x.new_state, y),
-        ),
+        check_func=lambda x: x.new_state,  # check if the service call was successful
     )
 
     cluster_first = py_trees_ros.action_clients.FromConstant(
@@ -175,14 +166,14 @@ def create_torpedo_root():
         ),
     )
 
-    # we call fk(<key>) here to capture the ns of this file
-    sel_tf_first = create_tf_selector_root(
-        choice_key=_CHOICE_KEY,
-        pose_key=_POSE_KEY,
-        go_back_pose_key=_GO_BACK_POSE_KEY,
-        is_first=True,
-        fish_shoot_frame=fish_shoot_frame,
-        shark_shoot_frame=shark_shoot_frame,
+    dynamic_set_pose = DynamicSetBlackboard(
+        name="select torpedo frame",
+        key=_CHOICE_KEY,
+        update_key=_POSE_KEY,
+        overwrite=True,
+        func=lambda choice: create_stamped_pose(
+            fish_shoot_frame if choice.success else shark_shoot_frame
+        ),
     )
 
     goto_target_first = goto.FromBlackboard(
@@ -198,9 +189,10 @@ def create_torpedo_root():
         service_request=Trigger.Request(),
     )
 
-    goto_back_centre = goto.FromBlackboard(
+    goto_back_centre = goto.FromConstant(
         name="Go back to centre",
-        pose_key=_GO_BACK_POSE_KEY,
+        pose=create_stamped_pose(CENTRE_VIEW_FRAME),
+        anchor_frame_name=CAMERA_FRAME,
     )
 
     cluster_second = py_trees_ros.action_clients.FromConstant(
@@ -215,13 +207,14 @@ def create_torpedo_root():
         ),
     )
 
-    sel_tf_second = create_tf_selector_root(
-        choice_key=_CHOICE_KEY,
-        pose_key=_POSE_KEY,
-        go_back_pose_key=_GO_BACK_POSE_KEY,
-        is_first=False,
-        fish_shoot_frame=fish_shoot_frame,
-        shark_shoot_frame=shark_shoot_frame,
+    dynamic_set_pose_2 = DynamicSetBlackboard(
+        name="select torpedo frame second",
+        key=_CHOICE_KEY,
+        update_key=_POSE_KEY,
+        overwrite=True,
+        func=lambda choice: create_stamped_pose(
+            shark_shoot_frame if choice.success else fish_shoot_frame
+        ),
     )
 
     goto_target_second = goto.FromBlackboard(
@@ -237,37 +230,22 @@ def create_torpedo_root():
         service_request=Trigger.Request(),
     )
 
-    srv_disable_detections = py_trees_ros.service_clients.FromConstant(
+    srv_disable_detections = checked_service.FromConstant(
         name="Disable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
         key_response=fk("torpedo_disable_detections"),
+        check_func=lambda x: x.new_state,  # check if the service call was successful
     )
 
-    check_disable_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check disable succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=fk("torpedo_disable_detections"),
-            value=False,
-            operator=lambda x, y: operator.eq(x.new_state, y),
-        ),
-    )
-
-    srv_end_vision = py_trees_ros.service_clients.FromConstant(
+    srv_end_vision = checked_service.FromConstant(
         name="End vision pipeline",
         service_name=VISION_SERVER_TOPIC,
         service_type=ChangeState,
         service_request=create_end_vision_req(),
         key_response=_STOP_VISION_KEY,
-    )
-    check_end_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify end vision pipeline succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=_STOP_VISION_KEY,
-            value=True,
-            operator=lambda x, y: operator.eq(x.success, y),
-        ),
+        check_func=lambda x: x.success,  # check if the service call was successful
     )
 
     seq_launch_torpedo.add_children(
@@ -279,22 +257,19 @@ def create_torpedo_root():
             goto_torp_centre,
             stabilise_before_matching,
             srv_enable_detections,
-            check_enable_succeeded,
             cluster_first,
-            sel_tf_first,
+            dynamic_set_pose,
             goto_target_first,
             py_trees.timers.Timer("Wait before fire", duration=STABILIZE_DURATION),
             fire_first,
             goto_back_centre,
             cluster_second,
-            sel_tf_second,
+            dynamic_set_pose_2,
             goto_target_second,
             py_trees.timers.Timer("Wait before fire", duration=STABILIZE_DURATION),
             fire_second,
             srv_disable_detections,
-            check_disable_succeeded,
             srv_end_vision,
-            check_end_vision_succeeded,
         ],
     )
 

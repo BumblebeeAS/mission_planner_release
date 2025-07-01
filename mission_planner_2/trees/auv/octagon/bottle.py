@@ -1,6 +1,8 @@
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -10,10 +12,9 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
+from mission_planner_2.commons.tf_checker import create_tf_checker_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.helpers import trash_view_frame_func
-from mission_planner_2.trees.auv.octagon.tf_checker import create_tf_checker_root
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -101,11 +102,12 @@ def create_bottle_root(
     )
 
     bottle_tf_checker = create_tf_checker_root(
-        frames=[
+        start_frames=[
             bottle_0_frame_clustered,
             bottle_1_frame_clustered,
             bottle_basket_frame_clustered,
         ],
+        end_frames=["world_ned", "world_ned", "world_ned"],
         update_keys=[_BOTTLE_0_FRAME_KEY, _BOTTLE_1_FRAME_KEY, _BASKET_FRAME_KEY],
         fallback_val=[None, None, None],
     )

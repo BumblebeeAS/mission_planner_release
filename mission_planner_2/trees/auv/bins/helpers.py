@@ -27,3 +27,35 @@ def find_acute_angle(pose: PoseStamped) -> PoseStamped:
         yaw=y,
         use_radians=True,
     )
+
+
+def within_threshold(
+    xyz_pose: PoseStamped,
+    rpy_pose: PoseStamped,
+    distance_threshold: float,
+    yaw_threshold: float,
+) -> bool:
+    _, _, y = euler_from_quaternion(
+        [
+            rpy_pose.pose.orientation.x,
+            rpy_pose.pose.orientation.y,
+            rpy_pose.pose.orientation.z,
+            rpy_pose.pose.orientation.w,
+        ]
+    )
+
+    y = np.degrees(y) % 360
+
+    if y > yaw_threshold:
+        return False
+
+    distance = np.sqrt(
+        (xyz_pose.pose.position.x**2)
+        + (xyz_pose.pose.position.y**2)
+        + (xyz_pose.pose.position.z**2)
+    )
+
+    if distance > distance_threshold:
+        return False
+
+    return True
