@@ -306,18 +306,20 @@ class ToBlackboardFromBlackboard(py_trees.behaviour.Behaviour):
             key=self.variable_name, access=py_trees.common.Access.WRITE
         )
 
-        self.target_frame_key = target_frame_key
-        self.source_frame_key = source_frame_key
         self.blackboard.register_key(
-            key=target_frame_key,
+            key="target",
             access=py_trees.common.Access.READ,
-            remap_to=py_trees.blackboard.Blackboard.absolute_name("/", "target"),
+            remap_to=py_trees.blackboard.Blackboard.absolute_name(
+                "/", target_frame_key
+            ),
         )
 
         self.blackboard.register_key(
-            key=source_frame_key,
+            key="source",
             access=py_trees.common.Access.READ,
-            remap_to=py_trees.blackboard.Blackboard.absolute_name("/", "source"),
+            remap_to=py_trees.blackboard.Blackboard.absolute_name(
+                "/", source_frame_key
+            ),
         )
 
         self.qos_profile = qos_profile
@@ -358,8 +360,8 @@ class ToBlackboardFromBlackboard(py_trees.behaviour.Behaviour):
         """
         if self.clearing_policy == py_trees.common.ClearingPolicy.ON_INITIALISE:
             self.blackboard.set(self.variable_name, None)
-        self.target_frame = self.blackboard.get(self.target_frame_key)
-        self.source_frame = self.blackboard.get(self.source_frame_key)
+        self.target_frame = self.blackboard.target
+        self.source_frame = self.blackboard.source
 
     def update(self):
         """
