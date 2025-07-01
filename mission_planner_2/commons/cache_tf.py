@@ -297,6 +297,7 @@ class ToBlackboardFromBlackboard(py_trees.behaviour.Behaviour):
         source_frame_key: str,
         qos_profile: rclpy.qos.QoSProfile = qos_profile_system_default,
         static_qos_profile: rclpy.qos.QoSProfile | None = None,
+        clearing_policy: py_trees.common.ClearingPolicy = py_trees.common.ClearingPolicy.ON_INITIALISE,
     ):
         super().__init__(name=name)
         self.variable_name = variable_name
@@ -320,6 +321,7 @@ class ToBlackboardFromBlackboard(py_trees.behaviour.Behaviour):
         self.qos_profile = qos_profile
         self.static_qos_profile = static_qos_profile
         self.buffer = tf2_ros.Buffer()
+        self.clearing_policy = clearing_policy
 
     def setup(self, **kwargs):
         """
