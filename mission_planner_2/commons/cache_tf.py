@@ -389,7 +389,7 @@ class ToBlackboardFromBlackboard(py_trees.behaviour.Behaviour):
             self.feedback_message = "transform saved to {}".format(self.variable_name)
             return py_trees.common.Status.SUCCESS
         else:
-            self.feedback_message = "waiting for transform".format(
+            self.feedback_message = "waiting for transform from {} to {}".format(
                 self.target_frame, self.source_frame
             )
             return py_trees.common.Status.RUNNING

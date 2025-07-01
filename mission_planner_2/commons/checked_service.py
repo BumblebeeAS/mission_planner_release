@@ -6,6 +6,7 @@ import uuid
 from typing import Any, Callable
 
 import py_trees
+
 from py_trees_ros import service_clients
 
 
@@ -18,7 +19,7 @@ class FromBlackboard(service_clients.FromBlackboard):
         service_type: Any,
         service_name: str,
         key_request: str,
-        key_response: str,
+        key_response: str | None = None,
         wait_for_server_timeout_sec: float = -3.0,
         check_func: Callable[[Any], bool] = lambda x: True,
     ):
@@ -40,12 +41,14 @@ class FromBlackboard(service_clients.FromBlackboard):
             py_trees.common.Status: The status of the service call.
         """
         status = super().update()
-        if status == py_trees.common.Status.FAILURE:
-            return py_trees.common.Status.FAILURE
+        if (
+            status == py_trees.common.Status.FAILURE
+            or status == py_trees.common.Status.RUNNING
+        ):
+            return status
 
-        response = self.blackboard.get(self.key_response, None)
-
-        if response is None or not self.check_func(response):
+        # self.response is set by the parent class inside update
+        if self.response is None or not self.check_func(self.response):
             return py_trees.common.Status.FAILURE
 
         return py_trees.common.Status.SUCCESS
@@ -60,7 +63,7 @@ class FromConstant(FromBlackboard):
         service_type: Any,
         service_name: str,
         service_request: Any,
-        key_response: str,
+        key_response: str | None = None,
         wait_for_server_timeout_sec: float = -3.0,
         check_func: Callable[[Any], bool] = lambda x: True,
     ):
@@ -73,6 +76,7 @@ class FromConstant(FromBlackboard):
             key_request=key_request,
             key_response=key_response,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
+            check_func=check_func,
         )
         self.blackboard.register_key(
             key=key_request,
