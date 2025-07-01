@@ -1,7 +1,6 @@
 import operator
 
 import py_trees
-import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
@@ -10,9 +9,10 @@ from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
+import py_trees_ros
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
-from mission_planner_2.commons.cluster_goto import create_goto_cluster_root
+from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -469,15 +469,14 @@ def create_bin_root():
         overwrite=True,
     )
 
-    seq_goto_cluster = create_goto_cluster_root(
+    seq_goto_cluster = create_goto_cluster_from_bb_root(
         cluster_node=action_cluster_for_goto,
         cluster_node_check=action_cluster_for_goto_check,
         goto_node=goto_align_to_target,
         distance_threshold=0.05,
         retries=3,
-        anchor_frame=_ANCHOR_FRAME_KEY,
-        goto_pose_frame_id=_GOTO_FRAME_KEY,
-        is_from_bb=True,
+        anchor_frame_key=_ANCHOR_FRAME_KEY,
+        goto_pose_frame_key=_GOTO_FRAME_KEY,
         within_threshold=within_threshold,
     )
 

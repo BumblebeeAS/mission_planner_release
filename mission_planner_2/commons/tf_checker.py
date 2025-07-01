@@ -1,7 +1,7 @@
 import py_trees
-import py_trees_ros
 from rclpy.qos import qos_profile_system_default
 
+import py_trees_ros
 from mission_planner_2.commons import cache_tf
 
 
@@ -58,14 +58,25 @@ def _tf_fallback_check(
     return root
 
 
-def create_tf_checker_root(
+def create_tf_checker_from_constant_root(
     start_frames: list[str] = ["_placeholder1", "_placeholder2"],
     end_frames: list[str] = ["_placeholder1u", "_placeholder2u"],
     timeout: float = 5.0,
     update_keys: list[str] = ["_placeholder1u", "_placeholder2u"],
     fallback_val: list[any] = [None, None],
-    is_from_bb: bool = False,
 ) -> py_trees.composites.Sequence:
+    """Creates a sequence of TF checks with constant frames.
+
+    Args:
+        start_frames (list[str], optional): list of start frame ids. Defaults to ["_placeholder1", "_placeholder2"].
+        end_frames (list[str], optional): list of end frame ids. Defaults to ["_placeholder1u", "_placeholder2u"].
+        timeout (float, optional): timeout for the tf lookup. Defaults to 5.0.
+        update_keys (list[str], optional): list of keys that will be used to store the TransformStamped msg. Defaults to ["_placeholder1u", "_placeholder2u"].
+        fallback_val (list[any], optional): value that will be set should the tf lookup fail. Defaults to [None, None].
+
+    Returns:
+        py_trees.composites.Sequence: A sequence of TF lookups that will be executed in order.
+    """
     root = py_trees.composites.Sequence(
         name="tf_checker sequence",
         memory=True,
@@ -78,10 +89,53 @@ def create_tf_checker_root(
             timeout=timeout,
             update_key=update_key,
             fallback_val=fallback_val,
-            is_from_bb=is_from_bb,
+            is_from_bb=False,
         )
         for start, end, update_key, fallback_val in zip(
             start_frames, end_frames, update_keys, fallback_val
+        )
+    ]
+
+    root.add_children(tf_checker_list)
+
+    return root
+
+
+def create_tf_checker_from_bb_root(
+    start_frame_keys: list[str] = ["_placeholder1", "_placeholder2"],
+    end_frame_keys: list[str] = ["_placeholder1u", "_placeholder2u"],
+    timeout: float = 5.0,
+    update_keys: list[str] = ["_placeholder1u", "_placeholder2u"],
+    fallback_val: list[any] = [None, None],
+) -> py_trees.composites.Sequence:
+    """Creates a sequence of TF checks from blackboard.
+
+    Args:
+        start_frame_keys (list[str], optional): blackboard keys that map to the start_frame. Defaults to ["_placeholder1", "_placeholder2"].
+        end_frame_keys (list[str], optional): blackboard keys that map to the end frame. Defaults to ["_placeholder1u", "_placeholder2u"].
+        timeout (float, optional): timeout for tf lookup. Defaults to 5.0.
+        update_keys (list[str], optional): blackboard keys to store the TransformStamped msg. Defaults to ["_placeholder1u", "_placeholder2u"].
+        fallback_val (list[any], optional): value that will be set should the tf lookup fail. Defaults to [None, None].
+
+    Returns:
+        py_trees.composites.Sequence: A sequence of TF lookups that will be executed in order.
+    """
+    root = py_trees.composites.Sequence(
+        name="tf_checker sequence from bb",
+        memory=True,
+    )
+
+    tf_checker_list = [
+        _tf_fallback_check(
+            frame_id=start,
+            end_frame=end,
+            timeout=timeout,
+            update_key=update_key,
+            fallback_val=fallback_val,
+            is_from_bb=True,
+        )
+        for start, end, update_key, fallback_val in zip(
+            start_frame_keys, end_frame_keys, update_keys, fallback_val
         )
     ]
 

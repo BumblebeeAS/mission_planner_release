@@ -1,11 +1,11 @@
 import py_trees
-import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
+import py_trees_ros
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -19,7 +19,7 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.commons.tf_checker import create_tf_checker_root
+from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.bottle import create_bottle_root
 from mission_planner_2.trees.auv.octagon.helpers import view_frame_func
@@ -179,7 +179,7 @@ def create_octagon_root():
         ]
     )
 
-    symbol_tf_checker = create_tf_checker_root(
+    symbol_tf_checker = create_tf_checker_from_constant_root(
         start_frames=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
         update_keys=[_FISH_TF_KEY, _SHARK_TF_KEY],
         end_frames=["world_ned", "world_ned"],
