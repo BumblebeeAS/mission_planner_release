@@ -66,7 +66,7 @@ bin:
       - "bin/shark"
       - "bin/fish/rotated"
       - "bin/shark/rotated"
-    z: -0.5
+    z: -0.75
     yaw: -90.0
 octagon:
   - name: trash_view
