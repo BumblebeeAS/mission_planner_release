@@ -44,12 +44,15 @@ CHANNEL_PAIR_ZERO_FRAME_CLUSTERED = CHANNEL_PAIR_ZERO_FRAME + "/clustered"
 CHANNEL_PAIR_ONE_FRAME_CLUSTERED = CHANNEL_PAIR_ONE_FRAME + "/clustered"
 CHANNEL_PAIR_TWO_FRAME_CLUSTERED = CHANNEL_PAIR_TWO_FRAME + "/clustered"
 
+CHANNEL_CENTRE_FRAME = "slalom/centre"
+
 SLALOM_ONE_FROM_ZERO_HARDCODED = "slalom_layer_1/hardcoded"
 SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
 
 TRANSFORM_TIMEOUT_DURATION = 5.0
 CLUSTER_VIEW_DURATION = 40
 WAIT_BETWEEN_MOVES_SEC = 4.0
+
 """
 For sim.
 FIRST_VIEW = {"position_x": 6.0, "position_y": -0.8, "position_z": 1.0, "yaw": -90.0}
@@ -396,6 +399,10 @@ def create_slalom_root():
         name="Check missing two transforms", check=check(2)
     )
 
+    move_to_centre = goto.FromConstant(
+        name="Move to centre", pose=create_stamped_pose(CHANNEL_CENTRE_FRAME)
+    )
+
     # Selector to choose the movement strategy based on the number of missing transforms
     select_movement_strategy = py_trees.composites.Selector(
         name="Select movement strategy",
@@ -467,8 +474,9 @@ def create_slalom_root():
             dynamic_set_create_pose_func,
             move_and_cluster_par,
             seq_check_transforms,
+            move_to_centre,
             select_movement_strategy,
-            py_trees.timers.Timer(name="timer", duration=10.0),
+            py_trees.timers.Timer(name="timer", duration=2.0),
             goto_pass_through,
             srv_end_vision,
             check_end_vision_succeeded,

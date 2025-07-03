@@ -50,6 +50,14 @@ bin:
     parent_frame_id: "bin/clustered"
     child_frame_id: "bin/shark/rotated"
 slalom:
+  - name: centre
+    x: 1.5
+    y: 0.3
+    z: -2.0
+    roll: -90.0
+    pitch: -90.0
+    parent_frame_id: "slalom_layer_0/clustered"
+    child_frame_id: "slalom/centre"
   # One Missing Transform
   - name: slalom_layer_2_from_1_hardcoded
     x: 1.00
@@ -94,8 +102,22 @@ urdf:
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/torpedo_shooter_bot"
   - name: dropper
-    x: -0.09964
-    y: -0.043029
+    x:  -0.14964
+    y: -0.093029
     z: 0.06985
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/dropper"
+map:
+  - name: slalom
+    x: 4.0
+    y: 6.5
+    z: -1.0
+    parent_frame_id: "map"
+    child_frame_id: "map/slalom"
+  - name: bin
+    x: 3.0
+    y: 6.5
+    z: -1.0
+    parent_frame_id: "map"
+    child_frame_id: "map/bin"
+
