@@ -96,7 +96,7 @@ urdf:
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/torpedo_shooter_left"
   - name: torpedo_right
-    x: -0.07819
+    x: -0.02819
     y: -0.11
     z: 0.06983
     parent_frame_id: "auv4/bot_cam_optical"
