@@ -31,15 +31,15 @@ SELECTED_TEMPLATE = 1  # MUST be 1 or 2
 VISION_SERVER_TOPIC = "/auv4/torpedo/manage_nodes"
 TOGGLE_TEMPLATE_TOPIC = "/auv4/torpedo/image_matching/toggle_template"
 CAMERA_FRAME = "auv4/front_cam_optical"
-TORPEDO_SHOOTER_TOP_FRAME = "auv4/torpedo_shooter_top"
-TORPEDO_SHOOTER_BOT_FRAME = "auv4/torpedo_shooter_bot"
+TORPEDO_SHOOTER_LEFT_FRAME = "auv4/torpedo_shooter_left"
+TORPEDO_SHOOTER_RIGHT_FRAME = "auv4/torpedo_shooter_right"
 TEMPLATE_FRAME_YOLO = "torpedo/yolo"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "torpedo/yolo/clustered"
 
 CENTRE_VIEW_FRAME = "torpedo/centre/view"
 
-ACTUATION_TOPIC_TOP = "/auv4/actuation/torpedo/top"
-ACTUATION_TOPIC_BOT = "/auv4/actuation/torpedo/bot"
+ACTUATION_TOPIC_LEFT = "/auv4/actuation/torpedo/left"
+ACTUATION_TOPIC_RIGHT = "/auv4/actuation/torpedo/right"
 
 CLUSTER_DURATION = 10
 STABILIZE_DURATION = 10
@@ -179,13 +179,13 @@ def create_torpedo_root():
     goto_target_first = goto.FromBlackboard(
         name="Go to first target",
         pose_key=_POSE_KEY,
-        anchor_frame_name=TORPEDO_SHOOTER_TOP_FRAME,
+        anchor_frame_name=TORPEDO_SHOOTER_LEFT_FRAME,
     )
 
     fire_first = py_trees_ros.service_clients.FromConstant(
         name="Fire first torpedo",
         service_type=Trigger,
-        service_name=ACTUATION_TOPIC_TOP,
+        service_name=ACTUATION_TOPIC_LEFT,
         service_request=Trigger.Request(),
     )
 
@@ -220,13 +220,13 @@ def create_torpedo_root():
     goto_target_second = goto.FromBlackboard(
         name="Go to second target",
         pose_key=_POSE_KEY,
-        anchor_frame_name=TORPEDO_SHOOTER_BOT_FRAME,
+        anchor_frame_name=TORPEDO_SHOOTER_RIGHT_FRAME,
     )
 
     fire_second = py_trees_ros.service_clients.FromConstant(
         name="Fire second torpedo",
         service_type=Trigger,
-        service_name=ACTUATION_TOPIC_BOT,
+        service_name=ACTUATION_TOPIC_RIGHT,
         service_request=Trigger.Request(),
     )
 

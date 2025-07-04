@@ -89,18 +89,18 @@ octagon:
     parent_frame_id: "trash/shark/clustered/view"
     child_frame_id: "trash/fish/clustered/view/hardcoded"
 urdf:
-  - name: torpedo_top
+  - name: torpedo_left
     x: -0.07819
     y: -0.11
     z: 0.06983
     parent_frame_id: "auv4/bot_cam_optical"
-    child_frame_id: "auv4/torpedo_shooter_top"
-  - name: torpedo_bot
+    child_frame_id: "auv4/torpedo_shooter_left"
+  - name: torpedo_right
     x: -0.07819
     y: -0.11
     z: 0.06983
     parent_frame_id: "auv4/bot_cam_optical"
-    child_frame_id: "auv4/torpedo_shooter_bot"
+    child_frame_id: "auv4/torpedo_shooter_right"
   - name: dropper
     x:  -0.14964
     y: -0.093029
