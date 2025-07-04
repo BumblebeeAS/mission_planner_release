@@ -5,10 +5,13 @@ import py_trees.console as console
 import py_trees_ros.trees
 import rclpy
 
-from mission_planner_2.trees.auv.tests.test_goto_nfrombb import (
-    create_test_multi_waypoint_root as tree_root,
+from mission_planner_2.trees.miniauv.tests.test_goto import (
+    create_goto_test as tree_root,
 )
 
+# from mission_planner_2.trees.auv.tests.test_goto_nfrombb import (
+#     create_test_multi_waypoint_root as tree_root,
+# )
 # from mission_planner_2.trees.auv.tests.test_convert_service import (
 #     create_test_convert_service_root as tree_root,
 # )

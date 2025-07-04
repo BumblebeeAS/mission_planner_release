@@ -95,7 +95,6 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
     ACTION_NAME = "/mini/controls"
     ACTION_GOAL_KEY = "goto_goal"
     SERVICE_TYPE = GetPoseToControlsFrame
-    #WHAT IS THIS SERVICE FOR
     SERVICE_NAME = "/mini/convert_to_controls_pose"
 
     def __init__(
