@@ -118,3 +118,31 @@ class DynamicSetBlackboard(py_trees.behaviour.Behaviour):
         args = [self.blackboard.get(k) for k in self.keys]
         out = self.func(*args)
         return out
+
+
+class MultiSetBlackboard(py_trees.behaviour.Behaviour):
+    def __init__(self, name, keys: list[str], values: list, overwrite: bool = True):
+        super().__init__(name)
+        self.blackboard = self.attach_blackboard_client(name="multi-setter")
+        self.keys = keys
+        self.values = values
+        self.overwrite = overwrite
+        self._register_keys()
+
+    def update(self):
+        for key, value in zip(self.keys, self.values):
+            if not self.blackboard.set(name=key, value=value, overwrite=self.overwrite):
+                self.feedback_message = f"Failed to set {key} to {value}"
+                return py_trees.common.Status.FAILURE
+
+        self.feedback_message = f"Set {self.keys} as {self.values}"
+
+        return py_trees.common.Status.SUCCESS
+
+    def _register_keys(self):
+        for key in self.keys:
+            self.blackboard.register_key(
+                key=key,
+                access=py_trees.common.Access.WRITE,
+                remap_to=py_trees.blackboard.Blackboard.absolute_name("/", key),
+            )
