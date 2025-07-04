@@ -8,7 +8,7 @@ from mission_planner_2.trees.miniauv.utils.controls_init import (
 )
 
 BASE_LINK_FRAME = "orca4_ned"
-FIXED_DEPTH = 1.0
+FIXED_DEPTH = -4.0
 
 
 def create_goto_test():

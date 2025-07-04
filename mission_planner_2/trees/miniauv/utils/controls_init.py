@@ -2,6 +2,8 @@ import py_trees
 import py_trees_ros
 from geographic_msgs.msg import GeoPoseStamped
 from mavros_msgs.srv import CommandBool, SetMode
+from rclpy.qos import qos_profile_system_default
+
 
 ARM_MAVROS_TOPIC = "/mavros/cmd/arming"
 SET_MODE_MAVROS_TOPIC = "/mavros/set_mode"
@@ -25,14 +27,14 @@ def create_init_controls_root(depth):
         name="Arm Miniauv Mavros",
         service_type=CommandBool,
         service_name=ARM_MAVROS_TOPIC,
-        service_request=CommandBool.Request(),
+        service_request=CommandBool.Request(value = True),
     )
 
     srv_set_mode_mavros = py_trees_ros.service_clients.FromConstant(
         name="Set Mode Mavros",
         service_type=SetMode,
         service_name=SET_MODE_MAVROS_TOPIC,
-        service_request=SetMode.Request(),
+        service_request=SetMode.Request(base_mode = 0, custom_mode = "ALT_HOLD"),
     )
 
     set_altitude_mavros = py_trees.behaviours.SetBlackboardVariable(
@@ -46,6 +48,7 @@ def create_init_controls_root(depth):
         name="Publish altitude setpoint",
         topic_name=SET_ALTITUDE_MAVROS_TOPIC,
         topic_type=GeoPoseStamped,
+        qos_profile=qos_profile_system_default,
         blackboard_variable=ALTITUDE_KEY,
     )
 
