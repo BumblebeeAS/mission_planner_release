@@ -271,3 +271,22 @@ def within_threshold(
         return False
 
     return True
+
+
+def within_threshold_dist(
+    tf_1: TransformStamped,
+    tf_2: TransformStamped,
+    distance_threshold: float,
+):
+    x1, y1, z1 = (
+        tf_1.transform.translation.x,
+        tf_1.transform.translation.y,
+        tf_1.transform.translation.z,
+    )
+    x2, y2, z2 = (
+        tf_2.transform.translation.x,
+        tf_2.transform.translation.y,
+        tf_2.transform.translation.z,
+    )
+    distance = np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
+    return distance <= distance_threshold
