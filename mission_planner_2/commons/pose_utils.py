@@ -7,6 +7,7 @@ from bb_controls_msgs.srv import Limits
 from bb_perception_msgs.action import ClusterTf
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped, TransformStamped
+from py_trees import console
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
 
@@ -288,5 +289,10 @@ def within_threshold_dist(
         tf_2.transform.translation.y,
         tf_2.transform.translation.z,
     )
+
+    console.logerror(
+        f"within_threshold_dist: Comparing ({x1}, {y1}, {z1}) with ({x2}, {y2}, {z2})"
+    )
+
     distance = np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
     return distance <= distance_threshold

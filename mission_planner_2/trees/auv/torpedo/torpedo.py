@@ -3,13 +3,12 @@ import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import (
     create_goto_cluster_from_bb_root,
     create_goto_cluster_from_bb_tf_tf_root,
+    create_goto_cluster_from_constant_tf_tf_root,
 )
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -26,6 +25,7 @@ from mission_planner_2.commons.pose_utils import (
     within_threshold_dist,
 )
 from mission_planner_2.trees.auv.goto import goto
+from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -220,25 +220,28 @@ def create_torpedo_root():
 
     goto_cluster_first = py_trees.decorators.FailureIsSuccess(
         name="Cluster and goto first",
-        # child=create_goto_cluster_from_bb_root(
-        #     cluster_node=cluster_node_first,
-        #     cluster_node_check=cluster_node_check_first,
-        #     goto_node=goto_target_first,
-        #     distance_threshold=0.05,
-        #     yaw_threshold=3.0,
-        #     retries=5,
-        #     anchor_frame_key=_ANCHOR_FRAME_KEY,
-        #     goto_pose_frame_key=_POSE_FRAME_KEY,
-        #     within_threshold=within_threshold,
-        # ),
-        child=create_goto_cluster_from_bb_tf_tf_root(
+        child=create_goto_cluster_from_bb_root(
             cluster_node=cluster_node_first,
             cluster_node_check=cluster_node_check_first,
             goto_node=goto_target_first,
             distance_threshold=0.05,
-            retries=5,
-            within_threshold=within_threshold_dist,
+            yaw_threshold=3.0,
+            retries=3,
+            anchor_frame_key=_ANCHOR_FRAME_KEY,
+            goto_pose_frame_key=_POSE_FRAME_KEY,
+            within_threshold=within_threshold,
+            stabilization_duration=2.5,
         ),
+        # child=create_goto_cluster_from_bb_tf_tf_root(
+        #     cluster_node=cluster_node_first,
+        #     cluster_node_check=cluster_node_check_first,
+        #     goto_node=goto_target_first,
+        #     distance_threshold=0.05,
+        #     retries=3,
+        #     tf_frame_key=_POSE_FRAME_KEY,
+        #     within_threshold=within_threshold_dist,
+        #     stabilization_duration=2.5,
+        # ),
     )
 
     fire_first = py_trees_ros.service_clients.FromConstant(
@@ -311,24 +314,28 @@ def create_torpedo_root():
 
     goto_cluster_second = py_trees.decorators.FailureIsSuccess(
         name="Cluster and goto second",
-        # child=create_goto_cluster_from_bb_root(
-        #     cluster_node=cluster_node_second,
-        #     cluster_node_check=cluster_node_check_second,
-        #     goto_node=goto_target_second,
-        #     distance_threshold=0.05,
-        #     yaw_threshold=5.0,
-        #     retries=5,
-        #     anchor_frame_key=_ANCHOR_FRAME_KEY,
-        #     goto_pose_frame_key=_POSE_FRAME_KEY,
-        #     within_threshold=within_threshold,
-        child=create_goto_cluster_from_bb_tf_tf_root(
+        child=create_goto_cluster_from_bb_root(
             cluster_node=cluster_node_second,
             cluster_node_check=cluster_node_check_second,
             goto_node=goto_target_second,
             distance_threshold=0.05,
-            retries=5,
-            within_threshold=within_threshold_dist,
+            yaw_threshold=5.0,
+            retries=3,
+            anchor_frame_key=_ANCHOR_FRAME_KEY,
+            goto_pose_frame_key=_POSE_FRAME_KEY,
+            within_threshold=within_threshold,
+            stabilization_duration=2.5,
         ),
+        # child=create_goto_cluster_from_bb_tf_tf_root(
+        #     cluster_node=cluster_node_second,
+        #     cluster_node_check=cluster_node_check_second,
+        #     goto_node=goto_target_second,
+        #     distance_threshold=0.05,
+        #     retries=3,
+        #     tf_frame_key=_POSE_FRAME_KEY,
+        #     within_threshold=within_threshold_dist,
+        #     stabilization_duration=2.5,
+        # ),
     )
 
     fire_second = py_trees_ros.service_clients.FromConstant(

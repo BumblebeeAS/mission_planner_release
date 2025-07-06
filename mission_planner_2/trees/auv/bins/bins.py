@@ -1,6 +1,7 @@
 import operator
 
 import py_trees
+import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
@@ -9,7 +10,6 @@ from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
-import py_trees_ros
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
@@ -50,7 +50,8 @@ TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 ACTUATION_TOPIC = "/auv4/actuation/dropper"
 ACTUATION_UINT = UInt8(data=6)
 
-CLUSTERING_DURATION = 10
+CLUSTERING_DURATION = 5
+REALIGN_CLUSTER_DURATION = 4
 STABILIZE_CONTROLS_DURATION = 10.0
 
 FISH_BIN_FRAME = "bin/fish"
@@ -432,15 +433,6 @@ def create_bin_root():
         ),
     )
 
-    # retry_cluster_and_move = goto_cluster.FromBlackboard(
-    #     name="Cluster and move repeatedly",
-    #     goto_pose_key=_POSE_KEY,
-    #     clustering_goal_key=_CLUSTERING_GOAL_KEY,
-    #     distance_threshold=0.05,
-    #     retries=3,
-    #     anchor_frame="auv4/dropper",
-    # )
-
     action_cluster_for_goto = py_trees_ros.action_clients.FromBlackboard(
         name="Cluster transforms for dropping",
         action_type=ClusterTf,
@@ -564,12 +556,8 @@ def create_bin_root():
             sel_update_template,
             srv_enable_correct_detections,
             check_enable_succeeded_correct,
-            # retry_cluster_and_move,
             set_anchor_frame,
             seq_goto_cluster,
-            # action_cluster_second,
-            # goto_align_to_target,
-            stabilise_before_dropping,
             set_dropper_actuation,
             pub_fire_dropper_first,
             py_trees.timers.Timer(name="Wait between drops", duration=3.5),
