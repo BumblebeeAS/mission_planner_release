@@ -3,6 +3,8 @@ import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import (
@@ -25,7 +27,6 @@ from mission_planner_2.commons.pose_utils import (
     within_threshold_dist,
 )
 from mission_planner_2.trees.auv.goto import goto
-from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()

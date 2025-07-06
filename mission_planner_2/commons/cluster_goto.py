@@ -3,6 +3,7 @@ import uuid
 
 import numpy as np
 import py_trees
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.tf_checker import (
     create_tf_checker_from_bb_root,
@@ -197,38 +198,26 @@ def create_goto_cluster_from_constant_root(
     return root
 
 
-def create_goto_cluster_from_bb_tf_tf_root(
+def _create_goto_cluster_tf_tf_root(
     cluster_node: py_trees.behaviour,
     cluster_node_check: py_trees.behaviour,
     goto_node: py_trees.behaviour,
+    tf_checker_1: py_trees.behaviour,
+    tf_checker_2: py_trees.behaviour,
     distance_threshold: float | None = None,
     retries: int = 3,
-    tf_frame_key: str = "something/clustered",
     stabilization_duration: float = 5.0,
     name="cluster_and_goto_tf_tf",
     within_threshold=lambda x, y: NotImplementedError(
         "Please provide a function to check within threshold"
     ),
+    tf_1_key: str | None = None,
+    tf_2_key: str | None = None,
+    check_res_key: str | None = None,
 ):
     root = py_trees.composites.Sequence(
         name=name,
         memory=True,
-    )
-
-    tf_1_key, tf_2_key, check_res_key = _create_internal_keys()
-
-    tf_checker = create_tf_checker_from_bb_root(
-        start_frame_keys=[tf_frame_key],
-        end_frame_keys=["/global/world"],
-        update_keys=[tf_1_key],
-        fallback_val=[None],
-    )
-
-    tf_checker_2 = create_tf_checker_from_bb_root(
-        start_frame_keys=[tf_frame_key],
-        end_frame_keys=["/global/world"],
-        update_keys=[tf_2_key],
-        fallback_val=[None],
     )
 
     wait = py_trees.timers.Timer(
@@ -254,7 +243,7 @@ def create_goto_cluster_from_bb_tf_tf_root(
     root.add_children(
         [
             cluster_node,
-            tf_checker,
+            tf_checker_1,
             goto_node,
             wait,
             cluster_node_check,
@@ -273,6 +262,54 @@ def create_goto_cluster_from_bb_tf_tf_root(
     return retry
 
 
+def create_goto_cluster_from_bb_tf_tf_root(
+    cluster_node: py_trees.behaviour,
+    cluster_node_check: py_trees.behaviour,
+    goto_node: py_trees.behaviour,
+    distance_threshold: float | None = None,
+    retries: int = 3,
+    tf_frame_key: str = "something/clustered",
+    stabilization_duration: float = 5.0,
+    name="cluster_and_goto_tf_tf",
+    within_threshold=lambda x, y: NotImplementedError(
+        "Please provide a function to check within threshold"
+    ),
+):
+    tf_1_key, tf_2_key, check_res_key = _create_internal_keys()
+
+    tf_checker = create_tf_checker_from_bb_root(
+        start_frame_keys=[tf_frame_key],
+        end_frame_keys=["/global/world"],
+        update_keys=[tf_1_key],
+        fallback_val=[None],
+    )
+
+    tf_checker_2 = create_tf_checker_from_bb_root(
+        start_frame_keys=[tf_frame_key],
+        end_frame_keys=["/global/world"],
+        update_keys=[tf_2_key],
+        fallback_val=[None],
+    )
+
+    cluster_retry = _create_goto_cluster_tf_tf_root(
+        cluster_node=cluster_node,
+        cluster_node_check=cluster_node_check,
+        goto_node=goto_node,
+        tf_checker_1=tf_checker,
+        tf_checker_2=tf_checker_2,
+        distance_threshold=distance_threshold,
+        retries=retries,
+        stabilization_duration=stabilization_duration,
+        name=name,
+        within_threshold=within_threshold,
+        tf_1_key=tf_1_key,
+        tf_2_key=tf_2_key,
+        check_res_key=check_res_key,
+    )
+
+    return cluster_retry
+
+
 def create_goto_cluster_from_constant_tf_tf_root(
     cluster_node: py_trees.behaviour,
     cluster_node_check: py_trees.behaviour,
@@ -286,10 +323,6 @@ def create_goto_cluster_from_constant_tf_tf_root(
         "Please provide a function to check within threshold"
     ),
 ):
-    root = py_trees.composites.Sequence(
-        name=name,
-        memory=True,
-    )
 
     tf_1_key, tf_2_key, check_res_key = _create_internal_keys()
 
@@ -307,43 +340,20 @@ def create_goto_cluster_from_constant_tf_tf_root(
         fallback_val=[None],
     )
 
-    wait = py_trees.timers.Timer(
-        name="Wait between clusters", duration=stabilization_duration
+    cluster_retry = _create_goto_cluster_tf_tf_root(
+        cluster_node=cluster_node,
+        cluster_node_check=cluster_node_check,
+        goto_node=goto_node,
+        tf_checker_1=tf_checker,
+        tf_checker_2=tf_checker_2,
+        distance_threshold=distance_threshold,
+        retries=retries,
+        stabilization_duration=stabilization_duration,
+        name=name,
+        within_threshold=within_threshold,
+        tf_1_key=tf_1_key,
+        tf_2_key=tf_2_key,
+        check_res_key=check_res_key,
     )
 
-    set_threshold_check = DynamicSetBlackboard(
-        name="Apply threshold check",
-        key=[tf_1_key, tf_2_key],
-        update_key=check_res_key,
-        func=lambda tf1, tf2: within_threshold(tf1, tf2, distance_threshold),
-    )
-
-    check_within_threshold = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify within threshold",
-        check=py_trees.common.ComparisonExpression(
-            variable=check_res_key,
-            value=True,
-            operator=operator.eq,
-        ),
-    )
-
-    root.add_children(
-        [
-            cluster_node,
-            tf_checker,
-            goto_node,
-            wait,
-            cluster_node_check,
-            tf_checker_2,
-            set_threshold_check,
-            check_within_threshold,
-        ]
-    )
-
-    retry = py_trees.decorators.Retry(
-        name="Retry",
-        child=root,
-        num_failures=retries,
-    )
-
-    return retry
+    return cluster_retry

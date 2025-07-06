@@ -12,7 +12,10 @@ from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
-from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
+from mission_planner_2.commons.cluster_goto import (
+    create_goto_cluster_from_bb_root,
+    create_goto_cluster_from_bb_tf_tf_root,
+)
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -24,6 +27,7 @@ from mission_planner_2.commons.namespace_utils import (
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     within_threshold,
+    within_threshold_dist,
 )
 from mission_planner_2.trees.auv.bins.choice_selector import create_choice_selector_root
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
@@ -471,6 +475,17 @@ def create_bin_root():
         goto_pose_frame_key=_GOTO_FRAME_KEY,
         within_threshold=within_threshold,
     )
+
+    # Uncomment the following lines if you want to use the TF-based goto cluster
+    # seq_goto_cluster = create_goto_cluster_from_bb_tf_tf_root(
+    #     cluster_node=action_cluster_for_goto,
+    #     cluster_node_check=action_cluster_for_goto_check,
+    #     goto_node=goto_align_to_target,
+    #     distance_threshold=0.05,
+    #     retries=3,
+    #     tf_frame_key=_GOTO_FRAME_KEY,
+    #     within_threshold=within_threshold_dist,
+    # )
 
     stabilise_before_dropping = py_trees.timers.Timer(
         "Stabilise before dropping", duration=STABILIZE_CONTROLS_DURATION
