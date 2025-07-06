@@ -1,8 +1,8 @@
 import py_trees
-from bb_perception_msgs.action import ClusterTf
-from std_srvs.srv import Trigger
-
 import py_trees_ros
+from bb_auv_msgs.action import Grabber
+from bb_perception_msgs.action import ClusterTf
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -90,7 +90,7 @@ def create_bottle_root(
             out_children=bottle_basket_frame_clustered,
             duration=cluster_duration,
             use_cache=False,
-            persistent=True,  # TODO: should use persistent?
+            persistent=False,
         ),
     )
 
@@ -138,11 +138,15 @@ def create_bottle_root(
         pose=create_stamped_pose(frame_id=bottle_0_view_frame),
     )
 
-    pub_half_close_grabber = py_trees_ros.service_clients.FromConstant(
+    pub_half_close_grabber = py_trees_ros.action_clients.FromConstant(
         name="Close grabber (bottle)",
-        service_name=actuation_topic,
-        service_type=Trigger,
-        service_request=Trigger.Request(),
+        action_name=actuation_topic,
+        action_type=Grabber,
+        action_goal=Grabber.Goal(
+            command=Grabber.Goal.GOAL_CLOSE,
+            tolerance=0,
+            timeout_ms=10000,  # 10 seconds
+        ),
     )
 
     # now surface with the bottle facing the saved tf
@@ -169,11 +173,15 @@ def create_bottle_root(
         pose=create_stamped_pose(frame_id=bottle_basket_view_frame),
     )
 
-    pub_activate_grabber_bottle = py_trees_ros.service_clients.FromConstant(
+    pub_activate_grabber_bottle = py_trees_ros.action_clients.FromConstant(
         name="Open grabber (bottle)",
-        service_name=actuation_topic,
-        service_type=Trigger,
-        service_request=Trigger.Request(),
+        action_name=actuation_topic,
+        action_type=Grabber,
+        action_goal=Grabber.Goal(
+            command=Grabber.Goal.GOAL_OPEN,
+            tolerance=0,
+            timeout_ms=10000,  # 10 seconds
+        ),
     )
 
     # resurface before start of bottle

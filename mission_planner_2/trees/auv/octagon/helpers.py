@@ -1,4 +1,5 @@
 from geometry_msgs.msg import TransformStamped, Vector3
+
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 
 
@@ -34,6 +35,7 @@ def _is_obj_in_basket(
     if obj_pos is None or basket_pos is None:
         raise ValueError("Object position or basket position is None")
 
+    # FIXME: do x y check separately
     dist = _euclidean_dist(
         obj_pos.x, obj_pos.y, obj_pos.z, basket_pos.x, basket_pos.y, basket_pos.z
     )

@@ -1,11 +1,12 @@
 import py_trees
+import py_trees_ros
+from bb_auv_msgs.action import Grabber
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
-import py_trees_ros
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -116,28 +117,6 @@ def create_octagon_root():
         service_type=Trigger,
         service_request=Trigger.Request(),
         key_response=_CHOICE_KEY,
-    )
-
-    set_activate_grabber = py_trees.behaviours.SetBlackboardVariable(
-        name="Set claw actuation",
-        variable_name=_ACTIVATE_GRABBER_KEY,
-        variable_value=ACTIVATE_GRABBER,
-        overwrite=True,
-    )
-
-    set_half_close_grabber = py_trees.behaviours.SetBlackboardVariable(
-        name="Set claw actuation half close",
-        variable_name=_HALF_CLOSE_GRABBER_KEY,
-        variable_value=HALF_CLOSE_GRABBER,
-        overwrite=True,
-    )
-
-    pub_activate_grabber = py_trees_ros.publishers.FromBlackboard(
-        name="Init grabber",
-        topic_name="/auv4/actuation/input",
-        topic_type=UInt8,
-        qos_profile=qos_profile_system_default,
-        blackboard_variable=_ACTIVATE_GRABBER_KEY,
     )
 
     par_search_tag = py_trees.composites.Parallel(
@@ -330,9 +309,6 @@ def create_octagon_root():
             srv_get_choice,
             srv_start_vision,
             check_start_vision_succeeded,
-            set_activate_grabber,
-            set_half_close_grabber,
-            pub_activate_grabber,
             par_search_tag,
             symbol_tf_checker,
             dynamic_set_surface_pose_frame,
