@@ -6,12 +6,6 @@ from lifecycle_msgs.srv import ChangeState
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import checked_service
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard
-from mission_planner_2.commons.cluster_goto import (
-    create_goto_cluster_from_bb_root,
-    create_goto_cluster_from_bb_tf_tf_root,
-    create_goto_cluster_from_constant_tf_tf_root,
-)
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -23,10 +17,11 @@ from mission_planner_2.commons.namespace_utils import (
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
-    within_threshold,
-    within_threshold_dist,
 )
 from mission_planner_2.trees.auv.goto import goto
+from mission_planner_2.trees.auv.torpedo.move_and_shoot_seq import (
+    create_move_and_shoot_generator,
+)
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -96,6 +91,27 @@ def create_torpedo_root():
     else:
         raise ValueError("Invalid template selected, must be 1 or 2")
 
+    move_and_shoot_gen = create_move_and_shoot_generator(
+        anchor_frame_key=_ANCHOR_FRAME_KEY,
+        torpedo_shooter_left_frame=TORPEDO_SHOOTER_LEFT_FRAME,
+        torpedo_shooter_right_frame=TORPEDO_SHOOTER_RIGHT_FRAME,
+        choice_key=_CHOICE_KEY,
+        pose_key=_POSE_KEY,
+        pose_frame_key=_POSE_FRAME_KEY,
+        fish_shoot_frame=fish_shoot_frame,
+        shark_shoot_frame=shark_shoot_frame,
+        template_frame_optical=template_frame_optical,
+        template_frame_optical_clustered=template_frame_optical_clustered,
+        cluster_duration=CLUSTER_DURATION,
+        realign_cluster_duration=REALIGN_CLUSTER_DURATION,
+        actuation_topic_left=ACTUATION_TOPIC_LEFT,
+        actuation_topic_right=ACTUATION_TOPIC_RIGHT,
+        distance_threshold=0.05,
+        yaw_threshold=3.0,
+        retries=3,
+        stabilization_duration=2.5,
+    )
+
     seq_torpedo_root = py_trees.composites.Sequence(
         name="Torpedo root",
         memory=True,
@@ -164,93 +180,7 @@ def create_torpedo_root():
         check_func=lambda x: x.new_state,  # check if the service call was successful
     )
 
-    set_anchor_frame = py_trees.behaviours.SetBlackboardVariable(
-        name="Set anchor frame",
-        variable_name=_ANCHOR_FRAME_KEY,
-        variable_value=TORPEDO_SHOOTER_LEFT_FRAME,
-        overwrite=True,
-    )
-
-    dynamic_set_pose = DynamicSetBlackboard(
-        name="select torpedo frame",
-        key=_CHOICE_KEY,
-        update_key=_POSE_KEY,
-        overwrite=True,
-        func=lambda choice: create_stamped_pose(
-            fish_shoot_frame if choice.success else shark_shoot_frame
-        ),
-    )
-
-    dynamic_set_frame = DynamicSetBlackboard(
-        name="select torpedo frame",
-        key=_CHOICE_KEY,
-        update_key=_POSE_FRAME_KEY,
-        overwrite=True,
-        func=lambda choice: fish_shoot_frame if choice.success else shark_shoot_frame,
-    )
-
-    cluster_node_first = py_trees_ros.action_clients.FromConstant(
-        name="Cluster the transforms before first shot",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=template_frame_optical,
-            out_children=template_frame_optical_clustered,
-            duration=CLUSTER_DURATION,
-            use_cache=False,
-        ),
-    )
-
-    cluster_node_check_first = py_trees_ros.action_clients.FromConstant(
-        name="Cluster the transforms before first shot",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=template_frame_optical,
-            out_children=template_frame_optical_clustered,
-            duration=REALIGN_CLUSTER_DURATION,
-            use_cache=False,
-        ),
-    )
-
-    goto_target_first = goto.FromBlackboard(
-        name="Go to first target",
-        pose_key=_POSE_KEY,
-        anchor_frame_name=TORPEDO_SHOOTER_LEFT_FRAME,
-    )
-
-    goto_cluster_first = py_trees.decorators.FailureIsSuccess(
-        name="Cluster and goto first",
-        child=create_goto_cluster_from_bb_root(
-            cluster_node=cluster_node_first,
-            cluster_node_check=cluster_node_check_first,
-            goto_node=goto_target_first,
-            distance_threshold=0.05,
-            yaw_threshold=3.0,
-            retries=3,
-            anchor_frame_key=_ANCHOR_FRAME_KEY,
-            goto_pose_frame_key=_POSE_FRAME_KEY,
-            within_threshold=within_threshold,
-            stabilization_duration=2.5,
-        ),
-        # child=create_goto_cluster_from_bb_tf_tf_root(
-        #     cluster_node=cluster_node_first,
-        #     cluster_node_check=cluster_node_check_first,
-        #     goto_node=goto_target_first,
-        #     distance_threshold=0.05,
-        #     retries=3,
-        #     tf_frame_key=_POSE_FRAME_KEY,
-        #     within_threshold=within_threshold_dist,
-        #     stabilization_duration=2.5,
-        # ),
-    )
-
-    fire_first = py_trees_ros.service_clients.FromConstant(
-        name="Fire first torpedo",
-        service_type=Trigger,
-        service_name=ACTUATION_TOPIC_LEFT,
-        service_request=Trigger.Request(),
-    )
+    move_and_shoot_first = move_and_shoot_gen(first=True)
 
     goto_back_centre = goto.FromConstant(
         name="Go back to centre",
@@ -258,93 +188,7 @@ def create_torpedo_root():
         anchor_frame_name=CAMERA_FRAME,
     )
 
-    set_anchor_frame_2 = py_trees.behaviours.SetBlackboardVariable(
-        name="Set anchor frame",
-        variable_name=_ANCHOR_FRAME_KEY,
-        variable_value=TORPEDO_SHOOTER_RIGHT_FRAME,
-        overwrite=True,
-    )
-
-    dynamic_set_pose_2 = DynamicSetBlackboard(
-        name="select torpedo frame",
-        key=_CHOICE_KEY,
-        update_key=_POSE_KEY,
-        overwrite=True,
-        func=lambda choice: create_stamped_pose(
-            shark_shoot_frame if choice.success else fish_shoot_frame
-        ),
-    )
-
-    dynamic_set_frame_2 = DynamicSetBlackboard(
-        name="select torpedo frame second",
-        key=_CHOICE_KEY,
-        update_key=_POSE_FRAME_KEY,
-        overwrite=True,
-        func=lambda choice: shark_shoot_frame if choice.success else fish_shoot_frame,
-    )
-
-    cluster_node_second = py_trees_ros.action_clients.FromConstant(
-        name="Cluster transforms before second shot",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=template_frame_optical,
-            out_children=template_frame_optical_clustered,
-            duration=CLUSTER_DURATION,
-            use_cache=False,
-        ),
-    )
-
-    cluster_node_check_second = py_trees_ros.action_clients.FromConstant(
-        name="Cluster the transforms before first second",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=template_frame_optical,
-            out_children=template_frame_optical_clustered,
-            duration=REALIGN_CLUSTER_DURATION,
-            use_cache=False,
-        ),
-    )
-
-    goto_target_second = goto.FromBlackboard(
-        name="Go to second target",
-        pose_key=_POSE_KEY,
-        anchor_frame_name=TORPEDO_SHOOTER_RIGHT_FRAME,
-    )
-
-    goto_cluster_second = py_trees.decorators.FailureIsSuccess(
-        name="Cluster and goto second",
-        child=create_goto_cluster_from_bb_root(
-            cluster_node=cluster_node_second,
-            cluster_node_check=cluster_node_check_second,
-            goto_node=goto_target_second,
-            distance_threshold=0.05,
-            yaw_threshold=5.0,
-            retries=3,
-            anchor_frame_key=_ANCHOR_FRAME_KEY,
-            goto_pose_frame_key=_POSE_FRAME_KEY,
-            within_threshold=within_threshold,
-            stabilization_duration=2.5,
-        ),
-        # child=create_goto_cluster_from_bb_tf_tf_root(
-        #     cluster_node=cluster_node_second,
-        #     cluster_node_check=cluster_node_check_second,
-        #     goto_node=goto_target_second,
-        #     distance_threshold=0.05,
-        #     retries=3,
-        #     tf_frame_key=_POSE_FRAME_KEY,
-        #     within_threshold=within_threshold_dist,
-        #     stabilization_duration=2.5,
-        # ),
-    )
-
-    fire_second = py_trees_ros.service_clients.FromConstant(
-        name="Fire second torpedo",
-        service_type=Trigger,
-        service_name=ACTUATION_TOPIC_RIGHT,
-        service_request=Trigger.Request(),
-    )
+    move_and_shoot_second = move_and_shoot_gen(first=False)
 
     srv_disable_detections = checked_service.FromConstant(
         name="Disable detections",
@@ -373,17 +217,9 @@ def create_torpedo_root():
             goto_torp_centre,
             stabilise_before_matching,
             srv_enable_detections,
-            set_anchor_frame,
-            dynamic_set_pose,
-            dynamic_set_frame,
-            goto_cluster_first,
-            fire_first,
+            move_and_shoot_first,
             goto_back_centre,
-            set_anchor_frame_2,
-            dynamic_set_pose_2,
-            dynamic_set_frame_2,
-            goto_cluster_second,
-            fire_second,
+            move_and_shoot_second,
             srv_disable_detections,
             srv_end_vision,
         ],
