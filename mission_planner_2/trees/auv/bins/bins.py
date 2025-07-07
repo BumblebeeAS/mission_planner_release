@@ -14,7 +14,6 @@ from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import (
     create_goto_cluster_from_bb_root,
-    create_goto_cluster_from_bb_tf_tf_root,
 )
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -27,10 +26,11 @@ from mission_planner_2.commons.namespace_utils import (
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     within_threshold,
-    within_threshold_dist,
 )
-from mission_planner_2.trees.auv.bins.choice_selector import create_choice_selector_root
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
+from mission_planner_2.trees.auv.bins.template_selector import (
+    create_template_selector_root,
+)
 from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
@@ -88,128 +88,6 @@ _BIN_CORRECT_ENABLE_DETECTIONS_KEY = fk("bin_correct_enable_detections")
 _BIN_DISABLE_DETECTIONS_KEY = fk("bin_disable_detections")
 _BIN_CENTRE_TF_KEY = fk("bin_centre_tf")
 _BIN_CENTRE_ACUTE_POSE_KEY = fk("bin_centre_acute_pose")
-
-
-def create_template_selector_root() -> py_trees.composites.Selector:
-    sel_template_selector_root = py_trees.composites.Selector(
-        name="Template selector root",
-        memory=True,
-    )
-
-    seq_unrotated = py_trees.composites.Sequence(
-        name="Seq unrotated set up",
-        memory=True,
-    )
-
-    seq_rotate = py_trees.composites.Sequence(
-        name="Seq rotated set up",
-        memory=True,
-    )
-
-    # Step 1: Check if need to rotate, returns true if need to rotate
-    set_if_not_rotate = DynamicSetBlackboard(
-        name="Set is_rotated",
-        key=[_POINTS_1_KEY, _POINTS_2_KEY],
-        update_key=_IS_ROTATED_KEY,
-        func=lambda p1, p2: len(p1.data) > len(p2.data),
-    )
-
-    check_if_rotated = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check if is_rotated",
-        check=py_trees.common.ComparisonExpression(
-            variable=_IS_ROTATED_KEY,
-            value=True,
-            operator=operator.eq,
-        ),
-    )
-
-    set_enable_detections_req = py_trees.behaviours.SetBlackboardVariable(
-        name="Set enable detections request",
-        variable_name=_BIN_CORRECT_DETECTIONS_REQ_KEY,
-        variable_value=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True,
-            camera_frame_id=CAMERA_FRAME,
-            template_name=TEMPLATE_NAME,
-        ),
-        overwrite=True,
-    )
-
-    set_clustering_goal = py_trees.behaviours.SetBlackboardVariable(
-        name="Set clustering goal",
-        variable_name=_CLUSTERING_GOAL_KEY,
-        variable_value=create_clustering_goal(
-            in_children=TEMPLATE_FRAME_OPTICAL,
-            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
-            duration=CLUSTERING_DURATION,
-            use_cache=False,
-        ),
-        overwrite=True,
-    )
-
-    sel_update_selection = create_choice_selector_root(
-        choice_key=_CHOICE_KEY,
-        pose_key=_POSE_KEY,
-        goto_frame_key=_GOTO_FRAME_KEY,
-        fish_bin_frame=FISH_BIN_VIEW_FRAME,
-        shark_bin_frame=SHARK_BIN_VIEW_FRAME,
-    )
-
-    seq_unrotated.add_children(
-        [
-            set_if_not_rotate,
-            check_if_rotated,
-            set_enable_detections_req,
-            set_clustering_goal,
-            sel_update_selection,
-        ]
-    )
-
-    set_rotated_enable_detections_req = py_trees.behaviours.SetBlackboardVariable(
-        name="Set enable detections request (rotated)",
-        variable_name=_BIN_CORRECT_DETECTIONS_REQ_KEY,
-        variable_value=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True,
-            camera_frame_id=CAMERA_FRAME,
-            template_name=ROTATED_TEMPLATE_NAME,
-        ),
-        overwrite=True,
-    )
-
-    set_rotated_clustering_goal = py_trees.behaviours.SetBlackboardVariable(
-        name="Set clustering goal (rotated)",
-        variable_name=_CLUSTERING_GOAL_KEY,
-        variable_value=create_clustering_goal(
-            in_children=ROTATED_TEMPLATE_FRAME_OPTICAL,
-            out_children=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
-            duration=CLUSTERING_DURATION,
-            use_cache=False,
-        ),
-        overwrite=True,
-    )
-
-    sel_rotated_update_selection = create_choice_selector_root(
-        choice_key=_CHOICE_KEY,
-        pose_key=_POSE_KEY,
-        goto_frame_key=_GOTO_FRAME_KEY,
-        fish_bin_frame=FISH_BIN_VIEW_ROTATED_FRAME,
-        shark_bin_frame=SHARK_BIN_VIEW_ROTATED_FRAME,
-    )
-
-    seq_rotate.add_children(
-        [
-            set_rotated_clustering_goal,
-            set_rotated_enable_detections_req,
-            sel_rotated_update_selection,
-        ]
-    )
-
-    sel_template_selector_root.add_children(
-        children=[
-            seq_unrotated,
-            seq_rotate,
-        ],
-    )
-    return sel_template_selector_root
 
 
 def create_bin_root():
@@ -418,7 +296,27 @@ def create_bin_root():
         num_failures=100,
     )
 
-    sel_update_template = create_template_selector_root()
+    sel_update_template = create_template_selector_root(
+        points_1_key=_POINTS_1_KEY,
+        points_2_key=_POINTS_2_KEY,
+        is_rotated_key=_IS_ROTATED_KEY,
+        bin_correct_detections_req_key=_BIN_CORRECT_DETECTIONS_REQ_KEY,
+        camera_frame=CAMERA_FRAME,
+        template_name=TEMPLATE_NAME,
+        rotated_template_name=ROTATED_TEMPLATE_NAME,
+        clustering_goal_key=_CLUSTERING_GOAL_KEY,
+        template_frame_optical=TEMPLATE_FRAME_OPTICAL,
+        rotated_template_frame_optical=ROTATED_TEMPLATE_FRAME_OPTICAL,
+        template_frame_optical_clustered=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
+        clustering_duration=CLUSTERING_DURATION,
+        choice_key=_CHOICE_KEY,
+        pose_key=_POSE_KEY,
+        goto_frame_key=_GOTO_FRAME_KEY,
+        fish_bin_view_frame=FISH_BIN_VIEW_FRAME,
+        fish_bin_view_rotated_frame=FISH_BIN_VIEW_ROTATED_FRAME,
+        shark_bin_view_frame=SHARK_BIN_VIEW_FRAME,
+        shark_bin_view_rotated_frame=SHARK_BIN_VIEW_ROTATED_FRAME,
+    )
 
     srv_enable_correct_detections = py_trees_ros.service_clients.FromBlackboard(
         "Enable correct detection template",
