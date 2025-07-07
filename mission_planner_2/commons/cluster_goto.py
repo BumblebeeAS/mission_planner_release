@@ -48,7 +48,7 @@ def _create_goto_cluster_retry(
         yaw_threshold = 370.0
 
     wait = py_trees.timers.Timer(
-        name="Wait between clusters", duration=stabilization_duration
+        name="Wait for controls to stabilize", duration=stabilization_duration
     )
 
     set_threshold_check = DynamicSetBlackboard(
@@ -221,7 +221,7 @@ def _create_goto_cluster_tf_tf_root(
     )
 
     wait = py_trees.timers.Timer(
-        name="Wait between clusters", duration=stabilization_duration
+        name="Wait for controls to stabilize", duration=stabilization_duration
     )
 
     set_threshold_check = DynamicSetBlackboard(

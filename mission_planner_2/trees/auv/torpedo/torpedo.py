@@ -43,9 +43,9 @@ CENTRE_VIEW_FRAME = "torpedo/centre/view"
 ACTUATION_TOPIC_LEFT = "/auv4/actuation/torpedo/left"
 ACTUATION_TOPIC_RIGHT = "/auv4/actuation/torpedo/right"
 
-CLUSTER_DURATION = 10
-REALIGN_CLUSTER_DURATION = 4
-STABILIZE_DURATION = 10
+CLUSTER_DURATION = 4
+REALIGN_CLUSTER_DURATION = 2
+STABILIZE_DURATION = 5
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -106,9 +106,9 @@ def create_torpedo_root():
         realign_cluster_duration=REALIGN_CLUSTER_DURATION,
         actuation_topic_left=ACTUATION_TOPIC_LEFT,
         actuation_topic_right=ACTUATION_TOPIC_RIGHT,
-        distance_threshold=0.05,
-        yaw_threshold=3.0,
-        retries=3,
+        distance_threshold=0.025,
+        yaw_threshold=1.0,
+        retries=8,
         stabilization_duration=2.5,
     )
 

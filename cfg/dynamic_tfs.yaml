@@ -30,7 +30,7 @@ torpedo:
   - name: centre_view
     parents:
       - "torpedo/centre"
-    z: -0.6
+    z: -0.7
     roll: -90.0
     pitch: -90.0
   - name: shoot_view

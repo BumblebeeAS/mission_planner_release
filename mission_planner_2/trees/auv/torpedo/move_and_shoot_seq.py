@@ -1,17 +1,15 @@
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
-
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
-from mission_planner_2.commons.cluster_goto import (
-    create_goto_cluster_from_bb_root,
-)
+from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
     within_threshold,
 )
 from mission_planner_2.trees.auv.goto import goto
+from std_srvs.srv import Trigger
 
 
 def create_move_and_shoot_generator(
@@ -40,8 +38,8 @@ def create_move_and_shoot_generator(
             shoot_pose_sel = lambda choice: create_stamped_pose(
                 fish_shoot_frame if choice.success else shark_shoot_frame
             )
-            shoot_frame_sel = (
-                lambda choice: fish_shoot_frame if choice.success else shark_shoot_frame
+            shoot_frame_sel = lambda choice: (
+                fish_shoot_frame if choice.success else shark_shoot_frame
             )
             actuation_topic = actuation_topic_left
             torp_string = "first"
@@ -50,8 +48,8 @@ def create_move_and_shoot_generator(
             shoot_pose_sel = lambda choice: create_stamped_pose(
                 shark_shoot_frame if choice.success else fish_shoot_frame
             )
-            shoot_frame_sel = (
-                lambda choice: shark_shoot_frame if choice.success else fish_shoot_frame
+            shoot_frame_sel = lambda choice: (
+                shark_shoot_frame if choice.success else fish_shoot_frame
             )
             actuation_topic = actuation_topic_right
             torp_string = "second"
@@ -135,12 +133,12 @@ def create_move_and_shoot_generator(
             # ),
         )
 
-        # fire = py_trees_ros.service_clients.FromConstant(
-        #     name=f"Fire {torp_string} torpedo",
-        #     service_type=Trigger,
-        #     service_name=actuation_topic,
-        #     service_request=Trigger.Request(),
-        # )
+        fire = py_trees_ros.service_clients.FromConstant(
+            name=f"Fire {torp_string} torpedo",
+            service_type=Trigger,
+            service_name=actuation_topic,
+            service_request=Trigger.Request(),
+        )
 
         root = py_trees.composites.Sequence(
             f"Move and shoot {torp_string} torpedo",
@@ -150,7 +148,7 @@ def create_move_and_shoot_generator(
                 dynamic_set_pose,
                 dynamic_set_frame,
                 goto_cluster,
-                # fire,
+                fire,
             ],
         )
 
