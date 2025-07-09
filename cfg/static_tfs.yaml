@@ -107,6 +107,12 @@ urdf:
     z: 0.06985
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/dropper"
+  - name: grabber
+    x: 0.07
+    y: -0.03
+    z: 0.0
+    parent_frame_id: auv4/bot_cam_optical
+    child_frame_id: auv4/grabber
 map:
   - name: slalom
     x: 4.0
