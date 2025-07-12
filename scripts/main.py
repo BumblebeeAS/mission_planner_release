@@ -2,9 +2,10 @@
 
 import py_trees
 import py_trees.console as console
-import py_trees_ros.trees
 import rclpy
 
+from mission_planner_2.commons.hooks import stop_on_success_or_failure
+from mission_planner_2.commons.led_management import create_led_tree
 from mission_planner_2.trees.auv.mother.mother import create_mother
 
 
@@ -12,21 +13,13 @@ def main():
     rclpy.init(args=None)
     root = create_mother()
     py_trees.logging.level = py_trees.logging.Level.DEBUG
-    tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
+    tree, node = create_led_tree(root=root)
     try:
-        tree.setup(timeout=15.0)
+        tree.setup(node=node, timeout=15.0)
     except:
         console.logerror(console.red + "failed to setup the tree" + console.reset)
         tree.shutdown()
         rclpy.shutdown()
-
-    def stop_on_success_or_failure(tree):
-        if tree.root.status == py_trees.common.Status.SUCCESS:
-            console.loginfo(console.green + "completed one execution" + console.reset)
-            raise SystemExit
-        elif tree.root.status == py_trees.common.Status.FAILURE:
-            console.loginfo(console.red + "stopped on failure" + console.reset)
-            raise SystemExit
 
     tree.add_post_tick_handler(stop_on_success_or_failure)
     tree.tick_tock(period_ms=100)
