@@ -29,9 +29,8 @@ fk = full_key_generator(NAMESPACE)
 VISION_SERVER_TOPIC = "/auv4/gate_front/manage_nodes"
 
 CLUSTERING_DURATION = 20
-STABILIZE_DURATION = 10.0
+STABILIZE_DURATION = 7.0
 
-GATE_APPROACH_HEIGHT = 0.40
 FORWARD_DISTANCE = 3.0
 
 CAMERA_FRAME = "auv4/front_cam_optical"
@@ -85,10 +84,6 @@ def create_gate_root():
             operator=lambda x, y: operator.eq(x.success, y),
         ),
     )
-
-    # Step 2: Move towards gate
-    gate_init_pose = create_stamped_pose("world_ned", position_z=GATE_APPROACH_HEIGHT)
-    goto_towards_gate = goto.FromConstant("Goto gate vicinity", gate_init_pose)
 
     # Step 3: Cluster gate transforms
     action_cluster_gate = py_trees_ros.action_clients.FromConstant(
