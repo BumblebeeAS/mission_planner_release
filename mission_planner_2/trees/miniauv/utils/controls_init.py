@@ -4,12 +4,15 @@ from geographic_msgs.msg import GeoPoseStamped
 from mavros_msgs.srv import CommandBool, SetMode
 from rclpy.qos import qos_profile_system_default
 from bb_controls_msgs.srv import Controller
+from std_srvs.srv import Trigger
 
 ARM_MAVROS_TOPIC = "/mavros/cmd/arming"
 SET_MODE_MAVROS_TOPIC = "/mavros/set_mode"
 SET_ALTITUDE_MAVROS_TOPIC = "/mavros/setpoint_position/global"
 ENABLE_MINIAUV_CONTROLS = "/mini/controls/controller"
 ALTITUDE_KEY = "/miniauv/altitude"
+TRIGGER_MINICONTROLLER = "/mini/controls/trigger"
+STABILIZE_DURATION = 10.0
 
 
 def create_altitude_to_pub(depth):
@@ -60,9 +63,26 @@ def create_init_controls_root(depth):
         service_request=Controller.Request(enable=True, pause=False, disable_altitude=True),
     )
 
+    timer_stabilize = py_trees.timers.Timer(
+        "Stabilize before enabling thrust allocator", STABILIZE_DURATION
+    )
+    enable_minicontroller = py_trees_ros.service_clients.FromConstant(
+        name="Enable thrust allocator for miniauv",
+        service_type=Trigger,
+        service_name=TRIGGER_MINICONTROLLER,
+        service_request=Trigger.Request(),
+    )
 
     root.add_children(
-        [srv_arm_mavros, srv_set_mode_mavros, set_altitude_mavros, pub_altitude_mavros, enable_controls]
+        [
+            srv_arm_mavros,
+            srv_set_mode_mavros,
+            set_altitude_mavros,
+            pub_altitude_mavros,
+            enable_controls,
+            timer_stabilize,
+            enable_minicontroller
+        ]
     )
 
     return root

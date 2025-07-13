@@ -38,6 +38,7 @@ TEMPLATE_FRAME_YOLO = "gate"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
 CLUSTERED_OUT_PARENT = "map"
 GATE_CENTRE_FRAME = "gate/centre/view"
+TRIGGER_MINICONTROLLER = "/mini/controls/trigger"
 
 #########################################################################
 
