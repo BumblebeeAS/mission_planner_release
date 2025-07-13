@@ -12,9 +12,7 @@ from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import cache_tf
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
-from mission_planner_2.commons.cluster_goto import (
-    create_goto_cluster_from_bb_root,
-)
+from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -25,6 +23,7 @@ from mission_planner_2.commons.namespace_utils import (
 )
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
+    create_stamped_pose,
     within_threshold,
 )
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
@@ -44,6 +43,7 @@ TEMPLATE_NAME = "Task03_DropBRUVS.png"
 ROTATED_TEMPLATE_NAME = "Task03_DropBRUVS_Rotated.png"
 POINT_CORRESPONDENCES_TOPIC = "/auv4/bin/image_matching/point_correspondences"
 
+BASE_LINK_FRAME = "auv4/base_link_ned"
 CAMERA_FRAME = "auv4/bot_cam_optical"
 TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_optical"
 ROTATED_TEMPLATE_FRAME_OPTICAL = "Task03_DropBRUVS_Rotated_optical"
@@ -54,9 +54,10 @@ TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 ACTUATION_TOPIC = "/auv4/actuation/dropper"
 ACTUATION_UINT = UInt8(data=6)
 
-CLUSTERING_DURATION = 5
-REALIGN_CLUSTER_DURATION = 4
-STABILIZE_CONTROLS_DURATION = 10.0
+CLUSTERING_DURATION = 4
+REALIGN_CLUSTER_DURATION = 2
+STABILIZE_CONTROLS_DURATION = 5.0
+RETRIES = 5
 
 FISH_BIN_FRAME = "bin/fish"
 SHARK_BIN_FRAME = "bin/shark"
@@ -67,6 +68,13 @@ FISH_BIN_VIEW_FRAME = "bin/fish/view"
 SHARK_BIN_VIEW_FRAME = "bin/shark/view"
 FISH_BIN_VIEW_ROTATED_FRAME = "bin/fish/rotated/view"
 SHARK_BIN_VIEW_ROTATED_FRAME = "bin/shark/rotated/view"
+
+SEARCH_PATTERN = [
+    {"x": 0.0, "y": -0.25, "z": 0.0},
+    {"x": 0.5, "y": 0.0, "z": 0.0},
+    {"x": 0.0, "y": 0.5, "z": 0.0},
+    {"x": -0.5, "y": 0.0, "z": 0.0},
+]
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -131,6 +139,25 @@ def create_bin_root():
         ),
     )
 
+    par_search_bin = py_trees.composites.Parallel(
+        name="Search bin", policy=py_trees.common.ParallelPolicy.SuccessOnAll()
+    )
+
+    goto_n_search_poses = goto.NFromConstant(
+        name="Goto search poses",
+        poses=[
+            create_stamped_pose(
+                frame_id=BASE_LINK_FRAME,
+                position_x=pattern["x"],
+                position_y=pattern["y"],
+                position_z=pattern["z"],
+            )
+            for pattern in SEARCH_PATTERN
+        ],
+        specified_heading=True,
+        wait_between_moves_sec=2.0,
+    )
+
     # Step 1: Cluster transforms for initial orientation using YOLO
     action_cluster_first = py_trees_ros.action_clients.FromConstant(
         name="Cluster transforms for orientation",
@@ -143,6 +170,8 @@ def create_bin_root():
             use_cache=False,
         ),
     )
+
+    par_search_bin.add_children([action_cluster_first, goto_n_search_poses])
 
     extract_tf = cache_tf.ToBlackboard(
         name="Extract movement to bin centre",
@@ -363,15 +392,18 @@ def create_bin_root():
         overwrite=True,
     )
 
-    seq_goto_cluster = create_goto_cluster_from_bb_root(
-        cluster_node=action_cluster_for_goto,
-        cluster_node_check=action_cluster_for_goto_check,
-        goto_node=goto_align_to_target,
-        distance_threshold=0.05,
-        retries=3,
-        anchor_frame_key=_ANCHOR_FRAME_KEY,
-        goto_pose_frame_key=_GOTO_FRAME_KEY,
-        within_threshold=within_threshold,
+    seq_goto_cluster = py_trees.decorators.FailureIsSuccess(
+        name="Goto cluster",
+        child=create_goto_cluster_from_bb_root(
+            cluster_node=action_cluster_for_goto,
+            cluster_node_check=action_cluster_for_goto_check,
+            goto_node=goto_align_to_target,
+            distance_threshold=0.05,
+            retries=RETRIES,
+            anchor_frame_key=_ANCHOR_FRAME_KEY,
+            goto_pose_frame_key=_GOTO_FRAME_KEY,
+            within_threshold=within_threshold,
+        ),
     )
 
     # Uncomment the following lines if you want to use the TF-based goto cluster
@@ -455,7 +487,8 @@ def create_bin_root():
             srv_get_fish_choice,
             srv_start_vision,
             check_start_vision_succeeded,
-            action_cluster_first,
+            # action_cluster_first,
+            par_search_bin,
             extract_tf,
             calculate_acute_pose,
             goto_bin_centre,
