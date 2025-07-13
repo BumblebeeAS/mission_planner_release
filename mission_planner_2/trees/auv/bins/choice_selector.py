@@ -2,9 +2,8 @@ import operator
 
 import py_trees
 import py_trees_ros
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons.pose_utils import create_stamped_pose
+from std_srvs.srv import Trigger
 
 
 def create_choice_selector_root(
@@ -23,6 +22,9 @@ def create_choice_selector_root(
 
     # Fish sequence - executes if choice is fish
     seq_fish_setup = py_trees.composites.Sequence(name="Fish setup", memory=True)
+
+    # Shark setup sequence
+    seq_shark_setup = py_trees.composites.Sequence(name="Shark setup", memory=True)
 
     # Step 1: Service call to get the choice
     srv_get_choice = py_trees_ros.service_clients.FromConstant(
@@ -77,8 +79,9 @@ def create_choice_selector_root(
     seq_fish_setup.add_children(
         [srv_get_choice, check_is_fish, set_pose_fish, set_pose_frame_fish]
     )
-    sel_choice_selector_root.add_children(
-        [seq_fish_setup, set_pose_shark, set_pose_frame_shark]
-    )
+
+    seq_shark_setup.add_children([set_pose_shark, set_pose_frame_shark])
+
+    sel_choice_selector_root.add_children([seq_fish_setup, seq_shark_setup])
 
     return sel_choice_selector_root
