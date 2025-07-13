@@ -26,7 +26,7 @@ def create_goto_with_threshold_root():
 
     odom_sub = subscribers.ToBlackboard(
         name="odom_sub",
-        topic_name="/auv4/nav/odom_ned",
+        topic_name="/orca4/odom_ned",
         topic_type=Odometry,
         qos_profile=10,
         blackboard_variables={"odom": "pose"},

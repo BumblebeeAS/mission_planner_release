@@ -3,11 +3,12 @@ import py_trees_ros
 from geographic_msgs.msg import GeoPoseStamped
 from mavros_msgs.srv import CommandBool, SetMode
 from rclpy.qos import qos_profile_system_default
-
+from bb_controls_msgs.srv import Controller
 
 ARM_MAVROS_TOPIC = "/mavros/cmd/arming"
 SET_MODE_MAVROS_TOPIC = "/mavros/set_mode"
 SET_ALTITUDE_MAVROS_TOPIC = "/mavros/setpoint_position/global"
+ENABLE_MINIAUV_CONTROLS = "/mini/controls/controller"
 ALTITUDE_KEY = "/miniauv/altitude"
 
 
@@ -52,8 +53,16 @@ def create_init_controls_root(depth):
         blackboard_variable=ALTITUDE_KEY,
     )
 
+    enable_controls = py_trees_ros.service_clients.FromConstant(
+        name="Enable controls for miniauv",
+        service_type=Controller,
+        service_name=ENABLE_MINIAUV_CONTROLS,
+        service_request=Controller.Request(enable=True, pause=False, disable_altitude=True),
+    )
+
+
     root.add_children(
-        [srv_arm_mavros, srv_set_mode_mavros, set_altitude_mavros, pub_altitude_mavros]
+        [srv_arm_mavros, srv_set_mode_mavros, set_altitude_mavros, pub_altitude_mavros, enable_controls]
     )
 
     return root

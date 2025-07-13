@@ -17,9 +17,6 @@ def create_mother():
         variable_value="orca4_ned",
         overwrite=True,
     )
-    movement_root = create_movement_root()
-
-    gate_root = create_gate_root()
 
     # TODO: PURELY FOR TESTING
     set_is_left = py_trees.behaviours.SetBlackboardVariable(
@@ -32,7 +29,6 @@ def create_mother():
     root.add_children(
         [
             set_base_link_frame,
-            movement_root
         ]
     )
 
