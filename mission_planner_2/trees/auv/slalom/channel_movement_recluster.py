@@ -6,7 +6,6 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from geometry_msgs.msg import PoseStamped, TransformStamped
-
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -44,6 +43,7 @@ def _recluster_and_goto_sequence(
     next_frame: str,
     clustering_in_children: list[str],
     is_left: bool = True,
+    missing_layers: int = 1,
 ):
     """
     Creates a recluster and goto sequence that:
@@ -57,8 +57,8 @@ def _recluster_and_goto_sequence(
     current_frame_with_side = f"{current_frame}/{side}"
     next_frame_with_side = f"{next_frame}/{side}"
 
-    yaw_sequence = py_trees.composites.Sequence(
-        name=f"Recluster and goto sequence ({current_frame_with_side} -> {next_frame_with_side})",
+    seq_recluster_goto = py_trees.composites.Sequence(
+        name=f"Recluster and goto ({side}, missing layers: {missing_layers}) from {current_frame} to {next_frame}",
         memory=True,
     )
 
@@ -70,20 +70,20 @@ def _recluster_and_goto_sequence(
     )
 
     create_current_to_next_pose = DynamicSetBlackboard(
-        name="Dynamic create pose for goto yaw between current and next layer",
+        name=f"Create yaw pose ({side}, missing layers: {missing_layers})",
         key=_LAYER_TO_LAYER_TF_KEY,
         update_key=_LAYER_TO_LAYER_POSE_KEY,
         overwrite=True,
         func=lambda tf: create_yawed_pose(frame_id=current_frame_with_side, tf=tf),
     )
 
-    yaw_towards_next = goto.FromBlackboard(
-        name="Goto yaw towards next layer",
+    goto_yaw_towards_next = goto.FromBlackboard(
+        name=f"Yaw towards next layer ({side}, missing layers: {missing_layers})",
         pose_key=_LAYER_TO_LAYER_POSE_KEY,
     )
 
     recluster_action = py_trees_ros.action_clients.FromConstant(
-        name="Recluster slalom transforms",
+        name=f"Recluster transforms ({side}, missing layers: {missing_layers})",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf_multi",
         action_goal=create_clustering_goal(
@@ -98,28 +98,29 @@ def _recluster_and_goto_sequence(
     )
 
     goto_reclustered = goto.FromConstant(
-        name="Goto reclustered next layer",
+        name=f"Goto reclustered next layer ({side}, missing layers: {missing_layers})",
         pose=create_stamped_pose(f"{CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED}/{side}"),
         specified_heading=False,
     )
 
-    yaw_sequence.add_children(
+    seq_recluster_goto.add_children(
         [
             get_current_to_next_tf,
             create_current_to_next_pose,
-            yaw_towards_next,
+            goto_yaw_towards_next,
             recluster_action,
             goto_reclustered,
         ]
     )
 
-    return yaw_sequence
+    return seq_recluster_goto
 
 
 def _sweep_and_goto_sequence(
     clustering_in_children: list[str],
     is_left: bool = True,
     sweep_angle_degrees: float = 45.0,
+    missing_layers: int = 1,
 ):
     """
     Creates a sweep and goto sequence that:
@@ -130,13 +131,13 @@ def _sweep_and_goto_sequence(
     """
     side = "left" if is_left else "right"
 
-    root = py_trees.composites.Sequence(
-        name="Sweep and goto sequence",
+    seq_sweep_goto = py_trees.composites.Sequence(
+        name=f"Sweep and goto sequence ({side}, missing layers: {missing_layers})",
         memory=True,
     )
 
-    parallel_sweep_recluster = py_trees.composites.Parallel(
-        name="Parallel sweep and recluster",
+    par_sweep_recluster = py_trees.composites.Parallel(
+        name=f"Parallel sweep and recluster ({side}, missing layers: {missing_layers})",
         policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
     )
 
@@ -149,14 +150,14 @@ def _sweep_and_goto_sequence(
         ),
     ]
 
-    sweep_sequence = goto.NFromConstant(
-        name="Sweep left then right",
+    goto_sweep = goto.NFromConstant(
+        name=f"Sweep left then right ({side}, missing layers: {missing_layers})",
         poses=sweep_poses,
         wait_between_moves_sec=1.0,
     )
 
     recluster_action = py_trees_ros.action_clients.FromConstant(
-        name="Recluster slalom transforms",
+        name=f"Recluster during sweep ({side}, missing layers: {missing_layers})",
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf_multi",
         action_goal=create_clustering_goal(
@@ -170,27 +171,27 @@ def _sweep_and_goto_sequence(
         ),
     )
 
-    parallel_sweep_recluster.add_children(
+    par_sweep_recluster.add_children(
         [
-            sweep_sequence,
+            goto_sweep,
             recluster_action,
         ]
     )
 
     goto_reclustered_zero = goto.FromConstant(
-        name="Goto reclustered zero cluster",
+        name=f"Goto reclustered zero cluster ({side}, missing layers: {missing_layers})",
         pose=create_stamped_pose(f"{CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED}/{side}"),
         specified_heading=False,
     )
 
-    root.add_children(
+    seq_sweep_goto.add_children(
         [
-            parallel_sweep_recluster,
+            par_sweep_recluster,
             goto_reclustered_zero,
         ]
     )
 
-    return root
+    return seq_sweep_goto
 
 
 def create_yawed_pose(frame_id: str, tf: TransformStamped) -> PoseStamped:
@@ -212,7 +213,7 @@ def create_channel_movement_zero_root(
     Zero case: Check if is left, if yes then recluster and goto on layer 0 to layer 1,
     then recluster and goto on reclustered to layer 2. Fallback to right case if not left.
     """
-
+    missing_layers = None
     clustering_in_children = [
         slalom_frame_zero_clustered.split("/")[-2],
         slalom_frame_one_clustered.split("/")[-2],
@@ -220,18 +221,18 @@ def create_channel_movement_zero_root(
     ]
 
     root = py_trees.composites.Selector(
-        name="Channel Movement 0 missing",
+        name="Channel Movement: Zero Layers Missing",
         memory=True,
     )
 
     # Left side sequence
-    left_sequence = py_trees.composites.Sequence(
-        name="Left side sequence",
+    seq_zero_missing_left = py_trees.composites.Sequence(
+        name="Left side sequence: zero layers missing",
         memory=True,
     )
 
     check_is_left = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check is left",
+        name="Check is left (Zero Layers Missing)",
         check=py_trees.common.ComparisonExpression(
             variable=is_left_key,
             value=True,
@@ -240,7 +241,7 @@ def create_channel_movement_zero_root(
     )
 
     goto_layer_0_left = goto.FromConstant(
-        name="Goto layer 0 left",
+        name="Goto layer 0 (left): zero layers missing",
         pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/left"),
         specified_heading=False,
     )
@@ -250,17 +251,18 @@ def create_channel_movement_zero_root(
         next_frame=slalom_frame_one_clustered,
         clustering_in_children=clustering_in_children,
         is_left=True,
+        missing_layers=missing_layers,
     )
 
-    # Recluster and goto from reclustered to layer 2 (left)
     recluster_reclustered_to_2_left = _recluster_and_goto_sequence(
         current_frame=CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED,
         next_frame=slalom_frame_two_clustered,
         clustering_in_children=clustering_in_children,
         is_left=True,
+        missing_layers=missing_layers,
     )
 
-    left_sequence.add_children(
+    seq_zero_missing_left.add_children(
         [
             check_is_left,
             goto_layer_0_left,
@@ -270,34 +272,34 @@ def create_channel_movement_zero_root(
     )
 
     # Right side sequence (fallback)
-    right_sequence = py_trees.composites.Sequence(
-        name="Right side sequence",
+    seq_zero_missing_right = py_trees.composites.Sequence(
+        name="Right side sequence: zero layers missing",
         memory=True,
     )
 
     goto_layer_0_right = goto.FromConstant(
-        name="Goto layer 0 right",
+        name="Goto layer 0 (right): zero layers missing",
         pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/right"),
         specified_heading=False,
     )
 
-    # Recluster and goto from layer 0 to layer 1 (right)
     recluster_0_to_1_right = _recluster_and_goto_sequence(
         current_frame=slalom_frame_zero_clustered,
         next_frame=slalom_frame_one_clustered,
         clustering_in_children=clustering_in_children,
         is_left=False,
+        missing_layers=missing_layers,
     )
 
-    # Recluster and goto from reclustered to layer 2 (right)
     recluster_reclustered_to_2_right = _recluster_and_goto_sequence(
         current_frame=CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED,
         next_frame=slalom_frame_two_clustered,
         clustering_in_children=clustering_in_children,
         is_left=False,
+        missing_layers=missing_layers,
     )
 
-    right_sequence.add_children(
+    seq_zero_missing_right.add_children(
         [
             goto_layer_0_right,
             recluster_0_to_1_right,
@@ -307,8 +309,8 @@ def create_channel_movement_zero_root(
 
     root.add_children(
         [
-            left_sequence,
-            right_sequence,
+            seq_zero_missing_left,
+            seq_zero_missing_right,
         ]
     )
 
@@ -324,6 +326,97 @@ def check_tf_dist(
     return "two" if delta_x < dist_threshold else "one"
 
 
+def create_channel_movement_layer_one_missing_root(
+    slalom_frame_zero_clustered: str = "slalom_layer_0/clustered",
+    slalom_frame_one_clustered: str = "slalom_layer_1/clustered",
+    slalom_frame_two_clustered: str = "slalom_layer_2/clustered",
+    is_left: bool = True,
+):
+    side = "left" if is_left else "right"
+
+    clustering_in_children = [
+        slalom_frame_zero_clustered.split("/")[-2],
+        slalom_frame_one_clustered.split("/")[-2],
+        slalom_frame_two_clustered.split("/")[-2],
+    ]
+
+    seq_missing_layer_one = py_trees.composites.Sequence(
+        name=f"Movement sequence for missing 1 layer ({side})", memory=True
+    )
+
+    goto_layer_0 = goto.FromConstant(
+        name=f"Goto layer 0 ({side}): missing 1 layer",
+        pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/{side}"),
+        specified_heading=False,
+    )
+
+    sweep_and_goto_layer_1 = _sweep_and_goto_sequence(
+        clustering_in_children=clustering_in_children,
+        is_left=is_left,
+        missing_layers=1,
+    )
+
+    recluster_reclustered_to_2 = _recluster_and_goto_sequence(
+        current_frame=CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED,
+        next_frame=slalom_frame_two_clustered,
+        clustering_in_children=clustering_in_children,
+        is_left=is_left,
+        missing_layers=1,
+    )
+
+    seq_missing_layer_one.add_children(
+        [goto_layer_0, sweep_and_goto_layer_1, recluster_reclustered_to_2]
+    )
+
+    return seq_missing_layer_one
+
+
+def create_channel_movement_layer_two_missing_root(
+    slalom_frame_zero_clustered: str = "slalom_layer_0/clustered",
+    slalom_frame_one_clustered: str = "slalom_layer_1/clustered",
+    slalom_frame_two_clustered: str = "slalom_layer_2/clustered",
+    is_left: bool = True,
+):
+    side = "left" if is_left else "right"
+
+    clustering_in_children = [
+        slalom_frame_zero_clustered.split("/")[-2],
+        slalom_frame_one_clustered.split("/")[-2],
+        slalom_frame_two_clustered.split("/")[-2],
+    ]
+
+    # This flow is for when one layer is missing (in this case, layer 2).
+    seq_missing_layer_two = py_trees.composites.Sequence(
+        name=f"Movement sequence for missing 1 layer ({side})", memory=True
+    )
+
+    goto_layer_0 = goto.FromConstant(
+        name=f"Goto layer 0 ({side}): missing 1 layer",
+        pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/{side}"),
+        specified_heading=False,
+    )
+
+    recluster_reclustered_to_1 = _recluster_and_goto_sequence(
+        current_frame=slalom_frame_zero_clustered,
+        next_frame=slalom_frame_one_clustered,
+        clustering_in_children=clustering_in_children,
+        is_left=is_left,
+        missing_layers=1,
+    )
+
+    sweep_and_goto_layer_2 = _sweep_and_goto_sequence(
+        clustering_in_children=clustering_in_children,
+        is_left=is_left,
+        missing_layers=1,
+    )
+
+    seq_missing_layer_two.add_children(
+        [goto_layer_0, recluster_reclustered_to_1, sweep_and_goto_layer_2]
+    )
+
+    return seq_missing_layer_two
+
+
 def create_channel_movement_one_root(
     slalom_frame_zero_clustered: str = "slalom_layer_0/clustered",
     slalom_frame_one_clustered: str = "slalom_layer_1/clustered",
@@ -331,14 +424,8 @@ def create_channel_movement_one_root(
     is_left_key: str = "is_left_key",
     wait_between_moves_sec: float = 4.0,
 ):
-    clustering_in_children = [
-        slalom_frame_zero_clustered.split("/")[-2],
-        slalom_frame_one_clustered.split("/")[-2],
-        slalom_frame_two_clustered.split("/")[-2],
-    ]
-
-    root = py_trees.composites.Sequence(
-        name="Channel Movement 1 missing",
+    seq_channel_movement_one_missing = py_trees.composites.Sequence(
+        name="Channel Movement: One Layer Missing",
         memory=True,
     )
 
@@ -350,24 +437,25 @@ def create_channel_movement_one_root(
     )
 
     dynamic_tf_check = DynamicSetBlackboard(
-        name="Dynamic transform check missing layer",
+        name="Check distance to determine missing layer",
         key=_LAYER_TO_LAYER_TF_KEY,
         update_key=_MISSING_LAYER_KEY,
         overwrite=True,
         func=lambda x: check_tf_dist(x, dist_threshold=3.0),
     )
 
-    sel_correct_missing_layer = py_trees.composites.Selector(
-        name="Selector for missing layer",
+    sel_missing_layer_logic = py_trees.composites.Selector(
+        name="Select logic for missing layer 1 or 2",
         memory=True,
     )
 
-    seq_missing_layer_one = py_trees.composites.Sequence(
-        name="Sequence for missing layer 1", memory=True
+    # Sequence for when layer 1 is determined to be missing
+    seq_handle_missing_layer_one = py_trees.composites.Sequence(
+        name="Handle missing layer 1", memory=True
     )
 
     missing_layer_one_check = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check is missing layer one",
+        name="Check if layer 1 is missing",
         check=py_trees.common.ComparisonExpression(
             variable=_MISSING_LAYER_KEY,
             value="one",
@@ -375,18 +463,18 @@ def create_channel_movement_one_root(
         ),
     )
 
-    sel_left_right_one = py_trees.composites.Selector(
-        name="Select left or right",
+    sel_left_right_missing_one = py_trees.composites.Selector(
+        name="Select side for missing layer 1",
         memory=True,
     )
 
-    left_sequence_one = py_trees.composites.Sequence(
-        name="Left side sequence",
+    seq_left_missing_one = py_trees.composites.Sequence(
+        name="Left side sequence for missing layer 1",
         memory=True,
     )
 
     check_is_left_one = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check is left",
+        name="Check is left (for missing layer 1)",
         check=py_trees.common.ComparisonExpression(
             variable=is_left_key,
             value=True,
@@ -394,76 +482,45 @@ def create_channel_movement_one_root(
         ),
     )
 
-    goto_layer_0_left_one = goto.FromConstant(
-        name="Goto layer 0 left",
-        pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/left"),
-        specified_heading=False,
-    )
-
-    sweep_and_goto_layer_1_left = _sweep_and_goto_sequence(
-        clustering_in_children=clustering_in_children, is_left=True
-    )
-
-    recluster_reclustered_to_2_left = _recluster_and_goto_sequence(
-        current_frame=CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED,
-        next_frame=slalom_frame_two_clustered,
-        clustering_in_children=clustering_in_children,
+    seq_movement_missing_one_left = create_channel_movement_layer_one_missing_root(
+        slalom_frame_zero_clustered=slalom_frame_zero_clustered,
+        slalom_frame_one_clustered=slalom_frame_one_clustered,
+        slalom_frame_two_clustered=slalom_frame_two_clustered,
         is_left=True,
     )
 
-    left_sequence_one.add_children(
-        [
-            check_is_left_one,
-            goto_layer_0_left_one,
-            sweep_and_goto_layer_1_left,
-            recluster_reclustered_to_2_left,
-        ]
+    seq_left_missing_one.add_children(
+        [check_is_left_one, seq_movement_missing_one_left]
     )
 
-    right_sequence_one = py_trees.composites.Sequence(
-        name="Right side sequence",
-        memory=True,
-    )
-
-    goto_layer_0_right_one = goto.FromConstant(
-        name="Goto layer 0 right",
-        pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/right"),
-        specified_heading=False,
-    )
-
-    sweep_and_goto_layer_1_right = _sweep_and_goto_sequence(
-        clustering_in_children=clustering_in_children, is_left=False
-    )
-
-    recluster_reclustered_to_2_right = _recluster_and_goto_sequence(
-        current_frame=CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED,
-        next_frame=slalom_frame_two_clustered,
-        clustering_in_children=clustering_in_children,
+    seq_movement_missing_one_right = create_channel_movement_layer_one_missing_root(
+        slalom_frame_zero_clustered=slalom_frame_zero_clustered,
+        slalom_frame_one_clustered=slalom_frame_one_clustered,
+        slalom_frame_two_clustered=slalom_frame_two_clustered,
         is_left=False,
     )
 
-    right_sequence_one.add_children(
-        [
-            goto_layer_0_right_one,
-            sweep_and_goto_layer_1_right,
-            recluster_reclustered_to_2_right,
-        ]
+    sel_left_right_missing_one.add_children(
+        [seq_left_missing_one, seq_movement_missing_one_right]
     )
 
-    sel_left_right_one.add_children([left_sequence_one, right_sequence_one])
+    seq_handle_missing_layer_one.add_children(
+        [missing_layer_one_check, sel_left_right_missing_one]
+    )
 
-    sel_left_right_two = py_trees.composites.Selector(
-        name="Select left or right",
+    # Selector for when layer 2 is determined to be missing (fallback from layer 1 check)
+    sel_handle_missing_layer_two = py_trees.composites.Selector(
+        name="Select side for missing layer 2",
         memory=True,
     )
 
-    left_sequence_two = py_trees.composites.Sequence(
-        name="Left side sequence",
+    seq_left_missing_two = py_trees.composites.Sequence(
+        name="Left side sequence for missing layer 2",
         memory=True,
     )
 
     check_is_left_two = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check is left",
+        name="Check is left (for missing layer 2)",
         check=py_trees.common.ComparisonExpression(
             variable=is_left_key,
             value=True,
@@ -471,82 +528,41 @@ def create_channel_movement_one_root(
         ),
     )
 
-    goto_layer_0_left_two = goto.FromConstant(
-        name="Goto layer 0 left",
-        pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/left"),
-        specified_heading=False,
-    )
-
-    recluster_0_to_1_left = _recluster_and_goto_sequence(
-        current_frame=slalom_frame_zero_clustered,
-        next_frame=slalom_frame_one_clustered,
-        clustering_in_children=clustering_in_children,
+    seq_movement_missing_two_left = create_channel_movement_layer_two_missing_root(
+        slalom_frame_zero_clustered=slalom_frame_zero_clustered,
+        slalom_frame_one_clustered=slalom_frame_one_clustered,
+        slalom_frame_two_clustered=slalom_frame_two_clustered,
         is_left=True,
     )
 
-    sweep_and_goto_layer_2_left = _sweep_and_goto_sequence(
-        clustering_in_children=clustering_in_children, is_left=True
+    seq_left_missing_two.add_children(
+        [check_is_left_two, seq_movement_missing_two_left]
     )
 
-    left_sequence_two.add_children(
-        [
-            check_is_left_two,
-            goto_layer_0_left_two,
-            recluster_0_to_1_left,
-            sweep_and_goto_layer_2_left,
-        ]
-    )
-
-    right_sequence_two = py_trees.composites.Sequence(
-        name="Right side sequence",
-        memory=True,
-    )
-
-    goto_layer_0_right_two = goto.FromConstant(
-        name="Goto layer 0 right",
-        pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/right"),
-        specified_heading=False,
-    )
-
-    recluster_0_to_1_right = _recluster_and_goto_sequence(
-        current_frame=slalom_frame_zero_clustered,
-        next_frame=slalom_frame_one_clustered,
-        clustering_in_children=clustering_in_children,
+    seq_movement_missing_two_right = create_channel_movement_layer_two_missing_root(
+        slalom_frame_zero_clustered=slalom_frame_zero_clustered,
+        slalom_frame_one_clustered=slalom_frame_one_clustered,
+        slalom_frame_two_clustered=slalom_frame_two_clustered,
         is_left=False,
     )
 
-    sweep_and_goto_layer_2_right = _sweep_and_goto_sequence(
-        clustering_in_children=clustering_in_children, is_left=False
+    sel_handle_missing_layer_two.add_children(
+        [seq_left_missing_two, seq_movement_missing_two_right]
     )
 
-    sel_left_right_two = py_trees.composites.Selector(
-        name="Select left or right",
-        memory=True,
+    sel_missing_layer_logic.add_children(
+        [seq_handle_missing_layer_one, sel_handle_missing_layer_two]
     )
 
-    right_sequence_two.add_children(
-        [
-            goto_layer_0_right_two,
-            recluster_0_to_1_right,
-            sweep_and_goto_layer_2_right,
-        ]
-    )
-
-    sel_left_right_two.add_children([left_sequence_two, right_sequence_two])
-
-    seq_missing_layer_one.add_children([missing_layer_one_check, sel_left_right_one])
-
-    sel_correct_missing_layer.add_children([seq_missing_layer_one, sel_left_right_two])
-
-    root.add_children(
+    seq_channel_movement_one_missing.add_children(
         [
             get_layer_0_to_1_tf,
             dynamic_tf_check,
-            sel_correct_missing_layer,
+            sel_missing_layer_logic,
         ]
     )
 
-    return root
+    return seq_channel_movement_one_missing
 
 
 def create_channel_movement_two_root(
@@ -562,19 +578,19 @@ def create_channel_movement_two_root(
         slalom_frame_two_clustered.split("/")[-2],
     ]
 
-    root = py_trees.composites.Selector(
-        name="Channel Movement 2 missing",
+    sel_channel_movement_two_missing = py_trees.composites.Selector(
+        name="Channel Movement: Two Layers Missing",
         memory=True,
     )
 
     # Left side sequence
-    left_sequence = py_trees.composites.Sequence(
-        name="Left side sequence",
+    seq_two_missing_left = py_trees.composites.Sequence(
+        name="Left side sequence: two layers missing",
         memory=True,
     )
 
     check_is_left = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check is left",
+        name="Check is left (Two Layers Missing)",
         check=py_trees.common.ComparisonExpression(
             variable=is_left_key,
             value=True,
@@ -583,7 +599,7 @@ def create_channel_movement_two_root(
     )
 
     goto_layer_0_left = goto.FromConstant(
-        name="Goto layer 0 left",
+        name="Goto layer 0 (left): two layers missing",
         pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/left"),
         specified_heading=False,
     )
@@ -591,14 +607,16 @@ def create_channel_movement_two_root(
     sweep_and_goto_layer_1_left = _sweep_and_goto_sequence(
         clustering_in_children=clustering_in_children,
         is_left=True,
+        missing_layers=2,
     )
 
     sweep_and_goto_layer_2_left = _sweep_and_goto_sequence(
         clustering_in_children=clustering_in_children,
         is_left=True,
+        missing_layers=2,
     )
 
-    left_sequence.add_children(
+    seq_two_missing_left.add_children(
         [
             check_is_left,
             goto_layer_0_left,
@@ -607,13 +625,14 @@ def create_channel_movement_two_root(
         ]
     )
 
-    right_sequence = py_trees.composites.Sequence(
-        name="Right side sequence",
+    # Right side sequence
+    seq_two_missing_right = py_trees.composites.Sequence(
+        name="Right side sequence: two layers missing",
         memory=True,
     )
 
     goto_layer_0_right = goto.FromConstant(
-        name="Goto layer 0 right",
+        name="Goto layer 0 (right): two layers missing",
         pose=create_stamped_pose(f"{slalom_frame_zero_clustered}/right"),
         specified_heading=False,
     )
@@ -621,14 +640,16 @@ def create_channel_movement_two_root(
     sweep_and_goto_layer_1_right = _sweep_and_goto_sequence(
         clustering_in_children=clustering_in_children,
         is_left=False,
+        missing_layers=2,
     )
 
     sweep_and_goto_layer_2_right = _sweep_and_goto_sequence(
         clustering_in_children=clustering_in_children,
         is_left=False,
+        missing_layers=2,
     )
 
-    right_sequence.add_children(
+    seq_two_missing_right.add_children(
         [
             goto_layer_0_right,
             sweep_and_goto_layer_1_right,
@@ -636,11 +657,11 @@ def create_channel_movement_two_root(
         ]
     )
 
-    root.add_children(
+    sel_channel_movement_two_missing.add_children(
         [
-            left_sequence,
-            right_sequence,
+            seq_two_missing_left,
+            seq_two_missing_right,
         ]
     )
 
-    return root
+    return sel_channel_movement_two_missing
