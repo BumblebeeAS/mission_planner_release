@@ -73,7 +73,7 @@ BEHAVIOUR_REGISTRY = [
     LedBehaviour(
         name="stabilise",
         class_type=py_trees.timers.Timer,
-        search_str=["stabilise"],
+        search_str=["stabilise", "stabilize"],
         color=ORANGE,
     ),
 ]
@@ -92,7 +92,7 @@ class LedVisitor(VisitorBase):
         super().initialise()
 
         self.changed = False
-        self.previous_state = self.state
+        self.previous_state = self.state.copy()
 
         for led_behaviour in BEHAVIOUR_REGISTRY:
             self.state[led_behaviour.name] = py_trees.common.Status.INVALID
@@ -108,32 +108,26 @@ class LedVisitor(VisitorBase):
                         self.state[led_behaviour.name]
                         != self.previous_state[led_behaviour.name]
                     )
-
+                    return
             else:
                 contains_str = False
-
                 cleaned_name = behaviour.name.lower()
 
                 for search_str in led_behaviour.search_str:
                     if search_str in cleaned_name:
                         contains_str = True
-
                         break
 
                 if contains_str and isinstance(behaviour, led_behaviour.class_type):
                     self.state[led_behaviour.name] = behaviour.status
+                    self.changed = self.changed or (
+                        self.state[led_behaviour.name]
+                        != self.previous_state[led_behaviour.name]
+                    )
+                    return
 
     def finalise(self) -> None:
         super().finalise()
-
-        for status in self.state.values():
-            if status == py_trees.common.Status.SUCCESS:
-                self.is_success = True
-
-            if status == py_trees.common.Status.FAILURE:
-                self.is_failure = True
-
-                break
 
 
 def led_handler(
@@ -141,16 +135,11 @@ def led_handler(
     led_publisher: Publisher,
     tree: py_trees_ros.trees.BehaviourTree,
 ) -> None:
-    if py_trees.common.Status.FAILURE in visitor.state.values():
-        led_publisher.publish(RED)
-        return
-
-    if py_trees.common.Status.SUCCESS in visitor.state.values():
-        led_publisher.publish(GREEN)
+    if not visitor.changed:
         return
 
     for led_behaviour in BEHAVIOUR_REGISTRY:
-        if led_behaviour.name in visitor.state:
+        if visitor.state[led_behaviour.name] == py_trees.common.Status.RUNNING:
             led_publisher.publish(led_behaviour.color)
             break
 
