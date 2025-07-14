@@ -21,7 +21,7 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.slalom.channel_movement import (
+from mission_planner_2.trees.auv.slalom.channel_movement_recluster import (
     create_channel_movement_one_root,
     create_channel_movement_two_root,
     create_channel_movement_zero_root,
@@ -61,8 +61,8 @@ THIRD_VIEW = {"position_x": 7.0, "position_y": -0.8, "position_z": 1.0, "yaw": -
 """
 
 FIRST_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.0, "yaw": 0.0}
-SECOND_VIEW = {"position_x": 0.0, "position_y": -1.2, "position_z": 0.0, "yaw": 0.0}
-THIRD_VIEW = {"position_x": 0.0, "position_y": 2.4, "position_z": 0.0, "yaw": 0.0}
+SECOND_VIEW = {"position_x": 0.0, "position_y": -1.0, "position_z": 0.0, "yaw": 0.0}
+THIRD_VIEW = {"position_x": 0.0, "position_y": 2.0, "position_z": 0.0, "yaw": 0.0}
 
 # set by  gate task if there change must change here too
 IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
@@ -359,24 +359,21 @@ def create_slalom_root():
         slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
         slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
         slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-        create_func_key=_CREATE_POSE_FUNC_KEY,
+        is_left_key=IS_LEFT_KEY,
         wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
     )
     move_channel_two = create_channel_movement_one_root(
         slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
         slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-        slalom_frame_zero_key=_CHANNEL_ZERO_KEY,
-        slalom_frame_one_key=_CHANNEL_ONE_KEY,
-        slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
-        slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
-        create_func_key=_CREATE_POSE_FUNC_KEY,
+        slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+        is_left_key=IS_LEFT_KEY,
         wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
     )
     move_channel_three = create_channel_movement_two_root(
         slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-        slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
-        slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
-        create_func_key=_CREATE_POSE_FUNC_KEY,
+        slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+        slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+        is_left_key=IS_LEFT_KEY,
         wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
     )
 

@@ -46,7 +46,7 @@ gate:
   - name: centre_view
     parents:
       - "gate/centre"
-    y: 1.0
+    y: 0.4
     z: -2.0
     roll: -90.0
     pitch: -90.0
@@ -54,7 +54,7 @@ gate:
     parents:
       - "gate/left"
       - "gate/right"
-    y: 1.0
+    y: 0.4
     z: -1.0
     roll: -90.0
     pitch: -90.0
@@ -86,3 +86,26 @@ octagon:
       - "pink_bucket/clustered"
     z: -0.1
     yaw: -90.0
+slalom:
+  - name: slalom_left_channel
+    suffix: left
+    parents:
+      - "slalom_layer_0/clustered"
+      - "slalom_layer_1/clustered"
+      - "slalom_layer_2/clustered"
+      - "slalom/reclustered"
+    x: 0.75
+    y: 0.3
+    roll: -90.0
+    pitch: -90.0
+  - name: slalom_right_channel
+    suffix: right
+    parents:
+      - "slalom_layer_0/clustered"
+      - "slalom_layer_1/clustered"
+      - "slalom_layer_2/clustered"
+      - "slalom/reclustered"
+    x: 2.25
+    y: 0.3
+    roll: -90.0
+    pitch: -90.0
