@@ -86,12 +86,13 @@ class LedVisitor(VisitorBase):
         super().__init__(full)
 
         self.state = {}
+        self.previous_state = {}
 
     def initialise(self) -> None:
         super().initialise()
 
-        self.is_success = False
-        self.is_failure = False
+        self.changed = False
+        self.previous_state = self.state
 
         for led_behaviour in BEHAVIOUR_REGISTRY:
             self.state[led_behaviour.name] = py_trees.common.Status.INVALID
@@ -103,13 +104,20 @@ class LedVisitor(VisitorBase):
             if led_behaviour.search_str is None:
                 if isinstance(behaviour, led_behaviour.class_type):
                     self.state[led_behaviour.name] = behaviour.status
+                    self.changed = self.changed or (
+                        self.state[led_behaviour.name]
+                        != self.previous_state[led_behaviour.name]
+                    )
+
             else:
                 contains_str = False
 
                 cleaned_name = behaviour.name.lower()
+
                 for search_str in led_behaviour.search_str:
                     if search_str in cleaned_name:
                         contains_str = True
+
                         break
 
                 if contains_str and isinstance(behaviour, led_behaviour.class_type):
@@ -124,6 +132,7 @@ class LedVisitor(VisitorBase):
 
             if status == py_trees.common.Status.FAILURE:
                 self.is_failure = True
+
                 break
 
 
@@ -132,19 +141,18 @@ def led_handler(
     led_publisher: Publisher,
     tree: py_trees_ros.trees.BehaviourTree,
 ) -> None:
-    if visitor.is_failure:
+    if py_trees.common.Status.FAILURE in visitor.state.values():
         led_publisher.publish(RED)
         return
 
-    if visitor.is_success:
+    if py_trees.common.Status.SUCCESS in visitor.state.values():
         led_publisher.publish(GREEN)
         return
 
     for led_behaviour in BEHAVIOUR_REGISTRY:
-        if visitor.state[led_behaviour.name] == py_trees.common.Status.INVALID:
-            continue
-
-        led_publisher.publish(led_behaviour.color)
+        if led_behaviour.name in visitor.state:
+            led_publisher.publish(led_behaviour.color)
+            break
 
 
 def create_led_tree(
