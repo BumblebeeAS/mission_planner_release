@@ -1,10 +1,8 @@
 import py_trees
 import py_trees_ros
-from bb_auv_msgs.action import Grabber
+from bb_behavior_msgs.action import AlignAndCollect
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import UInt8
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -22,9 +20,11 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.octagon.bottle import create_bottle_root
 from mission_planner_2.trees.auv.octagon.helpers import view_frame_func
-from mission_planner_2.trees.auv.octagon.ladle import create_ladle_root
+from mission_planner_2.trees.auv.octagon.rubbish import (
+    create_reset_after_rubbish_root,
+    create_rubbish_root,
+)
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -66,9 +66,6 @@ FISH_VIEW_FRAME_HARDCODED = "trash/fish/clustered/view/hardcoded"
 SHARK_VIEW_FRAME = "trash/shark/clustered/view"
 SHARK_VIEW_FRAME_HARDCODED = "trash/shark/clustered/view/hardcoded"
 
-ACTIVATE_GRABBER = UInt8(data=0)
-HALF_CLOSE_GRABBER = UInt8(data=3)
-
 CLUSTER_DURATION = 30
 NUM_ROTATIONS = 6
 STABILIZE_DURATION = 10
@@ -78,8 +75,6 @@ STABILIZE_DURATION = 10
 # DONT go move it in the section to be updated
 _CHOICE_KEY = fk("choice")
 _GO_SURFACE_FRAME_KEY = fk("go_surface_frame")
-_ACTIVATE_GRABBER_KEY = fk("activate_grabber")
-_HALF_CLOSE_GRABBER_KEY = fk("half_close_grabber")
 _START_VISION_KEY = fk("bin_start_vision")
 _STOP_VISION_KEY = fk("bin_stop_vision")
 _FISH_TF_KEY = fk("fish_tf")
@@ -176,107 +171,160 @@ def create_octagon_root():
     )
 
     ################## SPOON PART #################
-    seq_spoon_1 = create_ladle_root(
-        ladle_0_frame=LADLE_0_FRAME,
-        ladle_1_frame=LADLE_1_FRAME,
-        ladle_0_view_frame=LADLE_0_VIEW_FRAME,
-        ladle_1_view_frame=LADLE_1_VIEW_FRAME,
-        ladle_0_frame_clustered=LADLE_0_FRAME_CLUSTERED,
-        ladle_1_frame_clustered=LADLE_1_FRAME_CLUSTERED,
-        ladle_basket_frame=LADLE_BASKET_FRAME,
-        ladle_basket_frame_clustered=LADLE_BASKET_FRAME_CLUSTERED,
-        ladle_basket_view_frame=LADLE_BASKET_VIEW_FRAME,
-        cluster_duration=CLUSTER_DURATION,
-        surface_frame_key=_GO_SURFACE_FRAME_KEY,
-        actuation_topic=ACTUATION_TOPIC,
+    # TODO: no drop stuff after adding drop sequence can consider abstracting more
+    seq_spoon_1 = py_trees.composites.Sequence(
+        name="Spoon 1",
+        memory=True,
+    )
+    seq_spoon_2 = py_trees.composites.Sequence(
+        name="Spoon 2",
+        memory=True,
     )
 
-    cluster_reset_symbols_1 = py_trees_ros.actions.ActionClient(
-        name="Cluster symbols",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=[FISH_FRAME, SHARK_FRAME],
-            out_children=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
-            duration=CLUSTER_DURATION,
-            use_cache=False,
-            persistent=True,
+    _call_samuel_spoon_1 = py_trees_ros.actions.ActionClient(
+        name="Call Samuel pick up (spoon 1)",
+        action_type=AlignAndCollect,
+        action_name="/auv4/octagon/pick_up",
+        action_goal=AlignAndCollect.Goal(
+            object_frame="ladle_2_0",  # TODO: ask samuel to change this
+            object_frame_clustered=LADLE_0_FRAME_CLUSTERED,
         ),
     )
 
-    seq_spoon_2 = create_ladle_root(
-        ladle_0_frame=LADLE_0_FRAME,
-        ladle_1_frame=LADLE_1_FRAME,
-        ladle_0_view_frame=LADLE_0_VIEW_FRAME,
-        ladle_1_view_frame=LADLE_1_VIEW_FRAME,
-        ladle_0_frame_clustered=LADLE_0_FRAME_CLUSTERED,
-        ladle_1_frame_clustered=LADLE_1_FRAME_CLUSTERED,
-        ladle_basket_frame=LADLE_BASKET_FRAME,
-        ladle_basket_frame_clustered=LADLE_BASKET_FRAME_CLUSTERED,
-        ladle_basket_view_frame=LADLE_BASKET_VIEW_FRAME,
+    seq_spoon_1_pick = create_rubbish_root(
+        depth_threshold=0.1,
+        rubbish_frame=LADLE_0_FRAME,
+        rubbish_frame_clustered=LADLE_0_FRAME_CLUSTERED,
         cluster_duration=CLUSTER_DURATION,
-        surface_frame_key=_GO_SURFACE_FRAME_KEY,
-        actuation_topic=ACTUATION_TOPIC,
+        call_samuel=_call_samuel_spoon_1,
+        rubbish_name="spoon 1",
     )
 
-    cluster_reset_symbols_2 = py_trees_ros.actions.ActionClient(
-        name="Cluster symbols",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=[FISH_FRAME, SHARK_FRAME],
-            out_children=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
-            duration=CLUSTER_DURATION,
-            use_cache=False,
-            persistent=True,
+    seq_reset_spoon_1_pick = create_reset_after_rubbish_root(
+        fish_frame=FISH_FRAME,
+        fish_frame_clustered=FISH_FRAME_CLUSTERED,
+        shark_frame=SHARK_FRAME,
+        shark_frame_clustered=SHARK_FRAME_CLUSTERED,
+        fish_view_frame=FISH_VIEW_FRAME,
+        fish_view_frame_hardcoded=FISH_VIEW_FRAME_HARDCODED,
+        shark_view_frame=SHARK_VIEW_FRAME,
+        shark_view_frame_hardcoded=SHARK_VIEW_FRAME_HARDCODED,
+        cluster_duration=CLUSTER_DURATION,
+        choice_key=_CHOICE_KEY,
+        rubbish_name="spoon 1 pick",
+    )
+
+    _call_samuel_spoon_2 = py_trees_ros.actions.ActionClient(
+        name="Call Samuel pick up (spoon 2)",
+        action_type=AlignAndCollect,
+        action_name="/auv4/octagon/pick_up",
+        action_goal=AlignAndCollect.Goal(
+            object_frame="Ladle_2_1",  # TODO: ask samuel to change this
+            object_frame_clustered=LADLE_1_FRAME_CLUSTERED,
         ),
+    )
+
+    seq_spoon_2_pick = create_rubbish_root(
+        depth_threshold=0.1,
+        rubbish_frame=LADLE_1_FRAME,
+        rubbish_frame_clustered=LADLE_1_FRAME_CLUSTERED,
+        cluster_duration=CLUSTER_DURATION,
+        call_samuel=_call_samuel_spoon_2,
+        rubbish_name="spoon 2",
+    )
+
+    seq_reset_spoon_2_pick = create_reset_after_rubbish_root(
+        fish_frame=FISH_FRAME,
+        fish_frame_clustered=FISH_FRAME_CLUSTERED,
+        shark_frame=SHARK_FRAME,
+        shark_frame_clustered=SHARK_FRAME_CLUSTERED,
+        fish_view_frame=FISH_VIEW_FRAME,
+        fish_view_frame_hardcoded=FISH_VIEW_FRAME_HARDCODED,
+        shark_view_frame=SHARK_VIEW_FRAME,
+        shark_view_frame_hardcoded=SHARK_VIEW_FRAME_HARDCODED,
+        cluster_duration=CLUSTER_DURATION,
+        choice_key=_CHOICE_KEY,
+        rubbish_name="spoon 2",
     )
 
     ################## CUP PART #################
-    seq_bottle_1 = create_bottle_root(
-        bottle_0_frame=BOTTLE_0_FRAME,
-        bottle_1_frame=BOTTLE_1_FRAME,
-        bottle_0_view_frame=BOTTLE_0_VIEW_FRAME,
-        bottle_1_view_frame=BOTTLE_1_VIEW_FRAME,
-        bottle_0_frame_clustered=BOTTLE_0_FRAME_CLUSTERED,
-        bottle_1_frame_clustered=BOTTLE_1_FRAME_CLUSTERED,
-        bottle_basket_frame=BOTTLE_BASKET_FRAME,
-        bottle_basket_frame_clustered=BOTTLE_BASKET_FRAME_CLUSTERED,
-        bottle_basket_view_frame=BOTTLE_BASKET_VIEW_FRAME,
-        cluster_duration=CLUSTER_DURATION,
-        surface_frame_key=_GO_SURFACE_FRAME_KEY,
-        actuation_topic=ACTUATION_TOPIC,
+    seq_bottle_1 = py_trees.composites.Sequence(
+        name="Bottle 1",
+        memory=True,
+    )
+    seq_bottle_2 = py_trees.composites.Sequence(
+        name="Bottle 2",
+        memory=True,
     )
 
-    cluster_reset_symbols_3 = py_trees_ros.actions.ActionClient(
-        name="Cluster symbols",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=[FISH_FRAME, SHARK_FRAME],
-            out_children=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
-            duration=CLUSTER_DURATION,
-            use_cache=False,
-            persistent=True,
+    _call_samuel_bottle_1 = py_trees_ros.actions.ActionClient(
+        name="Call Samuel pick up (bottle 1)",
+        action_type=AlignAndCollect,
+        action_name="/auv4/octagon/pick_up",
+        action_goal=AlignAndCollect.Goal(
+            object_frame="bottle_2_0",  # TODO: ask samuel to
+            object_frame_clustered=BOTTLE_0_FRAME_CLUSTERED,
         ),
     )
 
-    seq_bottle_2 = create_bottle_root(
-        bottle_0_frame=BOTTLE_0_FRAME,
-        bottle_1_frame=BOTTLE_1_FRAME,
-        bottle_0_view_frame=BOTTLE_0_VIEW_FRAME,
-        bottle_1_view_frame=BOTTLE_1_VIEW_FRAME,
-        bottle_0_frame_clustered=BOTTLE_0_FRAME_CLUSTERED,
-        bottle_1_frame_clustered=BOTTLE_1_FRAME_CLUSTERED,
-        bottle_basket_frame=BOTTLE_BASKET_FRAME,
-        bottle_basket_frame_clustered=BOTTLE_BASKET_FRAME_CLUSTERED,
-        bottle_basket_view_frame=BOTTLE_BASKET_VIEW_FRAME,
+    seq_bottle_1_pick_up = create_rubbish_root(
+        depth_threshold=0.1,
+        rubbish_frame=BOTTLE_0_FRAME,
+        rubbish_frame_clustered=BOTTLE_0_FRAME_CLUSTERED,
         cluster_duration=CLUSTER_DURATION,
-        surface_frame_key=_GO_SURFACE_FRAME_KEY,
-        actuation_topic=ACTUATION_TOPIC,
+        call_samuel=_call_samuel_bottle_1,
+        rubbish_name="bottle 1",
+    )
+
+    seq_reset_bottle_1_pick_up = create_reset_after_rubbish_root(
+        fish_frame=FISH_FRAME,
+        fish_frame_clustered=FISH_FRAME_CLUSTERED,
+        shark_frame=SHARK_FRAME,
+        shark_frame_clustered=SHARK_FRAME_CLUSTERED,
+        fish_view_frame=FISH_VIEW_FRAME,
+        fish_view_frame_hardcoded=FISH_VIEW_FRAME_HARDCODED,
+        shark_view_frame=SHARK_VIEW_FRAME,
+        shark_view_frame_hardcoded=SHARK_VIEW_FRAME_HARDCODED,
+        cluster_duration=CLUSTER_DURATION,
+        choice_key=_CHOICE_KEY,
+        rubbish_name="bottle 1",
+    )
+
+    _call_samuel_bottle_2 = py_trees_ros.actions.ActionClient(
+        name="Call Samuel pick up (bottle 2)",
+        action_type=AlignAndCollect,
+        action_name="/auv4/octagon/pick_up",
+        action_goal=AlignAndCollect.Goal(
+            object_frame="bottle_2_1",  # TODO: ask samuel to
+            object_frame_clustered=BOTTLE_1_FRAME_CLUSTERED,
+        ),
+    )
+
+    seq_bottle_2_pick_up = create_rubbish_root(
+        depth_threshold=0.1,
+        rubbish_frame=BOTTLE_1_FRAME,
+        rubbish_frame_clustered=BOTTLE_1_FRAME_CLUSTERED,
+        cluster_duration=CLUSTER_DURATION,
+        call_samuel=_call_samuel_bottle_2,
+        rubbish_name="bottle 2",
+    )
+
+    seq_reset_bottle_2_pick_up = create_reset_after_rubbish_root(
+        fish_frame=FISH_FRAME,
+        fish_frame_clustered=FISH_FRAME_CLUSTERED,
+        shark_frame=SHARK_FRAME,
+        shark_frame_clustered=SHARK_FRAME_CLUSTERED,
+        fish_view_frame=FISH_VIEW_FRAME,
+        fish_view_frame_hardcoded=FISH_VIEW_FRAME_HARDCODED,
+        shark_view_frame=SHARK_VIEW_FRAME,
+        shark_view_frame_hardcoded=SHARK_VIEW_FRAME_HARDCODED,
+        cluster_duration=CLUSTER_DURATION,
+        choice_key=_CHOICE_KEY,
+        rubbish_name="bottle 2",
     )
 
     ############### ROTATION PARTS ###############
+    # TODO: check the tfs with the within_dist to the basket to count before rotating
     goto_rotations = goto.NFromConstant(
         name="Go to rotations",
         poses=[
@@ -304,6 +352,31 @@ def create_octagon_root():
         ),
     )
 
+    seq_spoon_1.add_children(
+        children=[
+            seq_spoon_1_pick,
+            seq_reset_spoon_1_pick,
+        ]
+    )
+    seq_spoon_2.add_children(
+        children=[
+            seq_spoon_2_pick,
+            seq_reset_spoon_2_pick,
+        ]
+    )
+    seq_bottle_1.add_children(
+        children=[
+            seq_bottle_1_pick_up,
+            seq_reset_bottle_1_pick_up,
+        ]
+    )
+    seq_bottle_2.add_children(
+        children=[
+            seq_bottle_2_pick_up,
+            seq_reset_bottle_2_pick_up,
+        ]
+    )
+
     root.add_children(
         children=[
             srv_get_choice,
@@ -313,11 +386,8 @@ def create_octagon_root():
             symbol_tf_checker,
             dynamic_set_surface_pose_frame,
             seq_spoon_1,
-            cluster_reset_symbols_1,
             seq_spoon_2,
-            cluster_reset_symbols_2,
             seq_bottle_1,
-            cluster_reset_symbols_3,
             seq_bottle_2,
             goto_rotations,
             srv_end_vision,
