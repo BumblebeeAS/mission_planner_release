@@ -4,7 +4,6 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_system_default
 from std_srvs.srv import SetBool
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -20,6 +19,7 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
+from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.slalom.channel_movement_recluster import (
     create_channel_movement_one_root,
@@ -245,101 +245,31 @@ def create_slalom_root():
 
     move_and_cluster_par.add_children([cluster_action, seq_move_and_cluster])
 
-    # Initialize the number of missing transforms in blackboard to be used by DynamicSetBlackboard
-    init_missing_transforms = py_trees.behaviours.SetBlackboardVariable(
-        name="Initialize missing transforms",
-        variable_name=fk("missing_transforms"),
-        variable_value=0,
-        overwrite=True,
+    check_transforms = create_tf_checker_from_constant_root(
+        start_frames=[
+            BASE_LINK_FRAME,
+            BASE_LINK_FRAME,
+            BASE_LINK_FRAME,
+        ],
+        end_frames=[
+            CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+            CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+            CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+        ],
+        update_keys=[
+            _CHANNEL_ZERO_KEY,
+            _CHANNEL_ONE_KEY,
+            _CHANNEL_TWO_KEY,
+        ],
+        fallback_val=[None, None, None],
     )
 
-    # There is now A need to read/write the transforms from the blackboard (changed)
-    check_transform_zero = py_trees_ros.transforms.ToBlackboard(
-        name="Write channel pair zero transform",
-        variable_name=_CHANNEL_ZERO_KEY,
-        target_frame=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-        source_frame=BASE_LINK_FRAME,
-        qos_profile=qos_profile_system_default,
-    )
-
-    check_transform_one = py_trees_ros.transforms.ToBlackboard(
-        name="Write channel pair one transform",
-        variable_name=_CHANNEL_ONE_KEY,
-        target_frame=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-        source_frame=BASE_LINK_FRAME,
-        qos_profile=qos_profile_system_default,
-    )
-
-    check_transform_two = py_trees_ros.transforms.ToBlackboard(
-        name="Write channel pair two transform",
-        variable_name=_CHANNEL_TWO_KEY,
-        target_frame=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-        source_frame=BASE_LINK_FRAME,
-        qos_profile=qos_profile_system_default,
-    )
-
-    update_missing_transforms_one = DynamicSetBlackboard(
-        name="Update missing transforms one",
-        key=_MISSING_TRANSFORMS_KEY,
+    update_missing_transforms_qty = DynamicSetBlackboard(
+        name="Update number of missing transforms",
+        key=[_CHANNEL_ZERO_KEY, _CHANNEL_ONE_KEY, _CHANNEL_TWO_KEY],
         update_key=_MISSING_TRANSFORMS_KEY,
         overwrite=True,
-        func=lambda x: x + 1,
-    )
-
-    update_missing_transforms_two = DynamicSetBlackboard(
-        name="Update missing transforms two",
-        key=_MISSING_TRANSFORMS_KEY,
-        update_key=_MISSING_TRANSFORMS_KEY,
-        overwrite=True,
-        func=lambda x: x + 1,
-    )
-
-    update_missing_transforms_three = DynamicSetBlackboard(
-        name="Update missing transforms three",
-        key=_MISSING_TRANSFORMS_KEY,
-        update_key=_MISSING_TRANSFORMS_KEY,
-        overwrite=True,
-        func=lambda x: x + 1,
-    )
-
-    # Structure the check as a fallback that will update the number of missing transforms
-    check_and_update_fallback_one = py_trees.composites.Selector(
-        name="Check and update missing transforms one",
-        memory=True,
-        children=[
-            py_trees.decorators.Timeout(
-                name="Timeout for channel pair one",
-                child=check_transform_zero,
-                duration=TRANSFORM_TIMEOUT_DURATION,
-            ),
-            update_missing_transforms_one,
-        ],
-    )
-
-    check_and_update_fallback_two = py_trees.composites.Selector(
-        name="Check and update missing transforms two",
-        memory=True,
-        children=[
-            py_trees.decorators.Timeout(
-                name="Timeout for channel pair two",
-                child=check_transform_one,
-                duration=TRANSFORM_TIMEOUT_DURATION,
-            ),
-            update_missing_transforms_two,
-        ],
-    )
-
-    check_and_update_fallback_three = py_trees.composites.Selector(
-        name="Check and update missing transforms three",
-        memory=True,
-        children=[
-            py_trees.decorators.Timeout(
-                name="Timeout for channel pair three",
-                child=check_transform_two,
-                duration=TRANSFORM_TIMEOUT_DURATION,
-            ),
-            update_missing_transforms_three,
-        ],
+        func=lambda tf_1, tf_2, tf_3: (tf_1 is None) + (tf_2 is None) + (tf_3 is None),
     )
 
     # Sequence to check transforms and update the number of missing transforms
@@ -347,10 +277,8 @@ def create_slalom_root():
         name="Check transforms",
         memory=True,
         children=[
-            init_missing_transforms,
-            check_and_update_fallback_one,
-            check_and_update_fallback_two,
-            check_and_update_fallback_three,
+            check_transforms,
+            update_missing_transforms_qty,
         ],
     )
 
