@@ -1,15 +1,17 @@
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
-    within_threshold,
+    within_threshold_rpy,
+    within_threshold_xyz,
 )
 from mission_planner_2.trees.auv.goto import goto
-from std_srvs.srv import Trigger
 
 
 def create_move_and_shoot_generator(
@@ -113,12 +115,13 @@ def create_move_and_shoot_generator(
                 cluster_node=cluster_node,
                 cluster_node_check=cluster_node_check,
                 goto_node=goto_target,
-                distance_threshold=distance_threshold,
-                yaw_threshold=yaw_threshold,
+                start_frame_keys=[anchor_frame_key, "/global/base_link"],
                 retries=retries,
-                anchor_frame_key=anchor_frame_key,
                 goto_pose_frame_key=pose_frame_key,
-                within_threshold=within_threshold,
+                within_threshold_list=[
+                    within_threshold_xyz(distance_threshold),
+                    within_threshold_rpy(yaw_threshold),
+                ],
                 stabilization_duration=stabilization_duration,
             ),
             # child=create_goto_cluster_from_bb_tf_tf_root(

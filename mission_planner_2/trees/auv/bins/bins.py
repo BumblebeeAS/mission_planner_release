@@ -24,7 +24,7 @@ from mission_planner_2.commons.namespace_utils import (
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
-    within_threshold,
+    within_threshold_xyz,
 )
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.bins.template_selector import (
@@ -392,17 +392,19 @@ def create_bin_root():
         overwrite=True,
     )
 
+    # distance_threshold=0.05
     seq_goto_cluster = py_trees.decorators.FailureIsSuccess(
         name="Goto cluster",
         child=create_goto_cluster_from_bb_root(
             cluster_node=action_cluster_for_goto,
             cluster_node_check=action_cluster_for_goto_check,
             goto_node=goto_align_to_target,
-            distance_threshold=0.05,
             retries=RETRIES,
-            anchor_frame_key=_ANCHOR_FRAME_KEY,
+            start_frame_keys=[_ANCHOR_FRAME_KEY],
             goto_pose_frame_key=_GOTO_FRAME_KEY,
-            within_threshold=within_threshold,
+            within_threshold_list=[
+                within_threshold_xyz(0.05),
+            ],
         ),
     )
 

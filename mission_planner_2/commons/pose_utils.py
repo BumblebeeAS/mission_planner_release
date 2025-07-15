@@ -242,36 +242,44 @@ def create_limits_srv_request(
     return request
 
 
-def within_threshold(
-    xyz_tf: TransformStamped,
-    rpy_tf: TransformStamped,
+def within_threshold_xyz(
     distance_threshold: float,
+) -> bool:
+    def threshold_check(xyz_tf):
+        distance = np.sqrt(
+            (xyz_tf.transform.translation.x**2)
+            + (xyz_tf.transform.translation.y**2)
+            + (xyz_tf.transform.translation.z**2)
+        )
+
+        if distance > distance_threshold:
+            return False
+
+        return True
+
+    return threshold_check
+
+
+def within_threshold_rpy(
     yaw_threshold: float,
 ) -> bool:
-    _, _, y = euler_from_quaternion(
-        [
-            rpy_tf.transform.rotation.x,
-            rpy_tf.transform.rotation.y,
-            rpy_tf.transform.rotation.z,
-            rpy_tf.transform.rotation.w,
-        ]
-    )
+    def threshold_check(rpy_tf):
+        _, _, y = euler_from_quaternion(
+            [
+                rpy_tf.transform.rotation.x,
+                rpy_tf.transform.rotation.y,
+                rpy_tf.transform.rotation.z,
+                rpy_tf.transform.rotation.w,
+            ]
+        )
 
-    y = np.degrees(y) % 360
+        y = np.degrees(y) % 360
 
-    if y > yaw_threshold:
-        return False
+        if y > yaw_threshold:
+            return False
+        return True
 
-    distance = np.sqrt(
-        (xyz_tf.transform.translation.x**2)
-        + (xyz_tf.transform.translation.y**2)
-        + (xyz_tf.transform.translation.z**2)
-    )
-
-    if distance > distance_threshold:
-        return False
-
-    return True
+    return threshold_check
 
 
 def within_threshold_dist(
