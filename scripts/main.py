@@ -13,9 +13,9 @@ def main():
     rclpy.init(args=None)
     root = create_mother()
     py_trees.logging.level = py_trees.logging.Level.DEBUG
-    tree, node = create_led_tree(root=root)
+    tree, node = create_led_tree(root=root, display_only_visited_behaviours=True)
     try:
-        tree.setup(node=node, timeout=15.0)
+        tree.setup(node=node, timeout=60.0)
     except:
         console.logerror(console.red + "failed to setup the tree" + console.reset)
         tree.shutdown()

@@ -146,7 +146,7 @@ def led_handler(
 
 def create_led_tree(
     root: py_trees.behaviour.Behaviour,
-    unicode_tree_debug=True,
+    display_only_visited_behaviours=True,
 ) -> tuple[py_trees_ros.trees.BehaviourTree, Node]:
     node = Node("tree_node")
     led_publisher = node.create_publisher(
@@ -154,7 +154,9 @@ def create_led_tree(
     )
 
     tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
-    tree.snapshot_visitor.display_only_visited_behaviours = True
+    tree.snapshot_visitor.display_only_visited_behaviours = (
+        display_only_visited_behaviours
+    )
 
     led_visitor = LedVisitor()
     tree.add_visitor(led_visitor)
