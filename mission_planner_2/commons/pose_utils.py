@@ -2,6 +2,8 @@
 Common pose utilities for mission_planner_2.
 """
 
+from collections.abc import Callable
+
 import numpy as np
 from bb_controls_msgs.srv import Limits
 from bb_perception_msgs.action import ClusterTf
@@ -244,8 +246,8 @@ def create_limits_srv_request(
 
 def within_threshold_xyz(
     distance_threshold: float,
-) -> bool:
-    def threshold_check(xyz_tf):
+) -> Callable[[TransformStamped], bool]:
+    def threshold_check(xyz_tf: TransformStamped) -> bool:
         distance = np.sqrt(
             (xyz_tf.transform.translation.x**2)
             + (xyz_tf.transform.translation.y**2)
@@ -262,8 +264,8 @@ def within_threshold_xyz(
 
 def within_threshold_rpy(
     yaw_threshold: float,
-) -> bool:
-    def threshold_check(rpy_tf):
+) -> Callable[[TransformStamped], bool]:
+    def threshold_check(rpy_tf: TransformStamped) -> bool:
         _, _, y = euler_from_quaternion(
             [
                 rpy_tf.transform.rotation.x,

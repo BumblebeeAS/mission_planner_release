@@ -1,9 +1,9 @@
 import operator
 import uuid
-from typing import Callable, List
+from collections.abc import Callable, Sequence
 
-import numpy as np
 import py_trees
+from geometry_msgs.msg import TransformStamped
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.tf_checker import (
@@ -27,18 +27,14 @@ def _create_internal_keys(num_tfs: int = 2):
 
 
 def _create_goto_cluster_retry(
-    cluster_node_check: py_trees.behaviour,
-    goto_node: py_trees.behaviour,
-    tf_checker: py_trees.behaviour,
-    retries: int = 3,
-    stabilization_duration: float = 5.0,
-    within_threshold_list: List[Callable] = [
-        lambda x: NotImplementedError(
-            "Please provide a function to check within threshold"
-        )
-    ],
-    tf_keys: list[str] | None = None,
-    check_res_key: str | None = None,
+    cluster_node_check: py_trees.behaviour.Behaviour,
+    goto_node: py_trees.behaviour.Behaviour,
+    tf_checker: py_trees.behaviour.Behaviour,
+    tf_keys: list[str],
+    check_res_key: str,
+    within_threshold_list: list[Callable[[TransformStamped], bool]],
+    retries: int,
+    stabilization_duration: float,
 ):
     wait = py_trees.timers.Timer(
         name="Wait for controls to stabilize", duration=stabilization_duration
@@ -86,15 +82,15 @@ def _create_goto_cluster_retry(
 
 
 def create_goto_cluster_from_bb_root(
-    cluster_node: py_trees.behaviour,
-    cluster_node_check: py_trees.behaviour,
-    goto_node: py_trees.behaviour,
+    cluster_node: py_trees.behaviour.Behaviour,
+    cluster_node_check: py_trees.behaviour.Behaviour,
+    goto_node: py_trees.behaviour.Behaviour,
     retries: int = 3,
-    start_frame_keys: List[str] = ["key_start_frame"],
+    start_frame_keys: list[str] = ["key_start_frame"],
     goto_pose_frame_key: str = "key_goto_pose",
     stabilization_duration: float = 5.0,
     name="cluster_and_goto",
-    within_threshold_list: List[Callable] = [
+    within_threshold_list: Sequence[Callable[[TransformStamped], bool]] = [
         lambda x: NotImplementedError(
             "Please provide a function to check within threshold"
         )
@@ -144,15 +140,15 @@ def create_goto_cluster_from_bb_root(
 
 
 def create_goto_cluster_from_constant_root(
-    cluster_node: py_trees.behaviour,
-    cluster_node_check: py_trees.behaviour,
-    goto_node: py_trees.behaviour,
+    cluster_node: py_trees.behaviour.Behaviour,
+    cluster_node_check: py_trees.behaviour.Behaviour,
+    goto_node: py_trees.behaviour.Behaviour,
     retries: int = 3,
     start_frame_keys: list[str] = ["auv4/base_link_ned"],
     goto_pose_frame: str = "auv4/base_link_ned",
     stabilization_duration: float = 5.0,
-    name="cluster_and_goto",
-    within_threshold_list=[
+    name: str = "cluster_and_goto",
+    within_threshold_list: Sequence[Callable[[TransformStamped], bool]] = [
         lambda x: NotImplementedError(
             "Please provide a function to check within threshold"
         )
@@ -201,21 +197,19 @@ def create_goto_cluster_from_constant_root(
 
 
 def _create_goto_cluster_tf_tf_root(
-    cluster_node: py_trees.behaviour,
-    cluster_node_check: py_trees.behaviour,
-    goto_node: py_trees.behaviour,
-    tf_checker_1: py_trees.behaviour,
-    tf_checker_2: py_trees.behaviour,
-    distance_threshold: float | None = None,
-    retries: int = 3,
-    stabilization_duration: float = 5.0,
-    name="cluster_and_goto_tf_tf",
-    within_threshold=lambda x, y: NotImplementedError(
-        "Please provide a function to check within threshold"
-    ),
-    tf_1_key: str | None = None,
-    tf_2_key: str | None = None,
-    check_res_key: str | None = None,
+    cluster_node: py_trees.behaviour.Behaviour,
+    cluster_node_check: py_trees.behaviour.Behaviour,
+    goto_node: py_trees.behaviour.Behaviour,
+    tf_checker_1: py_trees.behaviour.Behaviour,
+    tf_checker_2: py_trees.behaviour.Behaviour,
+    tf_1_key: str,
+    tf_2_key: str,
+    check_res_key: str,
+    retries: int,
+    stabilization_duration: float,
+    distance_threshold: float,
+    within_threshold: Callable,
+    name: str = "cluster_and_goto_tf_tf",
 ):
     root = py_trees.composites.Sequence(
         name=name,
@@ -265,9 +259,9 @@ def _create_goto_cluster_tf_tf_root(
 
 
 def create_goto_cluster_from_bb_tf_tf_root(
-    cluster_node: py_trees.behaviour,
-    cluster_node_check: py_trees.behaviour,
-    goto_node: py_trees.behaviour,
+    cluster_node: py_trees.behaviour.Behaviour,
+    cluster_node_check: py_trees.behaviour.Behaviour,
+    goto_node: py_trees.behaviour.Behaviour,
     distance_threshold: float | None = None,
     retries: int = 3,
     tf_frame_key: str = "something/clustered",
@@ -277,6 +271,7 @@ def create_goto_cluster_from_bb_tf_tf_root(
         "Please provide a function to check within threshold"
     ),
 ):
+    # FIXME @wesley
     tf_1_key, tf_2_key, check_res_key = _create_internal_keys()
 
     tf_checker = create_tf_checker_from_bb_root(
@@ -313,9 +308,9 @@ def create_goto_cluster_from_bb_tf_tf_root(
 
 
 def create_goto_cluster_from_constant_tf_tf_root(
-    cluster_node: py_trees.behaviour,
-    cluster_node_check: py_trees.behaviour,
-    goto_node: py_trees.behaviour,
+    cluster_node: py_trees.behaviour.Behaviour,
+    cluster_node_check: py_trees.behaviour.Behaviour,
+    goto_node: py_trees.behaviour.Behaviour,
     distance_threshold: float | None = None,
     retries: int = 3,
     tf_frame: str = "something/clustered",
@@ -325,7 +320,6 @@ def create_goto_cluster_from_constant_tf_tf_root(
         "Please provide a function to check within threshold"
     ),
 ):
-
     tf_1_key, tf_2_key, check_res_key = _create_internal_keys()
 
     tf_checker = create_tf_checker_from_constant_root(
