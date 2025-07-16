@@ -50,7 +50,7 @@ def _create_goto_cluster_retry(
         update_key=check_res_key,
         func=lambda *args: all(
             threshold_func(tf)
-            for tf, threshold_func in zip(tf_keys, within_threshold_list)
+            for tf, threshold_func in zip(args, within_threshold_list)
         ),
     )
 
