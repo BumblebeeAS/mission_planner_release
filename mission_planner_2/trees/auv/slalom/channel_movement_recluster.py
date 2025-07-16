@@ -5,7 +5,9 @@ import numpy as np
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.action import ClusterTf
+from bb_planner_msgs.srv import MapRelocalize
 from geometry_msgs.msg import PoseStamped, TransformStamped
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -29,6 +31,7 @@ CHANNEL_PAIR_ONE_FRAME_RECLUSTERED = "slalom/dummy/one"
 CHANNEL_PAIR_TWO_FRAME_RECLUSTERED = "slalom/dummy/two"
 RECLUSTER_DURATION = 5
 SWEEP_RECLUSTER_DURATION = 10
+MAP_RELOCALIZE_SRV = "/auv4/nav/relocalize"
 #########################################################################
 
 _MISSING_LAYER_KEY = fk("missing_layer")  # key for missing layer
@@ -262,12 +265,23 @@ def create_channel_movement_zero_root(
         missing_layers=missing_layers,
     )
 
+    relocalize_left = py_trees_ros.service_clients.FromConstant(
+        name="Relocalize to final layer",
+        service_type=MapRelocalize,
+        service_name=MAP_RELOCALIZE_SRV,
+        service_request=MapRelocalize.Request(
+            map_object_frame="map/slalom",
+            odom_object_frame=CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED,
+        ),
+    )
+
     seq_zero_missing_left.add_children(
         [
             check_is_left,
             goto_layer_0_left,
             recluster_0_to_1_left,
             recluster_reclustered_to_2_left,
+            relocalize_left,
         ]
     )
 
@@ -299,11 +313,22 @@ def create_channel_movement_zero_root(
         missing_layers=missing_layers,
     )
 
+    relocalize_right = py_trees_ros.service_clients.FromConstant(
+        name="Relocalize to final layer",
+        service_type=MapRelocalize,
+        service_name=MAP_RELOCALIZE_SRV,
+        service_request=MapRelocalize.Request(
+            map_object_frame="map/slalom",
+            odom_object_frame=CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED,
+        ),
+    )
+
     seq_zero_missing_right.add_children(
         [
             goto_layer_0_right,
             recluster_0_to_1_right,
             recluster_reclustered_to_2_right,
+            relocalize_right,
         ]
     )
 
