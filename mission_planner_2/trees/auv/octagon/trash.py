@@ -28,6 +28,8 @@ def create_trash_root(
     trash_name: str,
     depth_threshold: float = 0.1,
     cluster_duration: int = 10,
+    command: int = AlignAndCollect.Goal.CLOSE,
+    z_distance: float = 0.15,
 ):
     root = py_trees.composites.Sequence(
         name=f"Trash ({trash_name})",
@@ -53,6 +55,9 @@ def create_trash_root(
         action_goal=AlignAndCollect.Goal(
             object_frame=trash_frame_depth_from_odom,
             object_frame_clustered=trash_frame_clustered,
+            command=command,
+            z_distance=z_distance,
+            cutoff_z_distance=z_distance,
         ),
     )
 

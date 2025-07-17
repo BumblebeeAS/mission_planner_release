@@ -1,5 +1,6 @@
 import py_trees
 import py_trees_ros
+from bb_behavior_msgs.action import AlignAndCollect
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -48,12 +49,13 @@ LADLE_1_FRAME_FROM_TABLE = "ladle_1/from_table"
 LADLE_1_FRAME_FROM_ODOM = "ladle_1/from_odom"
 LADLE_1_FRAME_CLUSTERED = "ladle_1/clustered"
 
-LADLE_BASKET_FRAME = "yellow_bucket"
-LADLE_BASKET_FRAME_CLUSTERED = "yellow_bucket/clustered"
-LADLE_BASKET_VIEW_FRAME = "yellow_bucket/clustered/view"
-BOTTLE_BASKET_FRAME = "pink_bucket"
-BOTTLE_BASKET_FRAME_CLUSTERED = "pink_bucket/clustered"
-BOTTLE_BASKET_VIEW_FRAME = "pink_bucket/clustered/view"
+PINK_BUCKET_FRAME_FROM_TABLE = "pink_bucket/from_table"
+PINK_BUCKET_FRAME_FROM_ODOM = "pink_bucket/from_odom"
+PINK_BUCKET_FRAME_CLUSTERED = "pink_bucket/clustered"
+
+YELLOW_BUCKET_FRAME_FROM_TABLE = "yellow_bucket/from_table"
+YELLOW_BUCKET_FRAME_FROM_ODOM = "yellow_bucket/from_odom"
+YELLOW_BUCKET_FRAME_CLUSTERED = "yellow_bucket/clustered"
 
 FISH_FRAME = "trash/fish"
 SHARK_FRAME = "trash/shark"
@@ -194,8 +196,22 @@ def create_octagon_root():
         choice_key=_CHOICE_KEY,
         rubbish_name="Bottle 0",
     )
+    seq_bottle_0_drop = create_trash_root(
+        trash_frame_depth_from_table=PINK_BUCKET_FRAME_FROM_TABLE,
+        trash_frame_depth_from_odom=PINK_BUCKET_FRAME_FROM_ODOM,
+        trash_frame_clustered=PINK_BUCKET_FRAME_CLUSTERED,
+        trash_name="Bottle 0",
+        depth_threshold=0.1,
+        cluster_duration=CLUSTER_DURATION,
+        command=AlignAndCollect.Goal.OPEN,
+        z_distance=0.2,
+    )
     seq_bottle_0.add_children(
-        children=[seq_bottle_0_pick_up, seq_reset_bottle_0_pick_up]
+        children=[
+            seq_bottle_0_pick_up,
+            # seq_reset_bottle_0_pick_up,
+            seq_bottle_0_drop,
+        ]
     )
 
     ############### ROTATION PARTS ###############
