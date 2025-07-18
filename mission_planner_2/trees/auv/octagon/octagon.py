@@ -57,6 +57,9 @@ YELLOW_BUCKET_FRAME_FROM_TABLE = "yellow_bucket/from_table"
 YELLOW_BUCKET_FRAME_FROM_ODOM = "yellow_bucket/from_odom"
 YELLOW_BUCKET_FRAME_CLUSTERED = "yellow_bucket/clustered"
 
+TABLE_CENTER_FRAME = "table/center"
+TABLE_CENTER_FRAME_CLUSTERED = "table/center/clustered"
+
 FISH_FRAME = "trash/fish"
 SHARK_FRAME = "trash/shark"
 FISH_FRAME_CLUSTERED = "trash/fish/clustered"
@@ -68,7 +71,7 @@ SHARK_VIEW_FRAME_HARDCODED = "trash/shark/clustered/view/hardcoded"
 
 CLUSTER_DURATION = 4
 NUM_ROTATIONS = 6
-STABILIZE_DURATION = 10
+STABILIZE_DURATION = 5
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -182,6 +185,7 @@ def create_octagon_root():
         trash_name="Bottle 0",
         depth_threshold=0.1,
         cluster_duration=CLUSTER_DURATION,
+        z_distance=0.20,
     )
     seq_reset_bottle_0_pick_up = create_reset_after_rubbish_root(
         fish_frame=FISH_FRAME,
@@ -196,6 +200,29 @@ def create_octagon_root():
         choice_key=_CHOICE_KEY,
         rubbish_name="Bottle 0",
     )
+    cluster_table_centre = py_trees_ros.action_clients.FromConstant(
+        name="Cluster centre",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_children=TABLE_CENTER_FRAME,
+            out_children=TABLE_CENTER_FRAME_CLUSTERED,
+            duration=CLUSTER_DURATION,
+            use_cache=False,
+        ),
+    )
+    # TODO: Rotate additional 90 degrees to table center to be able to see both buckets
+    goto_table_centre = goto.FromConstant(
+        name="Goto table centre",
+        pose=create_stamped_pose(TABLE_CENTER_FRAME_CLUSTERED),
+        ignore_depth=True,
+    )
+    # FIXME: Somehow need to stabilize or TF lookup for yaw gets the stale values while the
+    # robot is turning to table center
+    stabilize_before_drop = py_trees.timers.Timer(
+        name="Stabilise before drop",
+        duration=STABILIZE_DURATION,
+    )
     seq_bottle_0_drop = create_trash_root(
         trash_frame_depth_from_table=PINK_BUCKET_FRAME_FROM_TABLE,
         trash_frame_depth_from_odom=PINK_BUCKET_FRAME_FROM_ODOM,
@@ -204,12 +231,15 @@ def create_octagon_root():
         depth_threshold=0.1,
         cluster_duration=CLUSTER_DURATION,
         command=AlignAndCollect.Goal.OPEN,
-        z_distance=0.2,
+        z_distance=0.30,
     )
     seq_bottle_0.add_children(
         children=[
             seq_bottle_0_pick_up,
             # seq_reset_bottle_0_pick_up,
+            cluster_table_centre,
+            goto_table_centre,
+            stabilize_before_drop,
             seq_bottle_0_drop,
         ]
     )
