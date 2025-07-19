@@ -18,9 +18,10 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.octagon.helpers import view_frame_func
-from mission_planner_2.trees.auv.octagon.symbols import create_reset_after_rubbish_root
+from mission_planner_2.trees.auv.octagon.helpers import get_table_to_surface_target_yaw
+from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
 from mission_planner_2.trees.auv.octagon.trash import create_trash_root
+from rclpy.qos import qos_profile_system_default
 from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
@@ -72,16 +73,19 @@ SHARK_VIEW_FRAME_HARDCODED = "trash/shark/clustered/view/hardcoded"
 CLUSTER_DURATION = 4
 NUM_ROTATIONS = 6
 STABILIZE_DURATION = 5
+WAIT_BETWEEN_ROTATIONS = 3
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
 _CHOICE_KEY = fk("choice")
-_GO_SURFACE_FRAME_KEY = fk("go_surface_frame")
+_TABLE_TO_SURFACE_TARGET_YAW_KEY = fk("go_surface_frame")
 _START_VISION_KEY = fk("bin_start_vision")
 _STOP_VISION_KEY = fk("bin_stop_vision")
 _FISH_TF_KEY = fk("fish_tf")
 _SHARK_TF_KEY = fk("shark_tf")
+_TABLE_TF_KEY = fk("table_tf")
+_LOOK_AT_TARGET_POSE_KEY = fk("look_at_target_pose")
 
 
 def create_collection_root(
@@ -93,6 +97,7 @@ def create_collection_root(
     bucket_frame_depth_from_odom: str,
     bucket_frame_clustered: str,
 ):
+    """Picks up trash, surfaces, looks at the target, and drops it in the bucket."""
     seq_trash = py_trees.composites.Sequence(
         name=trash_name,
         memory=True,
@@ -102,22 +107,16 @@ def create_collection_root(
         trash_frame_depth_from_odom,
         trash_frame_clustered,
         trash_name,
-        depth_threshold=0.1,
         cluster_duration=CLUSTER_DURATION,
         z_distance=0.20,
     )
-    seq_reset_trash_pick_up = create_reset_after_rubbish_root(
-        fish_frame=FISH_FRAME,
-        fish_frame_clustered=FISH_FRAME_CLUSTERED,
-        shark_frame=SHARK_FRAME,
-        shark_frame_clustered=SHARK_FRAME_CLUSTERED,
-        fish_view_frame=FISH_VIEW_FRAME,
-        fish_view_frame_hardcoded=FISH_VIEW_FRAME_HARDCODED,
-        shark_view_frame=SHARK_VIEW_FRAME,
-        shark_view_frame_hardcoded=SHARK_VIEW_FRAME_HARDCODED,
-        cluster_duration=CLUSTER_DURATION,
-        choice_key=_CHOICE_KEY,
-        rubbish_name=trash_name,
+    seq_look_at_target = create_look_at_target_root(
+        trash_name,
+        TABLE_CENTER_FRAME,
+        TABLE_CENTER_FRAME_CLUSTERED,
+        _TABLE_TO_SURFACE_TARGET_YAW_KEY,
+        _LOOK_AT_TARGET_POSE_KEY,
+        CLUSTER_DURATION,
     )
     cluster_table_centre = py_trees_ros.action_clients.FromConstant(
         name="Cluster centre",
@@ -155,7 +154,7 @@ def create_collection_root(
     seq_trash.add_children(
         children=[
             seq_trash_pick_up,
-            # seq_reset_trash_pick_up,
+            seq_look_at_target,
             cluster_table_centre,
             goto_table_centre,
             stabilize_before_drop,
@@ -163,6 +162,46 @@ def create_collection_root(
         ]
     )
     return seq_trash
+
+
+def create_search_root():
+    """Rotate 360 degrees and cluster the poses of the fish and shark tags. At the same time,
+    cluster the pose of the table center."""
+    par_search = py_trees.composites.Parallel(
+        name="Search",
+        policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
+    )
+    goto_n_search_poses = goto.NFromConstant(
+        name="Goto search poses",
+        poses=[
+            create_stamped_pose(
+                frame_id="auv4/base_link_ned",
+                yaw=360.0 / NUM_ROTATIONS,
+            )
+            for _ in range(NUM_ROTATIONS)
+        ],
+        anchor_frame_name="auv4/base_link_ned",
+        specified_heading=True,
+        wait_between_moves_sec=WAIT_BETWEEN_ROTATIONS,
+    )
+    cluster_tags_and_table = py_trees_ros.actions.ActionClient(
+        name="Cluster tags and table",
+        action_type=ClusterTf,
+        action_name="/auv4/cluster_tf",
+        action_goal=create_clustering_goal(
+            in_children=[FISH_FRAME, SHARK_FRAME, TABLE_CENTER_FRAME],
+            out_children=[
+                FISH_FRAME_CLUSTERED,
+                SHARK_FRAME_CLUSTERED,
+                TABLE_CENTER_FRAME_CLUSTERED,
+            ],
+            duration=CLUSTER_DURATION,
+            use_cache=False,
+            persistent=True,
+        ),
+    )
+    par_search.add_children([goto_n_search_poses, cluster_tags_and_table])
+    return par_search
 
 
 def create_octagon_root():
@@ -198,59 +237,28 @@ def create_octagon_root():
         key_response=_CHOICE_KEY,
     )
 
-    par_search_tag = py_trees.composites.Parallel(
-        name="Search tag",
-        policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
-    )
-
-    goto_n_search_poses = goto.NFromConstant(
-        name="Goto search poses",
-        poses=[
-            create_stamped_pose(
-                frame_id="auv4/base_link_ned",
-                yaw=360.0 / NUM_ROTATIONS,
-            )
-            for _ in range(NUM_ROTATIONS)
-        ],
-        anchor_frame_name="auv4/base_link_ned",
-        specified_heading=True,
-        wait_between_moves_sec=10.0,
-    )
-
-    cluster_tags = py_trees_ros.actions.ActionClient(
-        name="Cluster tags",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=[FISH_FRAME, SHARK_FRAME],
-            out_children=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
-            duration=CLUSTER_DURATION,
-            use_cache=False,
-            persistent=True,
-        ),
-    )
-
-    par_search_tag.add_children(
-        [
-            goto_n_search_poses,
-            cluster_tags,
-        ]
-    )
-
+    ################## SEARCH PART #################
+    par_search = create_search_root()
     symbol_tf_checker = create_tf_checker_from_constant_root(
         start_frames=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
         update_keys=[_FISH_TF_KEY, _SHARK_TF_KEY],
         end_frames=["world_ned", "world_ned"],
         fallback_val=[FISH_VIEW_FRAME_HARDCODED, SHARK_VIEW_FRAME_HARDCODED],
     )
-
-    dynamic_set_surface_pose_frame = DynamicSetBlackboard(
-        name="select surface frame",
-        key=[_CHOICE_KEY, _FISH_TF_KEY, _SHARK_TF_KEY],
-        update_key=_GO_SURFACE_FRAME_KEY,
+    table_tf_to_blackboard = py_trees_ros.transforms.ToBlackboard(
+        name="Table TF to Blackboard",
+        variable_name=_TABLE_TF_KEY,
+        target_frame=TABLE_CENTER_FRAME_CLUSTERED,
+        source_frame="world_ned",
+        qos_profile=qos_profile_system_default,
+    )
+    dynamic_set_surface_yaw = DynamicSetBlackboard(
+        name="Set surface yaw",
+        key=[_CHOICE_KEY, _FISH_TF_KEY, _SHARK_TF_KEY, _TABLE_TF_KEY],
+        update_key=_TABLE_TO_SURFACE_TARGET_YAW_KEY,
         overwrite=True,
-        func=lambda choice, fish_tf, shark_tf: view_frame_func(
-            choice, fish_tf, shark_tf, FISH_VIEW_FRAME, SHARK_VIEW_FRAME
+        func=lambda choice, fish_tf, shark_tf, table_tf: get_table_to_surface_target_yaw(
+            choice, fish_tf, shark_tf, table_tf
         ),
     )
 
@@ -284,7 +292,7 @@ def create_octagon_root():
             create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
             create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
         ],
-        wait_between_moves_sec=10.0,
+        wait_between_moves_sec=WAIT_BETWEEN_ROTATIONS,
     )
 
     srv_end_vision = py_trees_ros.service_clients.FromConstant(
@@ -308,9 +316,10 @@ def create_octagon_root():
             srv_get_choice,
             srv_start_vision,
             check_start_vision_succeeded,
-            # par_search_tag,
-            # symbol_tf_checker,
-            # dynamic_set_surface_pose_frame,
+            par_search,
+            symbol_tf_checker,
+            table_tf_to_blackboard,
+            dynamic_set_surface_yaw,
             seq_bottle_0,
             seq_ladle_0,
             # goto_rotations,

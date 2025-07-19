@@ -26,7 +26,7 @@ def create_trash_root(
     trash_frame_depth_from_odom: str,
     trash_frame_clustered: str,
     trash_name: str,
-    depth_threshold: float = 0.1,
+    depth_threshold: float = 0.2,
     cluster_duration: int = 10,
     command: int = AlignAndCollect.Goal.CLOSE,
     z_distance: float = 0.15,
