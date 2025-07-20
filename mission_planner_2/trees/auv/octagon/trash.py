@@ -23,9 +23,7 @@ CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 
 def create_align_actuate_surface_root(
     trash_name: str,
-    object_frame_depth_from_table: str,
-    object_frame_depth_from_odom: str,
-    object_frame_clustered: str,
+    object_frame: str,
     command: int,
     depth_threshold: float = 0.2,
     cluster_duration: int = 10,
@@ -35,6 +33,10 @@ def create_align_actuate_surface_root(
     aligns the robot to the trash / bucket and actuates the grabber to open / close. After the
     action is complete, controls remain disabled and the robot floats towards the surface. At
     a certain depth, controls are re-enabled."""
+    object_frame_depth_from_table = f"{object_frame}/from_table"
+    object_frame_depth_from_odom = f"{object_frame}/from_odom"
+    object_frame_clustered = f"{object_frame}/clustered"
+
     root = py_trees.composites.Sequence(
         name=f"Align, actuate, surface ({trash_name})",
         memory=True,

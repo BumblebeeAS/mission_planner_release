@@ -33,30 +33,16 @@ VISION_SERVER_TOPIC = "/auv4/trash/manage_nodes"
 ACTUATION_TOPIC = "/auv4/actuation/grabber"
 
 CAMERA_FRAME = "auv4/front_cam_optical"
+BASE_LINK_FRAME = "auv4/base_link_ned"
 
-BOTTLE_0_FRAME_FROM_TABLE = "bottle_0/from_table"
-BOTTLE_0_FRAME_FROM_ODOM = "bottle_0/from_odom"
-BOTTLE_0_FRAME_CLUSTERED = "bottle_0/clustered"
-
-BOTTLE_1_FRAME_FROM_TABLE = "bottle_1/from_table"
-BOTTLE_1_FRAME_FROM_ODOM = "bottle_1/from_odom"
-BOTTLE_1_FRAME_CLUSTERED = "bottle_1/clustered"
-
-LADLE_0_FRAME_FROM_TABLE = "ladle_0/from_table"
-LADLE_0_FRAME_FROM_ODOM = "ladle_0/from_odom"
-LADLE_0_FRAME_CLUSTERED = "ladle_0/clustered"
-
-LADLE_1_FRAME_FROM_TABLE = "ladle_1/from_table"
-LADLE_1_FRAME_FROM_ODOM = "ladle_1/from_odom"
-LADLE_1_FRAME_CLUSTERED = "ladle_1/clustered"
-
-PINK_BUCKET_FRAME_FROM_TABLE = "pink_bucket/from_table"
-PINK_BUCKET_FRAME_FROM_ODOM = "pink_bucket/from_odom"
-PINK_BUCKET_FRAME_CLUSTERED = "pink_bucket/clustered"
-
-YELLOW_BUCKET_FRAME_FROM_TABLE = "yellow_bucket/from_table"
-YELLOW_BUCKET_FRAME_FROM_ODOM = "yellow_bucket/from_odom"
-YELLOW_BUCKET_FRAME_CLUSTERED = "yellow_bucket/clustered"
+# Each of the following frames has a "/from_table", "/from_odom" and "/clustered" version
+# NOTE: The base frame name does not exist.
+BOTTLE_0_FRAME = "bottle_0"
+BOTTLE_1_FRAME = "bottle_1"
+LADLE_0_FRAME = "ladle_0"
+LADLE_1_FRAME = "ladle_1"
+PINK_BUCKET_FRAME = "pink_bucket"
+YELLOW_BUCKET_FRAME = "yellow_bucket"
 
 TABLE_CENTER_FRAME = "table/center"
 TABLE_CENTER_FRAME_CLUSTERED = "table/center/clustered"
@@ -88,15 +74,7 @@ _TABLE_TF_KEY = fk("table_tf")
 _LOOK_AT_TARGET_POSE_KEY = fk("look_at_target_pose")
 
 
-def create_collection_root(
-    trash_name: str,
-    trash_frame_depth_from_table: str,
-    trash_frame_depth_from_odom: str,
-    trash_frame_clustered: str,
-    bucket_frame_depth_from_table: str,
-    bucket_frame_depth_from_odom: str,
-    bucket_frame_clustered: str,
-):
+def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str):
     """Picks up trash, surfaces, looks at the target, and drops it in the bucket."""
     seq_trash = py_trees.composites.Sequence(
         name=trash_name,
@@ -104,9 +82,7 @@ def create_collection_root(
     )
     seq_trash_pick_up = create_align_actuate_surface_root(
         trash_name,
-        trash_frame_depth_from_table,
-        trash_frame_depth_from_odom,
-        trash_frame_clustered,
+        trash_frame,
         command=AlignAndCollect.Goal.CLOSE,
         cluster_duration=CLUSTER_DURATION,
         z_distance=0.20,
@@ -144,9 +120,7 @@ def create_collection_root(
     )
     seq_trash_drop = create_align_actuate_surface_root(
         trash_name,
-        bucket_frame_depth_from_table,
-        bucket_frame_depth_from_odom,
-        bucket_frame_clustered,
+        bucket_frame,
         command=AlignAndCollect.Goal.OPEN,
         depth_threshold=0.1,
         cluster_duration=CLUSTER_DURATION,
@@ -176,12 +150,12 @@ def create_search_root():
         name="Goto search poses",
         poses=[
             create_stamped_pose(
-                frame_id="auv4/base_link_ned",
+                frame_id=BASE_LINK_FRAME,
                 yaw=360.0 / NUM_ROTATIONS,
             )
             for _ in range(NUM_ROTATIONS)
         ],
-        anchor_frame_name="auv4/base_link_ned",
+        anchor_frame_name=BASE_LINK_FRAME,
         specified_heading=True,
         wait_between_moves_sec=WAIT_BETWEEN_ROTATIONS,
     )
@@ -266,21 +240,13 @@ def create_octagon_root():
     ################## BOTTLE PART #################
     seq_bottle_0 = create_collection_root(
         trash_name="Bottle 0",
-        trash_frame_depth_from_table=BOTTLE_0_FRAME_FROM_TABLE,
-        trash_frame_depth_from_odom=BOTTLE_0_FRAME_FROM_ODOM,
-        trash_frame_clustered=BOTTLE_0_FRAME_CLUSTERED,
-        bucket_frame_depth_from_table=PINK_BUCKET_FRAME_FROM_TABLE,
-        bucket_frame_depth_from_odom=PINK_BUCKET_FRAME_FROM_ODOM,
-        bucket_frame_clustered=PINK_BUCKET_FRAME_CLUSTERED,
+        trash_frame=BOTTLE_0_FRAME,
+        bucket_frame=PINK_BUCKET_FRAME,
     )
     seq_ladle_0 = create_collection_root(
         trash_name="Ladle 0",
-        trash_frame_depth_from_table=LADLE_0_FRAME_FROM_TABLE,
-        trash_frame_depth_from_odom=LADLE_0_FRAME_FROM_ODOM,
-        trash_frame_clustered=LADLE_0_FRAME_CLUSTERED,
-        bucket_frame_depth_from_table=YELLOW_BUCKET_FRAME_FROM_TABLE,
-        bucket_frame_depth_from_odom=YELLOW_BUCKET_FRAME_FROM_ODOM,
-        bucket_frame_clustered=YELLOW_BUCKET_FRAME_CLUSTERED,
+        trash_frame=LADLE_0_FRAME,
+        bucket_frame=YELLOW_BUCKET_FRAME,
     )
 
     ############### ROTATION PARTS ###############
@@ -288,10 +254,10 @@ def create_octagon_root():
     goto_rotations = goto.NFromConstant(
         name="Go to rotations",
         poses=[
-            create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
-            create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
-            create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
-            create_stamped_pose(frame_id="auv4/base_link_ned", yaw=360.0),
+            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=360.0),
+            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=360.0),
+            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=360.0),
+            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=360.0),
         ],
         wait_between_moves_sec=WAIT_BETWEEN_ROTATIONS,
     )
