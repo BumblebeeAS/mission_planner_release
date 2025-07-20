@@ -26,6 +26,7 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
     within_threshold_xyz,
 )
+from mission_planner_2.commons.search import create_search_bot_constant_root
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.bins.template_selector import (
     create_template_selector_root,
@@ -139,39 +140,15 @@ def create_bin_root():
         ),
     )
 
-    par_search_bin = py_trees.composites.Parallel(
-        name="Search bin", policy=py_trees.common.ParallelPolicy.SuccessOnAll()
+    seq_search = create_search_bot_constant_root(
+        fwd=0.5,
+        back=0.5,
+        left=0.5,
+        right=0.5,
+        object_frame=TEMPLATE_FRAME_YOLO,
+        object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,
+        wait_between_moves=3.0,
     )
-
-    goto_n_search_poses = goto.NFromConstant(
-        name="Goto search poses",
-        poses=[
-            create_stamped_pose(
-                frame_id=BASE_LINK_FRAME,
-                position_x=pattern["x"],
-                position_y=pattern["y"],
-                position_z=pattern["z"],
-            )
-            for pattern in SEARCH_PATTERN
-        ],
-        specified_heading=True,
-        wait_between_moves_sec=2.0,
-    )
-
-    # Step 1: Cluster transforms for initial orientation using YOLO
-    action_cluster_first = py_trees_ros.action_clients.FromConstant(
-        name="Cluster transforms for orientation",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=TEMPLATE_FRAME_YOLO,
-            out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
-            duration=CLUSTERING_DURATION,
-            use_cache=False,
-        ),
-    )
-
-    par_search_bin.add_children([action_cluster_first, goto_n_search_poses])
 
     extract_tf = cache_tf.ToBlackboard(
         name="Extract movement to bin centre",
@@ -489,8 +466,7 @@ def create_bin_root():
             srv_get_fish_choice,
             srv_start_vision,
             check_start_vision_succeeded,
-            # action_cluster_first,
-            par_search_bin,
+            seq_search,
             extract_tf,
             calculate_acute_pose,
             goto_bin_centre,

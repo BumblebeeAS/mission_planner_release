@@ -12,6 +12,7 @@ from mission_planner_2.commons.namespace_utils import (
 )
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
+    create_clustering_request,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
@@ -36,9 +37,14 @@ def _generate_square(fwd, back, left, right):
 
 def _create_search_bot_root(
     poses: List[PoseStamped],
-    cluster_node,
+    cluster_node_start,
+    cluster_node_end,
     wait_between_moves_sec: float = 5.0,
 ):
+    root = py_trees.composites.Sequence(
+        name="Search seq (bot cam)",
+        memory=True,
+    )
 
     goto_search_pattern = goto.NFromConstant(
         name=f"Goto search pattern",
@@ -48,17 +54,11 @@ def _create_search_bot_root(
         specified_heading=True,  # dont need to face dir for this search
     )
 
-    root = py_trees.composites.Parallel(
-        name="Search seq (constant)",
-        policy=py_trees.common.ParallelPolicy.SuccessOnSelected(  # TODO: never tried before
-            children=[goto_search_pattern]
-        ),
-    )
-
     root.add_children(
         [
+            cluster_node_start,
             goto_search_pattern,
-            cluster_node,
+            cluster_node_end,
         ]
     )
 
@@ -76,21 +76,35 @@ def create_search_bot_constant_root(
 ):
     poses = _generate_square(fwd, back, left, right)
 
-    cluster_node = py_trees_ros.action_clients.FromConstant(
+    cluster_node_start = py_trees_ros.service_clients.FromConstant(
         name="Cluster search",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
+        service_type=ClusterTf,
+        service_name="/auv4/cluster_tfs_srv",
+        service_request=create_clustering_request(
+            enabled=True,
             in_children=object_frame,
             out_children=object_frame_clustered,
-            use_cache=False,
             persistent=False,
-            duration=1e6,
+        ),
+    )
+
+    cluster_node_stop = py_trees_ros.service_clients.FromConstant(
+        name="Cluster search stop",
+        service_type=ClusterTf,
+        service_name="/auv4/cluster_tfs_srv",
+        service_request=create_clustering_request(
+            enabled=False,
+            persistent=False,
+            in_children=object_frame,
+            out_children=object_frame_clustered,
         ),
     )
 
     root = _create_search_bot_root(
-        poses, cluster_node, wait_between_moves_sec=wait_between_moves
+        poses,
+        cluster_node_start=cluster_node_start,
+        cluster_node_end=cluster_node_stop,
+        wait_between_moves_sec=wait_between_moves,
     )
 
     return root
@@ -106,43 +120,65 @@ def create_search_bot_bb_root(
     wait_between_moves: float = 5.0,
 ):
     poses = _generate_square(fwd, back, left, right)
-    goal_key = fk("action_goal")
+    enable_request_key = fk("service_request")
+    disable_request_key = fk("service_request_stop")
 
     root = py_trees.composites.Sequence(
         name="Search seq (bot cam)",
         memory=True,
     )
 
-    dynamic_set_goal = DynamicSetBlackboard(
+    dynamic_set_start_req = DynamicSetBlackboard(
         name="Dynamic set cluster goal",
         key=[object_frame_key, object_frame_clustered_key],
-        update_key=goal_key,
+        update_key=enable_request_key,
         overwrite=True,
-        func=lambda frame, frame_clustered: create_clustering_goal(
+        func=lambda frame, frame_clustered: create_clustering_request(
+            enabled=True,
             in_children=frame,
             out_children=frame_clustered,
-            use_cache=False,
             persistent=False,
-            duration=1e6,
         ),
     )
 
-    cluster_node = py_trees_ros.action_clients.FromBlackboard(
+    dynamic_set_end_req = DynamicSetBlackboard(
+        name="Dynamic set cluster stop",
+        key=[object_frame_key, object_frame_clustered_key],
+        update_key=disable_request_key,
+        overwrite=True,
+        func=lambda frame, frame_clustered: create_clustering_request(
+            enabled=False,
+            persistent=False,
+            in_children=frame,
+            out_children=frame_clustered,
+        ),
+    )
+
+    cluster_node_start = py_trees_ros.service_clients.FromBlackboard(
         name="Cluster search",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        key=goal_key,
+        service_type=ClusterTf,
+        service_name="/auv4/cluster_tfs_srv",
+        key_request=enable_request_key,
+    )
+
+    cluster_node_end = py_trees_ros.service_clients.FromBlackboard(
+        name="Cluster search stop",
+        service_type=ClusterTf,
+        service_name="/auv4/cluster_tfs_srv",
+        key_request=disable_request_key,
     )
 
     seq_search = _create_search_bot_root(
         poses,
-        cluster_node,
+        cluster_node_start=cluster_node_start,
+        cluster_node_end=cluster_node_end,
         wait_between_moves_sec=wait_between_moves,
     )
 
     root.add_children(
         [
-            dynamic_set_goal,
+            dynamic_set_start_req,
+            dynamic_set_end_req,
             seq_search,
         ]
     )

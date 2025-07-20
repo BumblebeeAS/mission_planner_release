@@ -7,6 +7,7 @@ from collections.abc import Callable
 import numpy as np
 from bb_controls_msgs.srv import Limits
 from bb_perception_msgs.action import ClusterTf
+from bb_perception_msgs.srv import ClusterTf as ClusterTfSrv
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from py_trees import console
@@ -170,6 +171,41 @@ def create_clustering_goal(
     goal.use_cache = use_cache
     goal.persistent = persistent
     return goal
+
+
+def create_clustering_request(
+    enabled: bool,
+    in_children: str | list[str],
+    out_children: str | list[str],
+    out_parents: str | list[str] = "world_ned",
+    min_cluster_size: int = 2,
+    min_samples: int = 1,
+    persistent: bool = False,
+):
+    """Create a ClusterTf request for clustering transforms.
+
+    Returns:
+        ClusterTf.Request: A configured request object.
+    """
+    if isinstance(in_children, str):
+        in_children = [in_children]
+
+    if isinstance(out_children, str):
+        out_children = [out_children]
+
+    if isinstance(out_parents, str):
+        out_parents = [out_parents] * len(out_children)
+
+    request = ClusterTfSrv.Request()
+    request.enabled = enabled
+    request.input_child_frame_ids = in_children
+    request.output_child_frame_ids = out_children
+    request.output_parent_frame_ids = out_parents
+    request.min_cluster_size = min_cluster_size
+    request.min_samples = min_samples
+    request.persistent = persistent
+
+    return request
 
 
 def create_slalom_clustering_goal(duration=20, min_cluster_size=10, min_samples=10):
