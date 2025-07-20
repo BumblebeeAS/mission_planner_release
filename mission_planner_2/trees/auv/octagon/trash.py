@@ -52,6 +52,17 @@ def create_align_actuate_surface_root(
         ),
     )
 
+    srv_disable_controls = checked_service.FromConstant(
+        name=f"Disable controls ({trash_name})",
+        service_name=CONTROLS_SRV_TOPIC,
+        service_type=Controller,
+        service_request=Controller.Request(
+            enable=False,
+            pause=False,
+            disable_altitude=False,
+        ),
+    )
+
     call_trash_pickup = py_trees_ros.actions.ActionClient(
         name=f"Call trash align and collect ({trash_name})",
         action_type=AlignAndCollect,
@@ -65,22 +76,10 @@ def create_align_actuate_surface_root(
         ),
     )
 
-    srv_disable_controls = checked_service.FromConstant(
-        name=f"Disable controls ({trash_name})",
-        service_name=CONTROLS_SRV_TOPIC,
-        service_type=Controller,
-        service_request=Controller.Request(
-            enable=False,
-            pause=False,
-            disable_altitude=False,
-        ),
-    )
-
     seq_surface = py_trees.composites.Sequence(
         name=f"Enable at surface ({trash_name})",
         memory=True,
     )
-
     sub_depth = py_trees_ros.subscribers.ToBlackboard(
         name=f"Sub depth ({trash_name})",
         topic_name="/auv4/depth",
@@ -88,7 +87,6 @@ def create_align_actuate_surface_root(
         qos_profile=qos_profile_system_default,
         blackboard_variables={_DEPTH_KEY: "data"},
     )
-
     # check if depth is less than or equal to threshold
     check_depth = py_trees.behaviours.CheckBlackboardVariableValue(
         name=f"Check depth ({trash_name})",
@@ -98,7 +96,6 @@ def create_align_actuate_surface_root(
             operator=lambda x, y: x <= y,
         ),
     )
-
     srv_enable_controls = checked_service.FromConstant(
         name=f"Enable controls ({trash_name})",
         service_name=CONTROLS_SRV_TOPIC,
@@ -109,7 +106,6 @@ def create_align_actuate_surface_root(
             disable_altitude=False,
         ),
     )
-
     seq_surface.add_children(
         children=[
             sub_depth,
@@ -117,17 +113,19 @@ def create_align_actuate_surface_root(
             srv_enable_controls,
         ]
     )
+    # TODO: can consider more targeted retry if want
+    retry_surfacing = py_trees.decorators.Retry(
+        name=f"retry surfacing ({trash_name})",
+        child=seq_surface,
+        num_failures=1e6,
+    )
 
     root.add_children(
         children=[
             cluster_trash,
             srv_disable_controls,
             call_trash_pickup,
-            py_trees.decorators.Retry(  # TODO: can consider more targeted retry if want
-                name=f"retry surfacing ({trash_name})",
-                child=seq_surface,
-                num_failures=1e6,
-            ),
+            retry_surfacing,
         ]
     )
 
