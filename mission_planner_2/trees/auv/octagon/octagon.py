@@ -20,7 +20,7 @@ from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.helpers import get_table_to_surface_target_yaw
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
-from mission_planner_2.trees.auv.octagon.trash import create_trash_root
+from mission_planner_2.trees.auv.octagon.trash import create_align_actuate_surface_root
 from rclpy.qos import qos_profile_system_default
 from std_srvs.srv import Trigger
 
@@ -102,11 +102,12 @@ def create_collection_root(
         name=trash_name,
         memory=True,
     )
-    seq_trash_pick_up = create_trash_root(
+    seq_trash_pick_up = create_align_actuate_surface_root(
+        trash_name,
         trash_frame_depth_from_table,
         trash_frame_depth_from_odom,
         trash_frame_clustered,
-        trash_name,
+        command=AlignAndCollect.Goal.CLOSE,
         cluster_duration=CLUSTER_DURATION,
         z_distance=0.20,
     )
@@ -141,14 +142,14 @@ def create_collection_root(
         name="Stabilise before drop",
         duration=STABILIZE_DURATION,
     )
-    seq_trash_drop = create_trash_root(
+    seq_trash_drop = create_align_actuate_surface_root(
+        trash_name,
         bucket_frame_depth_from_table,
         bucket_frame_depth_from_odom,
         bucket_frame_clustered,
-        trash_name=trash_name,
+        command=AlignAndCollect.Goal.OPEN,
         depth_threshold=0.1,
         cluster_duration=CLUSTER_DURATION,
-        command=AlignAndCollect.Goal.OPEN,
         z_distance=0.30,
     )
     seq_trash.add_children(

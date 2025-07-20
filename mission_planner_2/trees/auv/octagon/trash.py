@@ -21,18 +21,22 @@ _DEPTH_KEY = fk("depth")
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 
 
-def create_trash_root(
-    trash_frame_depth_from_table: str,
-    trash_frame_depth_from_odom: str,
-    trash_frame_clustered: str,
+def create_align_actuate_surface_root(
     trash_name: str,
+    object_frame_depth_from_table: str,
+    object_frame_depth_from_odom: str,
+    object_frame_clustered: str,
+    command: int,
     depth_threshold: float = 0.2,
     cluster_duration: int = 10,
-    command: int = AlignAndCollect.Goal.CLOSE,
     z_distance: float = 0.15,
 ):
+    """Cluster the trash / bucket pose, then pass control to the AlignAndCollect action which
+    aligns the robot to the trash / bucket and actuates the grabber to open / close. After the
+    action is complete, controls remain disabled and the robot floats towards the surface. At
+    a certain depth, controls are re-enabled."""
     root = py_trees.composites.Sequence(
-        name=f"Trash ({trash_name})",
+        name=f"Align, actuate, surface ({trash_name})",
         memory=True,
     )
 
@@ -41,8 +45,8 @@ def create_trash_root(
         action_type=ClusterTf,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
-            in_children=[trash_frame_depth_from_table],
-            out_children=[trash_frame_clustered],
+            in_children=[object_frame_depth_from_table],
+            out_children=[object_frame_clustered],
             duration=cluster_duration,
             use_cache=False,
         ),
@@ -53,8 +57,8 @@ def create_trash_root(
         action_type=AlignAndCollect,
         action_name="/auv4/align_and_collect",
         action_goal=AlignAndCollect.Goal(
-            object_frame=trash_frame_depth_from_odom,
-            object_frame_clustered=trash_frame_clustered,
+            object_frame=object_frame_depth_from_odom,
+            object_frame_clustered=object_frame_clustered,
             command=command,
             z_distance=z_distance,
             cutoff_z_distance=z_distance,
