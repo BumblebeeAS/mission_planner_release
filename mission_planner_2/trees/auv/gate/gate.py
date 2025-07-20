@@ -28,7 +28,7 @@ fk = full_key_generator(NAMESPACE)
 ######################### UPDATE CONSTANTS HERE #########################
 VISION_SERVER_TOPIC = "/auv4/gate_front/manage_nodes"
 
-CLUSTERING_DURATION = 20
+CLUSTERING_DURATION = 4
 STABILIZE_DURATION = 7.0
 
 FORWARD_DISTANCE = 3.0
