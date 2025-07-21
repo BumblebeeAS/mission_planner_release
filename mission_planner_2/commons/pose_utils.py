@@ -342,3 +342,15 @@ def within_threshold_dist(
 
     distance = np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
     return distance <= distance_threshold
+
+
+def compute_start_to_end_vector(start: dict, end: dict) -> dict:
+    output_vector_as_dict = {}
+    output_vector_as_dict["x"] = end["x"] - start["x"]
+    output_vector_as_dict["y"] = end["y"] - start["y"]
+    output_vector_as_dict["z"] = end["z"] - start["z"]
+    output_vector_as_dict["roll"] = 0.0
+    output_vector_as_dict["pitch"] = 0.0
+    output_vector_as_dict["yaw"] = 0.0
+
+    return output_vector_as_dict

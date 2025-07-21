@@ -1,5 +1,4 @@
 import py_trees
-
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -29,7 +28,7 @@ def create_move_to_slalom_task_root(world_coords: dict):
     )
     """
     slalom_init_pose = create_stamped_pose(
-        "world_ned",
+        "auv4/base_link_ned",
         position_x=world_coords["x"],
         position_y=world_coords["y"],
         position_z=world_coords["z"],

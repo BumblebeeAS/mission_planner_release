@@ -1,5 +1,4 @@
 import py_trees
-
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -22,7 +21,7 @@ def create_move_to_torpedo_task_root(world_coords: dict):
     )
 
     torpedo_init_pose = create_stamped_pose(
-        "world_ned",
+        "auv4/base_link_ned",
         position_x=world_coords["x"],
         position_y=world_coords["y"],
         position_z=world_coords["z"],
@@ -36,7 +35,20 @@ def create_move_to_torpedo_task_root(world_coords: dict):
         torpedo_init_pose,
     )
 
+    move_to_torp_rel = goto.FromConstant(
+        "Move to torpedo",
+        create_stamped_pose(
+            "auv4/base_link_ned",
+            yaw=-90.0,
+        ),
+    )
+
     # TODO: figure out the move to board subtree
-    root.add_children(children=[move_to_torp])
+    root.add_children(
+        children=[
+            move_to_torp
+            # move_to_torp_rel,
+        ]
+    )
 
     return root
