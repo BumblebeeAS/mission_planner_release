@@ -39,14 +39,14 @@ torpedo:
       - "torpedo_1/shark"
       - "torpedo_2/fish"
       - "torpedo_2/shark"
-    z: -0.6
+    z: -0.4
     roll: -90.0
     pitch: -90.0
 gate:
   - name: centre_view
     parents:
       - "gate/centre"
-    y: 0.4
+    y: 0.5
     z: -2.0
     roll: -90.0
     pitch: -90.0
@@ -54,7 +54,7 @@ gate:
     parents:
       - "gate/left"
       - "gate/right"
-    y: 0.4
+    y: 0.5
     z: -1.0
     roll: -90.0
     pitch: -90.0

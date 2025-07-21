@@ -53,11 +53,18 @@ slalom:
   - name: centre
     x: 1.5
     y: 0.3
-    z: -2.0
+    z: -3.0
     roll: -90.0
     pitch: -90.0
     parent_frame_id: "slalom_layer_0/clustered"
     child_frame_id: "slalom/centre"
+    # FIX ME: this is a hot fix, shouldn't have to define these dummy tfs
+  - name: centre_left
+    parent_frame_id: "slalom/centre"
+    child_frame_id: "slalom/centre/left"
+  - name: centre_right
+    parent_frame_id: "slalom/centre"
+    child_frame_id: "slalom/centre/right"
   # One Missing Transform
   - name: slalom_layer_2_from_1_hardcoded
     x: 1.00
@@ -115,15 +122,11 @@ urdf:
     child_frame_id: auv4/grabber
 map:
   - name: slalom
-    x: 4.0
-    y: 6.5
-    z: -1.0
+    x: 10.75
+    y: 6.75
+    z: 0.0
+    roll: -90
+    yaw: -90
     parent_frame_id: "map"
     child_frame_id: "map/slalom"
-  - name: bin
-    x: 3.0
-    y: 6.5
-    z: -1.0
-    parent_frame_id: "map"
-    child_frame_id: "map/bin"
 
