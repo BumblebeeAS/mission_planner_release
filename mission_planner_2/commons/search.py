@@ -1,9 +1,11 @@
 from typing import List
 
+import numpy as np
 import py_trees
 import py_trees_ros
 from bb_perception_msgs.srv import ClusterTf
 from geometry_msgs.msg import PoseStamped
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -17,6 +19,68 @@ from mission_planner_2.commons.pose_utils import (
 from mission_planner_2.trees.auv.goto import goto
 
 _BASE_LINK_FRAME = "auv4/base_link_ned"
+
+
+def _to_top_left(f: float, l: float, start_xy: np.ndarray) -> np.ndarray:
+    """
+    Convert forward and left distances to a 2D vector.
+    Think of start_xy as some relative position/vector from the origin.
+    We then apply the forward and left offsets to this position to get the position vector from the origin.
+    """
+    return np.array(
+        [
+            -start_xy[0] + f,
+            -start_xy[1] - l,
+        ],
+        dtype=float,
+    )
+
+
+def _gen_square(
+    f: float, b: float, l: float, r: float, start_xy: np.ndarray
+) -> np.ndarray:
+    top_left = _to_top_left(f, l, start_xy)
+    btm_left = np.array((-f - b, 0))
+    btm_right = np.array((0, l + r))
+    top_right = np.array((f + b, 0))
+    return np.array(
+        [
+            top_left,
+            btm_left,
+            btm_right,
+            top_right,
+        ],
+        dtype=float,
+    )
+
+
+def _generate_layered_square_search_bot_pattern(
+    num_squares: int, offset_coeff: float = 0.2
+) -> list:
+    """
+    Generate a layered square search pattern.
+    All returned points are defined relative to base_link, suitable to be used with goto.NFromConstant.
+
+    Args:
+        num_squares (int): Number of squares/layers to generate in the pattern.
+        offset_coeff (float): Coefficient to determine the distance between squares.
+            The distance between squares is `i * offset_coeff` where `i` is the square index (1-indexed).
+    Returns:
+        list: A list of PoseStamped objects representing the search pattern.
+    """
+    output_points = []
+    end = np.zeros_like((2, 1), dtype=float)
+    for i in range(1, num_squares + 1):
+        offset = i * offset_coeff
+        points = _gen_square(offset, offset, offset, offset, end)
+        output_points.append(points)
+        end = np.sum(points, axis=0) + end
+
+    output_points = np.concatenate(output_points, axis=0)
+    return [
+        create_stamped_pose(_BASE_LINK_FRAME, position_x=point[0], position_y=point[1])
+        for point in output_points
+    ]
 
 
 def _generate_square(fwd, back, left, right):
@@ -72,6 +136,49 @@ def create_search_bot_constant_root(
     wait_between_moves: float = 5.0,
 ):
     poses = _generate_square(fwd, back, left, right)
+
+    cluster_node_start = py_trees_ros.service_clients.FromConstant(
+        name="Cluster search",
+        service_type=ClusterTf,
+        service_name="/auv4/cluster_tfs_srv",
+        service_request=create_clustering_request(
+            enabled=True,
+            in_children=object_frame,
+            out_children=object_frame_clustered,
+            persistent=False,
+        ),
+    )
+
+    cluster_node_stop = py_trees_ros.service_clients.FromConstant(
+        name="Cluster search stop",
+        service_type=ClusterTf,
+        service_name="/auv4/cluster_tfs_srv",
+        service_request=create_clustering_request(
+            enabled=False,
+            persistent=False,
+            in_children=object_frame,
+            out_children=object_frame_clustered,
+        ),
+    )
+
+    root = _create_search_bot_root(
+        poses,
+        cluster_node_start=cluster_node_start,
+        cluster_node_end=cluster_node_stop,
+        wait_between_moves_sec=wait_between_moves,
+    )
+
+    return root
+
+
+def create_search_bot_layered_square_root(
+    num_squares: int,
+    object_frame: str,
+    object_frame_clustered: str,
+    offset_coeff: float = 0.2,
+    wait_between_moves: float = 5.0,
+):
+    poses = _generate_layered_square_search_bot_pattern(num_squares, offset_coeff)
 
     cluster_node_start = py_trees_ros.service_clients.FromConstant(
         name="Cluster search",
