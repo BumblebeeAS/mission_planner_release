@@ -1,5 +1,4 @@
 import py_trees
-import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect
 from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
@@ -23,6 +22,8 @@ from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_ro
 from mission_planner_2.trees.auv.octagon.trash import create_align_actuate_surface_root
 from rclpy.qos import qos_profile_system_default
 from std_srvs.srv import Trigger
+
+import py_trees_ros
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -60,6 +61,7 @@ CLUSTER_DURATION = 4
 NUM_ROTATIONS = 6
 STABILIZE_DURATION = 5
 WAIT_BETWEEN_ROTATIONS = 3
+LOOK_AT_TARGET_PAUSE_DURATION = 4
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -86,14 +88,6 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
         command=AlignAndCollect.Goal.CLOSE,
         cluster_duration=CLUSTER_DURATION,
         z_distance=0.20,
-    )
-    seq_look_at_target = create_look_at_target_root(
-        trash_name,
-        TABLE_CENTER_FRAME,
-        TABLE_CENTER_FRAME_CLUSTERED,
-        _TABLE_TO_SURFACE_TARGET_YAW_KEY,
-        _LOOK_AT_TARGET_POSE_KEY,
-        CLUSTER_DURATION,
     )
     cluster_table_centre = py_trees_ros.action_clients.FromConstant(
         name="Cluster centre",
@@ -129,7 +123,6 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
     seq_trash.add_children(
         children=[
             seq_trash_pick_up,
-            seq_look_at_target,
             cluster_table_centre,
             goto_table_centre,
             stabilize_before_drop,
@@ -203,7 +196,6 @@ def create_octagon_root():
             operator=lambda x, y: x.success == y,
         ),
     )
-
     srv_get_choice = py_trees_ros.service_clients.FromConstant(
         name="Get choice",
         service_name="/auv4/choice/get_is_fish",
@@ -235,6 +227,12 @@ def create_octagon_root():
         func=lambda choice, fish_tf, shark_tf, table_tf: get_table_to_surface_target_yaw(
             choice, fish_tf, shark_tf, table_tf
         ),
+    )
+    look_at_target = create_look_at_target_root(
+        table_center_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+        table_to_surface_target_yaw_key=_TABLE_TO_SURFACE_TARGET_YAW_KEY,
+        look_at_target_pose_key=_LOOK_AT_TARGET_POSE_KEY,
+        pause_duration=LOOK_AT_TARGET_PAUSE_DURATION,
     )
 
     ################## BOTTLE PART #################
@@ -287,11 +285,12 @@ def create_octagon_root():
             symbol_tf_checker,
             table_tf_to_blackboard,
             dynamic_set_surface_yaw,
+            look_at_target,
             seq_bottle_0,
             seq_ladle_0,
-            # goto_rotations,
-            # srv_end_vision,
-            # check_end_vision_succeeded,
+            goto_rotations,
+            srv_end_vision,
+            check_end_vision_succeeded,
         ]
     )
 
