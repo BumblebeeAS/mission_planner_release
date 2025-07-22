@@ -1,9 +1,12 @@
 import py_trees
 import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect
-from bb_perception_msgs.action import ClusterTf as ClusterTfAction
 from bb_perception_msgs.srv import ClusterTf as ClusterTfSrv
 from lifecycle_msgs.srv import ChangeState
+from rclpy.qos import qos_profile_system_default
+from std_srvs.srv import Trigger
+
+from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -13,6 +16,7 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
+from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_clustering_request,
@@ -23,8 +27,6 @@ from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.helpers import get_table_to_surface_target_yaw
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
 from mission_planner_2.trees.auv.octagon.trash import create_align_actuate_surface_root
-from rclpy.qos import qos_profile_system_default
-from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -90,10 +92,10 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
         cluster_duration=CLUSTER_DURATION,
         z_distance=0.20,
     )
-    cluster_table_centre = py_trees_ros.action_clients.FromConstant(
+
+    cluster_table_centre = shared_action_client.FromConstant(
         name="Cluster centre",
-        action_type=ClusterTfAction,
-        action_name="/auv4/cluster_tf",
+        shared_action=SharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children=TABLE_CENTER_FRAME,
             out_children=TABLE_CENTER_FRAME_CLUSTERED,
@@ -237,9 +239,10 @@ def create_octagon_root():
         key=[_CHOICE_KEY, _FISH_TF_KEY, _SHARK_TF_KEY, _TABLE_TF_KEY],
         update_key=_TABLE_TO_SURFACE_TARGET_YAW_KEY,
         overwrite=True,
-        func=lambda choice, fish_tf, shark_tf, table_tf: get_table_to_surface_target_yaw(
-            choice, fish_tf, shark_tf, table_tf
-        ),
+        func=lambda choice,
+        fish_tf,
+        shark_tf,
+        table_tf: get_table_to_surface_target_yaw(choice, fish_tf, shark_tf, table_tf),
     )
     look_at_target = create_look_at_target_root(
         table_center_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,

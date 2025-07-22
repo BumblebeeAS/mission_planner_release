@@ -4,15 +4,15 @@ from typing import Literal
 import numpy as np
 import py_trees
 import py_trees_ros
-from bb_perception_msgs.action import ClusterTf
 from bb_planner_msgs.srv import MapRelocalize
 from geometry_msgs.msg import PoseStamped, TransformStamped
-
+from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
+from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
@@ -86,10 +86,9 @@ def _recluster_and_goto_sequence(
         pose_key=_LAYER_TO_LAYER_POSE_KEY,
     )
 
-    recluster_action = py_trees_ros.action_clients.FromConstant(
+    recluster_action = shared_action_client.FromConstant(
         name=f"Recluster transforms ({side}, missing layers: {missing_layers})",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf_multi",
+        shared_action=SharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=clustering_in_children,
             out_children=[
@@ -160,10 +159,9 @@ def _sweep_and_goto_sequence(
         wait_between_moves_sec=1.0,
     )
 
-    recluster_action = py_trees_ros.action_clients.FromConstant(
+    recluster_action = shared_action_client.FromConstant(
         name=f"Recluster during sweep ({side}, missing layers: {missing_layers})",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf_multi",
+        shared_action=SharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=clustering_in_children,
             out_children=[

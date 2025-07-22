@@ -2,10 +2,8 @@ import operator
 
 import py_trees
 import py_trees_ros
-from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
-from std_srvs.srv import SetBool
-
+from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -15,6 +13,7 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
+from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
@@ -26,6 +25,7 @@ from mission_planner_2.trees.auv.slalom.channel_movement_recluster import (
     create_channel_movement_two_root,
     create_channel_movement_zero_root,
 )
+from std_srvs.srv import SetBool
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -212,10 +212,9 @@ def create_slalom_root():
         policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
     )
 
-    cluster_action = py_trees_ros.action_clients.FromConstant(
+    cluster_action = shared_action_client.FromConstant(
         name="Cluster slalom transforms",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf_multi",
+        shared_action=SharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=[
                 CHANNEL_PAIR_ZERO_FRAME,

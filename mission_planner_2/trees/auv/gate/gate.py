@@ -2,12 +2,8 @@ import operator
 
 import py_trees
 import py_trees_ros
-from bb_perception_msgs.action import ClusterTf
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import String
-from std_srvs.srv import Trigger
-
+from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -16,11 +12,15 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
+from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -86,10 +86,9 @@ def create_gate_root():
     )
 
     # Step 3: Cluster gate transforms
-    action_cluster_gate = py_trees_ros.action_clients.FromConstant(
+    action_cluster_gate = shared_action_client.FromConstant(
         name="Cluster gate transforms",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
+        shared_action=SharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_YOLO,
             out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,

@@ -1,10 +1,9 @@
 import py_trees
 import py_trees_ros
-from bb_perception_msgs.action import ClusterTf
-from std_srvs.srv import Trigger
-
+from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
+from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
@@ -12,6 +11,7 @@ from mission_planner_2.commons.pose_utils import (
     within_threshold_xyz,
 )
 from mission_planner_2.trees.auv.goto import goto
+from std_srvs.srv import Trigger
 
 
 def create_move_and_shoot_generator(
@@ -79,10 +79,9 @@ def create_move_and_shoot_generator(
             func=shoot_frame_sel,
         )
 
-        cluster_node = py_trees_ros.action_clients.FromConstant(
+        cluster_node = shared_action_client.FromConstant(
             name=f"Cluster the transforms before {torp_string} shot",
-            action_type=ClusterTf,
-            action_name="/auv4/cluster_tf",
+            shared_action=SharedAction.CLUSTER,
             action_goal=create_clustering_goal(
                 in_children=template_frame_optical,
                 out_children=template_frame_optical_clustered,
@@ -91,10 +90,9 @@ def create_move_and_shoot_generator(
             ),
         )
 
-        cluster_node_check = py_trees_ros.action_clients.FromConstant(
+        cluster_node_check = shared_action_client.FromConstant(
             name=f"Cluster the transforms before {torp_string} shot",
-            action_type=ClusterTf,
-            action_name="/auv4/cluster_tf",
+            shared_action=SharedAction.CLUSTER,
             action_goal=create_clustering_goal(
                 in_children=template_frame_optical,
                 out_children=template_frame_optical_clustered,

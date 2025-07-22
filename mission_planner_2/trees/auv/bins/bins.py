@@ -2,15 +2,10 @@ import operator
 
 import py_trees
 import py_trees_ros
-from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
-
-from mission_planner_2.commons import cache_tf
+from mission_planner_2.commons import cache_tf, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
 from mission_planner_2.commons.detection_utils import (
@@ -21,9 +16,8 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
+from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goal,
-    create_stamped_pose,
     within_threshold_xyz,
 )
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
@@ -32,6 +26,9 @@ from mission_planner_2.trees.auv.bins.template_selector import (
     create_template_selector_root,
 )
 from mission_planner_2.trees.auv.goto import goto
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -341,17 +338,15 @@ def create_bin_root():
         ),
     )
 
-    action_cluster_for_goto = py_trees_ros.action_clients.FromBlackboard(
+    action_cluster_for_goto = shared_action_client.FromBlackboard(
         name="Cluster transforms for dropping",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
+        shared_action=SharedAction.CLUSTER,
         key=_CLUSTERING_GOAL_KEY,
     )
 
-    action_cluster_for_goto_check = py_trees_ros.action_clients.FromBlackboard(
+    action_cluster_for_goto_check = shared_action_client.FromBlackboard(
         name="Cluster transforms for dropping",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
+        shared_action=SharedAction.CLUSTER,
         key=_CLUSTERING_GOAL_KEY,
     )
 
