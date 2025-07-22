@@ -6,8 +6,8 @@ from collections.abc import Callable
 
 import numpy as np
 from bb_controls_msgs.srv import Limits
-from bb_perception_msgs.action import ClusterTf
-from bb_perception_msgs.srv import ClusterTf as ClusterTfSrv
+from bb_perception_msgs.action import ClusterTfAction
+from bb_perception_msgs.srv import ClusterTfSrv
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from py_trees import console
@@ -79,7 +79,7 @@ def create_clustering_goal(
     use_cache: bool = False,
     persistent: bool = False,
 ):
-    """Create a ClusterTf goal for collecting and clustering coordinate transforms.
+    """Create a ClusterTfAction goal for collecting and clustering coordinate transforms.
 
     Args:
        in_children (str | list[str]): The child frame ID(s) for the input transform lookup.
@@ -110,7 +110,7 @@ def create_clustering_goal(
            Defaults to False.
 
     Returns:
-       ClusterTf.Goal: A configured goal object.
+       ClusterTfAction.Goal: A configured goal object.
 
     Example:
        >>> # Create a goal to cluster transforms for a single frame
@@ -133,7 +133,7 @@ def create_clustering_goal(
        >>> # Use the goal with a py_trees_ros action client
        >>> cluster = py_trees_ros.action_clients.FromConstant(
        ...     name="cluster_action",
-       ...     action_type=ClusterTf,
+       ...     action_type=ClusterTfAction,
        ...     action_name="/auv4/cluster_tf",
        ...     action_goal=goal,
        ... )
@@ -141,7 +141,7 @@ def create_clustering_goal(
        >>> # Or create the goal directly in the action client call
        >>> cluster = py_trees_ros.action_clients.FromConstant(
        ...     name="cluster_action",
-       ...     action_type=ClusterTf,
+       ...     action_type=ClusterTfAction,
        ...     action_name="/auv4/cluster_tf",
        ...     action_goal=create_clustering_goal(
        ...         in_children="camera_frame",
@@ -158,8 +158,8 @@ def create_clustering_goal(
     if isinstance(out_parents, str):
         out_parents = [out_parents] * len(out_children)
 
-    # To be used with modified ClusterTf goal that can support multiple children
-    goal = ClusterTf.Goal()
+    # To be used with modified ClusterTfAction goal that can support multiple children
+    goal = ClusterTfAction.Goal()
     goal.input_child_frame_ids = in_children
     goal.output_child_frame_ids = out_children
     goal.output_parent_frame_ids = out_parents
@@ -182,10 +182,10 @@ def create_clustering_request(
     min_samples: int = 1,
     persistent: bool = False,
 ):
-    """Create a ClusterTf request for clustering transforms.
+    """Create a ClusterTfSrv request for clustering transforms.
 
     Returns:
-        ClusterTf.Request: A configured request object.
+        ClusterTfSrv.Request: A configured request object.
     """
     if isinstance(in_children, str):
         in_children = [in_children]
@@ -209,7 +209,7 @@ def create_clustering_request(
 
 
 def create_slalom_clustering_goal(duration=20, min_cluster_size=10, min_samples=10):
-    """Create a ClusterTf goal for slalom clustering.
+    """Create a ClusterTfAction goal for slalom clustering.
 
     Args:
        duration (int, optional): The duration in seconds over which to collect
@@ -220,7 +220,7 @@ def create_slalom_clustering_goal(duration=20, min_cluster_size=10, min_samples=
            for a point to be considered a core point in clustering. Defaults to 10.
 
     Returns:
-       ClusterTf.Goal: A configured goal object.
+       ClusterTfAction.Goal: A configured goal object.
 
     Note:
        The frame IDs are set to dummy values since the action server loads the

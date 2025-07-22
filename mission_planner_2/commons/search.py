@@ -3,7 +3,7 @@ from typing import List
 import numpy as np
 import py_trees
 import py_trees_ros
-from bb_perception_msgs.srv import ClusterTf
+from bb_perception_msgs.srv import ClusterTfSrv
 from geometry_msgs.msg import PoseStamped
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -139,7 +139,7 @@ def create_search_bot_constant_root(
 
     cluster_node_start = py_trees_ros.service_clients.FromConstant(
         name="Cluster search",
-        service_type=ClusterTf,
+        service_type=ClusterTfSrv,
         service_name="/auv4/cluster_tfs_srv",
         service_request=create_clustering_request(
             enabled=True,
@@ -151,7 +151,7 @@ def create_search_bot_constant_root(
 
     cluster_node_stop = py_trees_ros.service_clients.FromConstant(
         name="Cluster search stop",
-        service_type=ClusterTf,
+        service_type=ClusterTfSrv,
         service_name="/auv4/cluster_tfs_srv",
         service_request=create_clustering_request(
             enabled=False,

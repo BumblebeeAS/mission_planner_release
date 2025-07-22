@@ -2,7 +2,7 @@ import py_trees
 import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect
 from bb_controls_msgs.srv import Controller
-from bb_perception_msgs.action import ClusterTf as ClusterTfAction
+from bb_perception_msgs.action import ClusterTfAction
 from bb_perception_msgs.srv import TrashToggleFrame
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.namespace_utils import (

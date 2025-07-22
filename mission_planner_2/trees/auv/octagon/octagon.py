@@ -1,7 +1,7 @@
 import py_trees
 import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect
-from bb_perception_msgs.srv import ClusterTf as ClusterTfSrv
+from bb_perception_msgs.srv import ClusterTfSrv
 from lifecycle_msgs.srv import ChangeState
 from rclpy.qos import qos_profile_system_default
 from std_srvs.srv import Trigger
