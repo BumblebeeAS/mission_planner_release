@@ -2,12 +2,8 @@
 
 import py_trees
 import py_trees.console as console
-import py_trees_ros.trees
+import py_trees_ros
 import rclpy
-
-from mission_planner_2.trees.miniauv.tests.test_goto import (
-    create_goto_test as tree_root,
-)
 
 # from mission_planner_2.trees.auv.tests.test_goto_nfrombb import (
 #     create_test_multi_waypoint_root as tree_root,
@@ -24,6 +20,9 @@ from mission_planner_2.trees.miniauv.tests.test_goto import (
 # from mission_planner_2.trees.auv.tests.test_multi_waypoint import (
 #     create_test_multi_waypoint_root as tree_root,
 # )
+from mission_planner_2.commons.hooks import stop_on_success_or_failure
+from mission_planner_2.commons.node_registry import TreeNode
+from mission_planner_2.trees.auv.tests.test_goto import create_goto_test as tree_root
 
 
 def main():
@@ -31,26 +30,30 @@ def main():
     root = tree_root()
     py_trees.logging.level = py_trees.logging.Level.DEBUG
     tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
+    node = TreeNode()
     try:
-        tree.setup(timeout=15.0)
+        tree.setup(node=node, timeout=60.0)
     except:
-        console.logerror(console.red + "failed to setup the tree")
+        console.logerror(console.red + "failed to setup the tree" + console.reset)
         tree.shutdown()
         rclpy.shutdown()
 
-    def stop_on_success(tree):
-        if tree.root.status == py_trees.common.Status.SUCCESS:
-            console.loginfo(console.green + "completed one execution")
-            tree.shutdown()
-            rclpy.shutdown()
-            exit(0)
-
-    tree.add_post_tick_handler(stop_on_success)
+    tree.add_post_tick_handler(stop_on_success_or_failure)
     tree.tick_tock(period_ms=100)
     try:
         rclpy.spin(tree.node)
     except KeyboardInterrupt:
-        pass
+        console.loginfo(console.yellow + "interrupted" + console.reset)
+    except SystemExit:
+        console.loginfo(console.yellow + "exiting" + console.reset)
+    except Exception as e:
+        console.logfatal(
+            console.red + "exception occurred: {}".format(e) + console.reset
+        )
+    finally:
+        console.loginfo(console.reset + "cleaning up")
+        tree.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":
