@@ -19,10 +19,12 @@ from geometry_msgs.msg import PoseStamped
 from numpy import rad2deg
 from transforms3d.euler import quat2euler
 
+from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import convert_to_safe_name
+from mission_planner_2.commons.node_registry import SharedAction, SharedService
 
 
-class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
+class FromBlackboard(shared_action_client.FromBlackboard):
     """
     Interface to communicate with controls `Locomotion Action Server` using a pose stored in the blackboard.
 
@@ -91,11 +93,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
                                        goal is rejected, or action fails
     """
 
-    ACTION_TYPE = Locomotion
-    ACTION_NAME = "/auv4/controls"
     ACTION_GOAL_KEY = "goto_goal"
-    SERVICE_TYPE = GetPoseToControlsFrame
-    SERVICE_NAME = "/auv4/convert_to_controls_pose"
 
     def __init__(
         self,
@@ -115,8 +113,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
 
         super().__init__(
             name,
-            self.ACTION_TYPE,
-            self.ACTION_NAME,
+            SharedAction.LOCOMOTION,
             py_trees.blackboard.Blackboard.absolute_name(
                 namespace, self.ACTION_GOAL_KEY
             ),
@@ -149,10 +146,9 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
         """
         super().setup(**kwargs)
 
-        self.service_client = self.node.create_client(
-            srv_type=self.SERVICE_TYPE, srv_name=self.SERVICE_NAME
-        )
-
+        self.service_client = self.node.service_clients[
+            SharedService.CONVERT_TO_CONTROLS_POSE.name
+        ]
         self._check_srv_setup()
 
     def initialise(self):
@@ -349,14 +345,16 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
                     self.node.get_logger().warning(
                         "waiting for service server ... [{}s][{}][{}]".format(
                             iterations * period_sec,
-                            self.node.resolve_service_name(self.SERVICE_NAME),
+                            self.node.resolve_service_name(
+                                self.shared_action.value.topic
+                            ),
                             self.qualified_name,
                         )
                     )
 
         if not result:
             self.feedback_message = "timed out waiting for the server [{}]".format(
-                self.node.resolve_service_name(self.SERVICE_NAME)
+                self.node.resolve_service_name(self.shared_action.value.topic)
             )
             self.node.get_logger().error(
                 "{}[{}]".format(self.feedback_message, self.qualified_name)
@@ -364,7 +362,7 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
             raise py_trees_ros.exceptions.TimedOutError(self.feedback_message)
         else:
             self.feedback_message = "... connected to service server [{}]".format(
-                self.node.resolve_service_name(self.SERVICE_NAME)
+                self.node.resolve_service_name(self.shared_action.value.topic)
             )
             self.node.get_logger().info(
                 "{}[{}]".format(self.feedback_message, self.qualified_name)
@@ -473,7 +471,6 @@ class NFromBlackboard(FromBlackboard):
         wait_between_moves_sec=10.0,
         ignore_depth: bool = False,
     ):
-
         super().__init__(
             name,
             pose_key=pose_key,
