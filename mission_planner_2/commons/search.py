@@ -55,13 +55,22 @@ def _gen_square(
 
 
 def _generate_layered_square_search_bot_pattern(
-    num_squares: int, offset_coeff: float = 0.2
+    fwd: float,
+    back: float,
+    left: float,
+    right: float,
+    num_squares: int,
+    offset_coeff: float = 0.2,
 ) -> list:
     """
     Generate a layered square search pattern.
     All returned points are defined relative to base_link, suitable to be used with goto.NFromConstant.
 
     Args:
+        fwd (float): Forward distance of the square (this is for first layer offset will be applied with layer_num * offset where layer_num starts from 0 up to num_squares - 1).
+        back (float): Backward distance of the square.
+        left (float): Left distance of the square.
+        right (float): Right distance of the square.
         num_squares (int): Number of squares/layers to generate in the pattern.
         offset_coeff (float): Coefficient to determine the distance between squares.
             The distance between squares is `i * offset_coeff` where `i` is the square index (1-indexed).
@@ -70,9 +79,11 @@ def _generate_layered_square_search_bot_pattern(
     """
     output_points = []
     end = np.zeros_like((2, 1), dtype=float)
-    for i in range(1, num_squares + 1):
+    for i in range(0, num_squares):
         offset = i * offset_coeff
-        points = _gen_square(offset, offset, offset, offset, end)
+        points = _gen_square(
+            fwd + offset, back + offset, left + offset, right + offset, end
+        )
         output_points.append(points)
         end = np.sum(points, axis=0) + end
 
@@ -172,13 +183,19 @@ def create_search_bot_constant_root(
 
 
 def create_search_bot_layered_square_root(
+    fwd: float,
+    back: float,
+    left: float,
+    right: float,
     num_squares: int,
     object_frame: str,
     object_frame_clustered: str,
     offset_coeff: float = 0.2,
     wait_between_moves: float = 5.0,
 ):
-    poses = _generate_layered_square_search_bot_pattern(num_squares, offset_coeff)
+    poses = _generate_layered_square_search_bot_pattern(
+        fwd, back, left, right, num_squares, offset_coeff
+    )
 
     cluster_node_start = py_trees_ros.service_clients.FromConstant(
         name="Cluster search",
@@ -210,6 +227,49 @@ def create_search_bot_layered_square_root(
         cluster_node_end=cluster_node_stop,
         wait_between_moves_sec=wait_between_moves,
     )
+
+    # cluster start finish one layer stop then go next
+    # TODO: if u want to add logic to early stop add into the root children
+    # root_for_samuel = py_trees.composites.Sequence(
+    #     name="Search seq (bot cam) with layers",
+    #     memory=True,
+    # )
+    # children: List[py_trees.behaviour.Behaviour] = [
+    #     py_trees.composites.Sequence(
+    #         name=f"Search layer {i + 1}",
+    #         memory=True,
+    #         children=[
+    #             _create_search_bot_root(
+    #                 poses[i],
+    #                 cluster_node_start=py_trees_ros.service_clients.FromConstant(
+    #                     name="Cluster search",
+    #                     service_type=ClusterTf,
+    #                     service_name="/auv4/cluster_tfs_srv",
+    #                     service_request=create_clustering_request(
+    #                         enabled=True,
+    #                         in_children=object_frame,
+    #                         out_children=object_frame_clustered,
+    #                         persistent=False,
+    #                     ),
+    #                 ),
+    #                 cluster_node_end=py_trees_ros.service_clients.FromConstant(
+    #                     name="Cluster search stop",
+    #                     service_type=ClusterTf,
+    #                     service_name="/auv4/cluster_tfs_srv",
+    #                     service_request=create_clustering_request(
+    #                         enabled=False,
+    #                         persistent=False,
+    #                         in_children=object_frame,
+    #                         out_children=object_frame_clustered,
+    #                     ),
+    #                 ),
+    #                 wait_between_moves_sec=wait_between_moves,
+    #             )
+    #         ],
+    #     )
+    #     for i in range(len(poses))
+    # ]
+    # root_for_samuel.add_children(children)
 
     return root
 
