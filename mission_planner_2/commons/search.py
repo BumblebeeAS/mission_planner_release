@@ -15,9 +15,38 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
+import numpy as np
 
 _BASE_LINK_FRAME = "auv4/base_link_ned"
 
+def _to_top_left(f: float, l: float, start_xy: list[float]) -> np.ndarray:
+    """
+    Convert forward and left distances to a 2D vector.
+    Think of start_xy as some relative position/vector from the origin.
+    We then apply the forward and left offsets to this position to get the position vector from the origin.
+    """
+    return np.array(
+        [
+            -start_xy[0] + f,
+            -start_xy[1] - l,
+        ],
+        dtype=float,
+    )
+
+def _gen_sqaure(f, b, l, r, start_xy):
+    top_left = _to_top_left(f, l, start_xy)
+    btm_left = np.array((-f -b, 0))
+    btm_right = np.array((0, l + r))
+    top_right = np.array((f + b, 0))
+    return np.array(
+        [
+            top_left,
+            btm_left,
+            btm_right,
+            top_right,
+        ],
+        dtype=float,
+    )
 
 def _generate_square(fwd, back, left, right):
     """Generate a square pattern with the given dimensions."""
