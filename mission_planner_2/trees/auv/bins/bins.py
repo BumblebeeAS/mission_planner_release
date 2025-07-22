@@ -26,7 +26,7 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
     within_threshold_xyz,
 )
-from mission_planner_2.commons.search import create_search_bot_constant_root
+from mission_planner_2.commons.search import create_search_bot_layered_square_root
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.bins.template_selector import (
     create_template_selector_root,
@@ -55,6 +55,8 @@ TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 ACTUATION_TOPIC = "/auv4/actuation/dropper"
 ACTUATION_UINT = UInt8(data=6)
 
+NUM_SQUARES = 3
+OFFSET_COEFF = 0.2
 CLUSTERING_DURATION = 4
 REALIGN_CLUSTER_DURATION = 2
 STABILIZE_CONTROLS_DURATION = 5.0
@@ -140,13 +142,11 @@ def create_bin_root():
         ),
     )
 
-    seq_search = create_search_bot_constant_root(
-        fwd=0.5,
-        back=0.5,
-        left=0.5,
-        right=0.5,
+    seq_search = create_search_bot_layered_square_root(
+        num_squares=NUM_SQUARES,
         object_frame=TEMPLATE_FRAME_YOLO,
         object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,
+        offset_coeff=OFFSET_COEFF,
         wait_between_moves=3.0,
     )
 
