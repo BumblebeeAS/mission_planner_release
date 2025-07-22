@@ -1,6 +1,8 @@
 import py_trees
+import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect
-from bb_perception_msgs.action import ClusterTf
+from bb_perception_msgs.action import ClusterTf as ClusterTfAction
+from bb_perception_msgs.srv import ClusterTf as ClusterTfSrv
 from lifecycle_msgs.srv import ChangeState
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
@@ -13,6 +15,7 @@ from mission_planner_2.commons.namespace_utils import (
 )
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
+    create_clustering_request,
     create_stamped_pose,
 )
 from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
@@ -22,8 +25,6 @@ from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_ro
 from mission_planner_2.trees.auv.octagon.trash import create_align_actuate_surface_root
 from rclpy.qos import qos_profile_system_default
 from std_srvs.srv import Trigger
-
-import py_trees_ros
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -91,7 +92,7 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
     )
     cluster_table_centre = py_trees_ros.action_clients.FromConstant(
         name="Cluster centre",
-        action_type=ClusterTf,
+        action_type=ClusterTfAction,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
             in_children=TABLE_CENTER_FRAME,
@@ -135,9 +136,24 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
 def create_search_root():
     """Rotate 360 degrees and cluster the poses of the fish and shark tags. At the same time,
     cluster the pose of the table center."""
-    par_search = py_trees.composites.Parallel(
-        name="Search",
-        policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
+    in_children = [FISH_FRAME, SHARK_FRAME, TABLE_CENTER_FRAME]
+    out_children = [
+        FISH_FRAME_CLUSTERED,
+        SHARK_FRAME_CLUSTERED,
+        TABLE_CENTER_FRAME_CLUSTERED,
+    ]
+
+    seq_search = py_trees.composites.Sequence(name="Search", memory=True)
+    cluster_node_start = py_trees_ros.service_clients.FromConstant(
+        name="Cluster search",
+        service_type=ClusterTfSrv,
+        service_name="/auv4/cluster_tfs_srv",
+        service_request=create_clustering_request(
+            enabled=True,
+            in_children=in_children,
+            out_children=out_children,
+            persistent=False,
+        ),
     )
     goto_n_search_poses = goto.NFromConstant(
         name="Goto search poses",
@@ -152,24 +168,21 @@ def create_search_root():
         specified_heading=True,
         wait_between_moves_sec=WAIT_BETWEEN_ROTATIONS,
     )
-    cluster_tags_and_table = py_trees_ros.actions.ActionClient(
-        name="Cluster tags and table",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=[FISH_FRAME, SHARK_FRAME, TABLE_CENTER_FRAME],
-            out_children=[
-                FISH_FRAME_CLUSTERED,
-                SHARK_FRAME_CLUSTERED,
-                TABLE_CENTER_FRAME_CLUSTERED,
-            ],
-            duration=CLUSTER_DURATION,
-            use_cache=False,
-            persistent=True,
+    cluster_node_stop = py_trees_ros.service_clients.FromConstant(
+        name="Cluster search stop",
+        service_type=ClusterTfSrv,
+        service_name="/auv4/cluster_tfs_srv",
+        service_request=create_clustering_request(
+            enabled=False,
+            in_children=in_children,
+            out_children=out_children,
+            persistent=False,
         ),
     )
-    par_search.add_children([goto_n_search_poses, cluster_tags_and_table])
-    return par_search
+    seq_search.add_children(
+        [cluster_node_start, goto_n_search_poses, cluster_node_stop]
+    )
+    return seq_search
 
 
 def create_octagon_root():

@@ -2,7 +2,8 @@ import py_trees
 import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect
 from bb_controls_msgs.srv import Controller
-from bb_perception_msgs.action import ClusterTf
+from bb_perception_msgs.action import ClusterTf as ClusterTfAction
+from bb_perception_msgs.srv import TrashToggleFrame
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -19,6 +20,7 @@ fk = full_key_generator(NAMESPACE)
 # DONT go move it in the section to be updated
 _DEPTH_KEY = fk("depth")
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
+TOGGLE_TRASH_FRAME_CLUSTERED_TOPIC = "/auv4/trash/toggle_trash_frame_clustered"
 
 
 def create_align_actuate_surface_root(
@@ -41,10 +43,9 @@ def create_align_actuate_surface_root(
         name=f"Align, actuate, surface ({trash_name})",
         memory=True,
     )
-
     cluster_trash = py_trees_ros.actions.ActionClient(
         name=f"Cluster trash ({trash_name})",
-        action_type=ClusterTf,
+        action_type=ClusterTfAction,
         action_name="/auv4/cluster_tf",
         action_goal=create_clustering_goal(
             in_children=[object_frame_depth_from_table],
@@ -53,7 +54,14 @@ def create_align_actuate_surface_root(
             use_cache=False,
         ),
     )
-
+    srv_toggle_trash_frame_clustered = py_trees_ros.service_clients.FromConstant(
+        name=f"Toggle trash frame clustered ({trash_name})",
+        service_type=TrashToggleFrame,
+        service_name=TOGGLE_TRASH_FRAME_CLUSTERED_TOPIC,
+        service_request=TrashToggleFrame.Request(
+            trash_frame_clustered=object_frame_clustered, enable=True
+        ),
+    )
     srv_disable_controls = checked_service.FromConstant(
         name=f"Disable controls ({trash_name})",
         service_name=CONTROLS_SRV_TOPIC,
@@ -64,7 +72,6 @@ def create_align_actuate_surface_root(
             disable_altitude=False,
         ),
     )
-
     call_trash_pickup = py_trees_ros.actions.ActionClient(
         name=f"Call trash align and collect ({trash_name})",
         action_type=AlignAndCollect,
@@ -125,6 +132,7 @@ def create_align_actuate_surface_root(
     root.add_children(
         children=[
             cluster_trash,
+            srv_toggle_trash_frame_clustered,
             srv_disable_controls,
             call_trash_pickup,
             retry_surfacing,
