@@ -52,6 +52,7 @@ SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
 TRANSFORM_TIMEOUT_DURATION = 5.0
 CLUSTER_VIEW_DURATION = 40
 WAIT_BETWEEN_MOVES_SEC = 4.0
+MIN_CLUSTER_SIZE = 10
 
 """
 For sim.
@@ -61,8 +62,8 @@ THIRD_VIEW = {"position_x": 7.0, "position_y": -0.8, "position_z": 1.0, "yaw": -
 """
 
 FIRST_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.0, "yaw": 0.0}
-SECOND_VIEW = {"position_x": 0.0, "position_y": -1.0, "position_z": 0.0, "yaw": 0.0}
-THIRD_VIEW = {"position_x": 0.0, "position_y": 2.0, "position_z": 0.0, "yaw": 0.0}
+SECOND_VIEW = {"position_x": 0.0, "position_y": -1.2, "position_z": 0.0, "yaw": 0.0}
+THIRD_VIEW = {"position_x": 0.0, "position_y": 2.4, "position_z": 0.0, "yaw": 0.0}
 
 # set by  gate task if there change must change here too
 IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
@@ -227,6 +228,8 @@ def create_slalom_root():
                 CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
             ],
             duration=CLUSTER_VIEW_DURATION,
+            min_cluster_size=MIN_CLUSTER_SIZE,
+            min_samples=MIN_CLUSTER_SIZE,
         ),
     )
 
@@ -284,6 +287,7 @@ def create_slalom_root():
 
     # Generate movement options based on the number of missing transforms, generation done in compile time, execution done in runtime
     move_channel_one = create_channel_movement_zero_root(
+        slalom_frame_centre=CHANNEL_CENTRE_FRAME,
         slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
         slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
         slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,

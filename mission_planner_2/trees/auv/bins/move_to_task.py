@@ -1,5 +1,4 @@
 import py_trees
-
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.goto import goto
 
@@ -14,7 +13,7 @@ def create_move_to_bin_task_root(world_coords: dict) -> py_trees.behaviour.Behav
     )
 
     bin_init_pose = create_stamped_pose(
-        "world_ned",
+        "auv4/base_link_ned",
         position_x=world_coords["x"],
         position_y=world_coords["y"],
         position_z=world_coords["z"],

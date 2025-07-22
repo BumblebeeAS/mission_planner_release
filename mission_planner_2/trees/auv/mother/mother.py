@@ -3,6 +3,9 @@ import py_trees
 from mission_planner_2.commons.pose_utils import compute_start_to_end_vector
 from mission_planner_2.trees.auv.bins.bins import create_bin_root
 from mission_planner_2.trees.auv.bins.move_to_task import create_move_to_bin_task_root
+from mission_planner_2.trees.auv.button.wait_for_button import (
+    create_wait_for_button_root,
+)
 from mission_planner_2.trees.auv.gate.gate import create_gate_root
 from mission_planner_2.trees.auv.gate.move_to_task import create_move_to_gate_task_root
 from mission_planner_2.trees.auv.gate.return_home import create_return_root
@@ -19,6 +22,7 @@ from mission_planner_2.trees.auv.torpedo.move_to_task import (
 )
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
+BUTTON_TOPIC = "/auv4/button/left"
 IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 BASE_LINK_KEY = "/global/base_link"
 WORLD_KEY = "/global/world"
@@ -33,7 +37,7 @@ MAP_NED_COORDS_GATE_START = {
     "yaw": 0.0,
 }
 MAP_NED_COORDS_GATE_END = {  # TODO: MUST TUNE
-    "x": 2.0,
+    "x": 5.0,
     "y": 0.0,
     "z": 0.3,
     "roll": 0.0,
@@ -42,21 +46,29 @@ MAP_NED_COORDS_GATE_END = {  # TODO: MUST TUNE
 }
 MAP_NED_COORDS_SLALOM_START = {
     "x": 7.0,
-    "y": -1.0,
+    "y": -1.5,
     "z": 0.3,
     "roll": 0.0,
     "pitch": 0.0,
     "yaw": 0.0,
 }
 MAP_NED_COORDS_SLALOM_END = {  # TODO: MUST TUNE
-    "x": 7.0,
-    "y": -1.0,
+    "x": 13.0,
+    "y": -1.5,
     "z": 0.3,
     "roll": 0.0,
     "pitch": 0.0,
     "yaw": 0.0,
 }
-MAP_NED_COORDS_BIN_START = {
+MAP_NED_COORDS_BIN = {
+    "x": 16.0,
+    "y": 1.0,
+    "z": 0.3,
+    "roll": 0.0,
+    "pitch": 0.0,
+    "yaw": 0.0,
+}
+MAP_NED_COORDS_TORPEDO = {
     "x": 16.0,
     "y": 1.5,
     "z": 0.3,
@@ -64,33 +76,9 @@ MAP_NED_COORDS_BIN_START = {
     "pitch": 0.0,
     "yaw": 0.0,
 }
-MAP_NED_COORDS_BIN_END = {  # TODO: MUST TUNE
-    "x": 7.0,
-    "y": -1.0,
-    "z": 0.3,
-    "roll": 0.0,
-    "pitch": 0.0,
-    "yaw": 0.0,
-}
-MAP_NED_COORDS_TORPEDO_START = {
-    "x": 18.5,
-    "y": -1.0,
-    "z": 0.3,
-    "roll": 0.0,
-    "pitch": 0.0,
-    "yaw": 0.0,
-}
-MAP_NED_COORDS_TORPEDO_END = {
-    "x": 18.5,
-    "y": -1.0,
-    "z": 0.3,
-    "roll": 0.0,
-    "pitch": 0.0,
-    "yaw": 0.0,
-}
 MAP_NED_COORDS_OCTAGON = {
-    "x": 6.0,
-    "y": 1.2,
+    "x": 20.0,
+    "y": 1.5,
     "z": 0.3,
     "roll": 0.0,
     "pitch": 0.0,
@@ -102,6 +90,11 @@ def create_mother():
     root = py_trees.composites.Sequence(
         name="mother",
         memory=True,
+    )
+
+    wait_for_button = create_wait_for_button_root(
+        button_topic=BUTTON_TOPIC,
+        num_retries=1000000,
     )
 
     set_base_link_frame = py_trees.behaviours.SetBlackboardVariable(
@@ -128,19 +121,19 @@ def create_mother():
     slalom_root = create_slalom_root()
 
     slalom_to_bin_vector = compute_start_to_end_vector(
-        MAP_NED_COORDS_SLALOM_END, MAP_NED_COORDS_BIN_START
+        MAP_NED_COORDS_SLALOM_END, MAP_NED_COORDS_BIN
     )
     move_to_bin = create_move_to_bin_task_root(slalom_to_bin_vector)
     bin_root = create_bin_root()
 
     bin_to_torpedo_vector = compute_start_to_end_vector(
-        MAP_NED_COORDS_BIN_END, MAP_NED_COORDS_TORPEDO_START
+        MAP_NED_COORDS_BIN, MAP_NED_COORDS_TORPEDO
     )
     move_to_torpedo = create_move_to_torpedo_task_root(bin_to_torpedo_vector)
     torpedo_root = create_torpedo_root()
 
     torpedo_to_octagon_vector = compute_start_to_end_vector(
-        MAP_NED_COORDS_TORPEDO_END, MAP_NED_COORDS_OCTAGON
+        MAP_NED_COORDS_TORPEDO, MAP_NED_COORDS_OCTAGON
     )
     move_to_octagon = create_move_to_octagon_task_root(torpedo_to_octagon_vector)
     octagon_root = create_octagon_root()
@@ -158,19 +151,20 @@ def create_mother():
 
     root.add_children(
         [
-            set_is_left,
+            # wait_for_button,
+            # set_is_left,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
-            # move_to_gate,
-            # gate_root,
-            # move_to_slalom,
-            # slalom_root,
-            # move_to_bin,
-            # bin_root,
-            # move_to_torpedo,
-            # torpedo_root,
+            move_to_gate,
+            gate_root,
+            move_to_slalom,
+            slalom_root,
+            move_to_bin,
+            bin_root,
+            move_to_torpedo,
+            torpedo_root,
             # move_to_octagon,
-            octagon_root,
+            # octagon_root,
             # return_root,
         ]
     )

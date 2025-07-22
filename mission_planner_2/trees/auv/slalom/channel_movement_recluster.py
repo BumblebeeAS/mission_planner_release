@@ -32,6 +32,7 @@ CHANNEL_PAIR_TWO_FRAME_RECLUSTERED = "slalom/dummy/two"
 RECLUSTER_DURATION = 5
 SWEEP_RECLUSTER_DURATION = 10
 MAP_RELOCALIZE_SRV = "/auv4/nav/relocalize"
+BASE_LINK_FRAME = "auv4/base_link_ned"
 #########################################################################
 
 _MISSING_LAYER_KEY = fk("missing_layer")  # key for missing layer
@@ -77,7 +78,7 @@ def _recluster_and_goto_sequence(
         key=_LAYER_TO_LAYER_TF_KEY,
         update_key=_LAYER_TO_LAYER_POSE_KEY,
         overwrite=True,
-        func=lambda tf: create_yawed_pose(frame_id=current_frame_with_side, tf=tf),
+        func=lambda tf: create_yawed_pose(tf=tf),
     )
 
     goto_yaw_towards_next = goto.FromBlackboard(
@@ -197,15 +198,13 @@ def _sweep_and_goto_sequence(
     return seq_sweep_goto
 
 
-def create_yawed_pose(frame_id: str, tf: TransformStamped) -> PoseStamped:
-    # _, _, y = euler_from_quaternion(
-    #     [*operator.attrgetter("x", "y", "z", "w")(tf.transform.rotation)]
-    # )
+def create_yawed_pose(tf: TransformStamped) -> PoseStamped:
     yaw = np.arctan2(tf.transform.translation.y, tf.transform.translation.x)
-    return create_stamped_pose(frame_id=frame_id, yaw=yaw, use_radians=True)
+    return create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=yaw, use_radians=True)
 
 
 def create_channel_movement_zero_root(
+    slalom_frame_centre: str = "slalom/centre",
     slalom_frame_zero_clustered: str = "slalom_layer_0/clustered",
     slalom_frame_one_clustered: str = "slalom_layer_1/clustered",
     slalom_frame_two_clustered: str = "slalom_layer_2/clustered",
@@ -249,8 +248,17 @@ def create_channel_movement_zero_root(
         specified_heading=False,
     )
 
+    recluster_centre_to_0_left = _recluster_and_goto_sequence(
+        current_frame=slalom_frame_centre,
+        next_frame=slalom_frame_zero_clustered,
+        clustering_in_children=clustering_in_children,
+        is_left=True,
+        missing_layers=missing_layers,
+    )
+
     recluster_0_to_1_left = _recluster_and_goto_sequence(
         current_frame=slalom_frame_zero_clustered,
+        # current_frame=CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED,
         next_frame=slalom_frame_one_clustered,
         clustering_in_children=clustering_in_children,
         is_left=True,
@@ -279,9 +287,10 @@ def create_channel_movement_zero_root(
         [
             check_is_left,
             goto_layer_0_left,
+            # recluster_centre_to_0_left,
             recluster_0_to_1_left,
             recluster_reclustered_to_2_left,
-            relocalize_left,
+            # relocalize_left,
         ]
     )
 
@@ -297,8 +306,17 @@ def create_channel_movement_zero_root(
         specified_heading=False,
     )
 
+    recluster_centre_to_0_right = _recluster_and_goto_sequence(
+        current_frame=slalom_frame_centre,
+        next_frame=slalom_frame_zero_clustered,
+        clustering_in_children=clustering_in_children,
+        is_left=False,
+        missing_layers=missing_layers,
+    )
+
     recluster_0_to_1_right = _recluster_and_goto_sequence(
         current_frame=slalom_frame_zero_clustered,
+        # current_frame=CHANNEL_PAIR_ZERO_FRAME_RECLUSTERED,
         next_frame=slalom_frame_one_clustered,
         clustering_in_children=clustering_in_children,
         is_left=False,
@@ -326,9 +344,10 @@ def create_channel_movement_zero_root(
     seq_zero_missing_right.add_children(
         [
             goto_layer_0_right,
+            # recluster_centre_to_0_right,
             recluster_0_to_1_right,
             recluster_reclustered_to_2_right,
-            relocalize_right,
+            # relocalize_right,
         ]
     )
 

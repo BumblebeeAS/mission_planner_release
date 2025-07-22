@@ -18,6 +18,7 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
+from mission_planner_2.commons.search import create_search_front_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_and_shoot_seq import (
     create_move_and_shoot_generator,
@@ -139,17 +140,24 @@ def create_torpedo_root():
         ),
     )
 
-    cluster_board_centre = py_trees_ros.action_clients.FromConstant(
-        name="Cluster centre",
-        action_type=ClusterTf,
-        action_name="/auv4/cluster_tf",
-        action_goal=create_clustering_goal(
-            in_children=TEMPLATE_FRAME_YOLO,
-            out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
-            duration=CLUSTER_DURATION,
-            use_cache=False,
-        ),
+    seq_search = create_search_front_root(
+        object_frame=TEMPLATE_FRAME_YOLO,
+        object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,
+        wait_between_moves=7.0,
     )
+
+    # use this if not seq_search
+    # cluster_board_centre = py_trees_ros.action_clients.FromConstant(
+    #     name="Cluster centre",
+    #     action_type=ClusterTf,
+    #     action_name="/auv4/cluster_tf",
+    #     action_goal=create_clustering_goal(
+    #         in_children=TEMPLATE_FRAME_YOLO,
+    #         out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
+    #         duration=CLUSTER_DURATION,
+    #         use_cache=False,
+    #     ),
+    # )
 
     goto_torp_centre = goto.FromConstant(
         name="Goto torp centre",
@@ -196,7 +204,7 @@ def create_torpedo_root():
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
         key_response=fk("torpedo_disable_detections"),
-        check_func=lambda x: x.new_state,  # check if the service call was successful
+        check_func=lambda x: not x.new_state,  # check if the service call was successful
     )
 
     srv_end_vision = checked_service.FromConstant(
@@ -213,7 +221,8 @@ def create_torpedo_root():
             srv_get_choice,
             srv_start_vision,
             check_start_vision_succeeded,
-            cluster_board_centre,
+            seq_search,
+            # cluster_board_centre,
             goto_torp_centre,
             stabilise_before_matching,
             srv_enable_detections,
