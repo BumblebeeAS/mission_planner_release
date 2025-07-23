@@ -1,19 +1,28 @@
 import numpy as np
-from geometry_msgs.msg import TransformStamped, Vector3
+from geometry_msgs.msg import PoseStamped, TransformStamped, Vector3
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons.pose_utils import create_stamped_pose
-from std_srvs.srv import SetBool
 
 
-def get_table_to_surface_target_yaw(
-    choice: SetBool.Response,
+def get_table_to_symbol_pose(
+    choice: Trigger.Response,
     fish_tf: TransformStamped,
     shark_tf: TransformStamped,
-    table_tf: TransformStamped,
-) -> float:
+) -> PoseStamped:
     target_tf = fish_tf if choice.success else shark_tf
-    x_offset = target_tf.transform.translation.x - table_tf.transform.translation.x
-    y_offset = target_tf.transform.translation.y - table_tf.transform.translation.y
-    return np.arctan2(y_offset, x_offset)
+
+    yaw = np.arctan2(
+        target_tf.transform.translation.y, target_tf.transform.translation.x
+    )
+
+    target_pose = create_stamped_pose(
+        frame_id=target_tf.header.frame_id,
+        yaw=yaw,
+        use_radians=True,
+    )
+
+    return target_pose
 
 
 def _euclidean_dist(x1, y1, z1, x2, y2, z2):

@@ -3,11 +3,9 @@ import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect
 from bb_perception_msgs.srv import ClusterTfSrv
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_system_default
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import shared_action_client
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -22,9 +20,7 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_request,
     create_stamped_pose,
 )
-from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.octagon.helpers import get_table_to_surface_target_yaw
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
 from mission_planner_2.trees.auv.octagon.trash import create_align_actuate_surface_root
 
@@ -68,13 +64,8 @@ LOOK_AT_TARGET_PAUSE_DURATION = 4
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
 _CHOICE_KEY = fk("choice")
-_TABLE_TO_SURFACE_TARGET_YAW_KEY = fk("go_surface_frame")
 _START_VISION_KEY = fk("bin_start_vision")
 _STOP_VISION_KEY = fk("bin_stop_vision")
-_FISH_TF_KEY = fk("fish_tf")
-_SHARK_TF_KEY = fk("shark_tf")
-_TABLE_TF_KEY = fk("table_tf")
-_LOOK_AT_TARGET_POSE_KEY = fk("look_at_target_pose")
 
 
 def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str):
@@ -154,6 +145,7 @@ def create_search_root():
             persistent=False,
         ),
     )
+
     goto_n_search_poses = goto.NFromConstant(
         name="Goto search poses",
         poses=[
@@ -179,7 +171,11 @@ def create_search_root():
         ),
     )
     seq_search.add_children(
-        [cluster_node_start, goto_n_search_poses, cluster_node_stop]
+        [
+            cluster_node_start,
+            goto_n_search_poses,
+            cluster_node_stop,
+        ]
     )
     return seq_search
 
@@ -218,32 +214,12 @@ def create_octagon_root():
 
     ################## SEARCH PART #################
     par_search = create_search_root()
-    symbol_tf_checker = create_tf_checker_from_constant_root(
-        start_frames=["world_ned", "world_ned"],
-        update_keys=[_FISH_TF_KEY, _SHARK_TF_KEY],
-        end_frames=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
-        fallback_val=[FISH_VIEW_FRAME_HARDCODED, SHARK_VIEW_FRAME_HARDCODED],
-    )
-    table_tf_to_blackboard = py_trees_ros.transforms.ToBlackboard(
-        name="Table TF to Blackboard",
-        variable_name=_TABLE_TF_KEY,
-        target_frame=TABLE_CENTER_FRAME_CLUSTERED,
-        source_frame="world_ned",
-        qos_profile=qos_profile_system_default,
-    )
-    dynamic_set_surface_yaw = DynamicSetBlackboard(
-        name="Set surface yaw",
-        key=[_CHOICE_KEY, _FISH_TF_KEY, _SHARK_TF_KEY, _TABLE_TF_KEY],
-        update_key=_TABLE_TO_SURFACE_TARGET_YAW_KEY,
-        overwrite=True,
-        func=lambda choice, fish_tf, shark_tf, table_tf: get_table_to_surface_target_yaw(
-            choice, fish_tf, shark_tf, table_tf
-        ),
-    )
+
     look_at_target = create_look_at_target_root(
+        choice_key=_CHOICE_KEY,
+        fish_frame_clustered=FISH_FRAME_CLUSTERED,
+        shark_frame_clustered=SHARK_FRAME_CLUSTERED,
         table_center_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
-        table_to_surface_target_yaw_key=_TABLE_TO_SURFACE_TARGET_YAW_KEY,
-        look_at_target_pose_key=_LOOK_AT_TARGET_POSE_KEY,
         pause_duration=LOOK_AT_TARGET_PAUSE_DURATION,
     )
 
@@ -304,12 +280,9 @@ def create_octagon_root():
             srv_start_vision,
             check_start_vision_succeeded,
             par_search,
-            symbol_tf_checker,
-            table_tf_to_blackboard,
-            dynamic_set_surface_yaw,
             look_at_target,
-            seq_bottle_0,
-            seq_bottle_1,
+            # seq_bottle_0,
+            # seq_bottle_1,
             # seq_ladle_0,
             # seq_ladle_1,
             # goto_rotations,
