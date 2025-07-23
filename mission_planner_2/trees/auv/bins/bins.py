@@ -140,6 +140,10 @@ def create_bin_root():
     )
 
     seq_search = create_search_bot_layered_square_root(
+        fwd=1.0,
+        back=0.3,
+        left=1.0,
+        right=1.0,
         num_squares=NUM_SQUARES,
         object_frame=TEMPLATE_FRAME_YOLO,
         object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,

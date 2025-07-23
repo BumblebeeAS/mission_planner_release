@@ -41,10 +41,8 @@ BASE_LINK_FRAME = "auv4/base_link_ned"
 
 # Each of the following frames has a "/from_table", "/from_odom" and "/clustered" version
 # NOTE: The base frame name does not exist.
-BOTTLE_0_FRAME = "bottle_0"
-BOTTLE_1_FRAME = "bottle_1"
-LADLE_0_FRAME = "ladle_0"
-LADLE_1_FRAME = "ladle_1"
+BOTTLE_FRAME = "bottle_0"
+LADLE_FRAME = "ladle_0"
 PINK_BUCKET_FRAME = "pink_bucket"
 YELLOW_BUCKET_FRAME = "yellow_bucket"
 
@@ -89,8 +87,8 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
         trash_name,
         trash_frame,
         command=AlignAndCollect.Goal.CLOSE,
+        depth_rate=0.05,
         cluster_duration=CLUSTER_DURATION,
-        z_distance=0.20,
     )
 
     cluster_table_centre = shared_action_client.FromConstant(
@@ -119,7 +117,6 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
         trash_name,
         bucket_frame,
         command=AlignAndCollect.Goal.OPEN,
-        depth_threshold=0.1,
         cluster_duration=CLUSTER_DURATION,
         z_distance=0.30,
     )
@@ -222,9 +219,9 @@ def create_octagon_root():
     ################## SEARCH PART #################
     par_search = create_search_root()
     symbol_tf_checker = create_tf_checker_from_constant_root(
-        start_frames=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
+        start_frames=["world_ned", "world_ned"],
         update_keys=[_FISH_TF_KEY, _SHARK_TF_KEY],
-        end_frames=["world_ned", "world_ned"],
+        end_frames=[FISH_FRAME_CLUSTERED, SHARK_FRAME_CLUSTERED],
         fallback_val=[FISH_VIEW_FRAME_HARDCODED, SHARK_VIEW_FRAME_HARDCODED],
     )
     table_tf_to_blackboard = py_trees_ros.transforms.ToBlackboard(
@@ -239,10 +236,9 @@ def create_octagon_root():
         key=[_CHOICE_KEY, _FISH_TF_KEY, _SHARK_TF_KEY, _TABLE_TF_KEY],
         update_key=_TABLE_TO_SURFACE_TARGET_YAW_KEY,
         overwrite=True,
-        func=lambda choice,
-        fish_tf,
-        shark_tf,
-        table_tf: get_table_to_surface_target_yaw(choice, fish_tf, shark_tf, table_tf),
+        func=lambda choice, fish_tf, shark_tf, table_tf: get_table_to_surface_target_yaw(
+            choice, fish_tf, shark_tf, table_tf
+        ),
     )
     look_at_target = create_look_at_target_root(
         table_center_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
@@ -254,12 +250,22 @@ def create_octagon_root():
     ################## BOTTLE PART #################
     seq_bottle_0 = create_collection_root(
         trash_name="Bottle 0",
-        trash_frame=BOTTLE_0_FRAME,
+        trash_frame=BOTTLE_FRAME,
+        bucket_frame=PINK_BUCKET_FRAME,
+    )
+    seq_bottle_1 = create_collection_root(
+        trash_name="Bottle 1",
+        trash_frame=BOTTLE_FRAME,
         bucket_frame=PINK_BUCKET_FRAME,
     )
     seq_ladle_0 = create_collection_root(
         trash_name="Ladle 0",
-        trash_frame=LADLE_0_FRAME,
+        trash_frame=LADLE_FRAME,
+        bucket_frame=YELLOW_BUCKET_FRAME,
+    )
+    seq_ladle_1 = create_collection_root(
+        trash_name="Ladle 1",
+        trash_frame=LADLE_FRAME,
         bucket_frame=YELLOW_BUCKET_FRAME,
     )
 
@@ -303,8 +309,10 @@ def create_octagon_root():
             dynamic_set_surface_yaw,
             look_at_target,
             seq_bottle_0,
-            seq_ladle_0,
-            goto_rotations,
+            seq_bottle_1,
+            # seq_ladle_0,
+            # seq_ladle_1,
+            # goto_rotations,
             srv_end_vision,
             check_end_vision_succeeded,
         ]

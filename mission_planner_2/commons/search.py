@@ -5,7 +5,6 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.srv import ClusterTfSrv
 from geometry_msgs.msg import PoseStamped
-
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
@@ -199,7 +198,7 @@ def create_search_bot_layered_square_root(
 
     cluster_node_start = py_trees_ros.service_clients.FromConstant(
         name="Cluster search",
-        service_type=ClusterTf,
+        service_type=ClusterTfSrv,
         service_name="/auv4/cluster_tfs_srv",
         service_request=create_clustering_request(
             enabled=True,
@@ -211,7 +210,7 @@ def create_search_bot_layered_square_root(
 
     cluster_node_stop = py_trees_ros.service_clients.FromConstant(
         name="Cluster search stop",
-        service_type=ClusterTf,
+        service_type=ClusterTfSrv,
         service_name="/auv4/cluster_tfs_srv",
         service_request=create_clustering_request(
             enabled=False,
@@ -243,7 +242,7 @@ def create_search_bot_layered_square_root(
     #                 poses[i],
     #                 cluster_node_start=py_trees_ros.service_clients.FromConstant(
     #                     name="Cluster search",
-    #                     service_type=ClusterTf,
+    #                     service_type=ClusterTfSrv,
     #                     service_name="/auv4/cluster_tfs_srv",
     #                     service_request=create_clustering_request(
     #                         enabled=True,
@@ -254,7 +253,7 @@ def create_search_bot_layered_square_root(
     #                 ),
     #                 cluster_node_end=py_trees_ros.service_clients.FromConstant(
     #                     name="Cluster search stop",
-    #                     service_type=ClusterTf,
+    #                     service_type=ClusterTfSrv,
     #                     service_name="/auv4/cluster_tfs_srv",
     #                     service_request=create_clustering_request(
     #                         enabled=False,
@@ -321,14 +320,14 @@ def create_search_bot_bb_root(
 
     cluster_node_start = py_trees_ros.service_clients.FromBlackboard(
         name="Cluster search",
-        service_type=ClusterTf,
+        service_type=ClusterTfSrv,
         service_name="/auv4/cluster_tfs_srv",
         key_request=enable_request_key,
     )
 
     cluster_node_end = py_trees_ros.service_clients.FromBlackboard(
         name="Cluster search stop",
-        service_type=ClusterTf,
+        service_type=ClusterTfSrv,
         service_name="/auv4/cluster_tfs_srv",
         key_request=disable_request_key,
     )
@@ -376,7 +375,7 @@ def create_search_front_root(
 
     cluster_node_start = py_trees_ros.service_clients.FromConstant(
         name="Cluster search",
-        service_type=ClusterTf,
+        service_type=ClusterTfSrv,
         service_name="/auv4/cluster_tfs_srv",
         service_request=create_clustering_request(
             enabled=True,
@@ -388,7 +387,7 @@ def create_search_front_root(
 
     cluster_node_stop = py_trees_ros.service_clients.FromConstant(
         name="Cluster search stop",
-        service_type=ClusterTf,
+        service_type=ClusterTfSrv,
         service_name="/auv4/cluster_tfs_srv",
         service_request=create_clustering_request(
             enabled=False,

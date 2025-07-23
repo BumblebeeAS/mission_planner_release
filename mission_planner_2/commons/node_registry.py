@@ -6,7 +6,9 @@ import rclpy
 import rclpy.action
 import rclpy.client
 import rclpy.node
+from bb_behavior_msgs.action import AlignAndCollect
 from bb_controls_msgs.action import Locomotion
+from bb_perception_msgs.action import ClusterTfAction
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 
 
@@ -22,14 +24,10 @@ class ServiceRegistry:
     type: typing.Any
 
 
-from bb_behavior_msgs.action import AlignAndCollect
-from bb_perception_msgs.action import ClusterTf
-
-
 class SharedAction(Enum):
     LOCOMOTION = ActionRegistry("/auv4/controls", Locomotion)
-    CLUSTER = ActionRegistry("/auv4/cluster_tf", ClusterTf)
-    CLUSTER_MULTI = ActionRegistry("/auv4/cluster_tf_multi", ClusterTf)
+    CLUSTER = ActionRegistry("/auv4/cluster_tf", ClusterTfAction)
+    CLUSTER_MULTI = ActionRegistry("/auv4/cluster_tf_multi", ClusterTfAction)
     TRASH = ActionRegistry("/auv4/trash_align_and_collect", AlignAndCollect)
 
 

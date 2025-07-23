@@ -27,9 +27,10 @@ def create_align_actuate_surface_root(
     trash_name: str,
     object_frame: str,
     command: int,
-    depth_threshold: float = 0.2,
+    depth_rate: float = 0.1,
     cluster_duration: int = 10,
     z_distance: float = 0.15,
+    surface_depth_threshold: float = 0.2,
 ):
     """Cluster the trash / bucket pose, then pass control to the AlignAndCollect action which
     aligns the robot to the trash / bucket and actuates the grabber to open / close. After the
@@ -80,6 +81,7 @@ def create_align_actuate_surface_root(
             object_frame=object_frame_depth_from_odom,
             object_frame_clustered=object_frame_clustered,
             command=command,
+            depth_rate=depth_rate,
             z_distance=z_distance,
             cutoff_z_distance=z_distance,
         ),
@@ -101,7 +103,7 @@ def create_align_actuate_surface_root(
         name=f"Check depth ({trash_name})",
         check=py_trees.common.ComparisonExpression(
             variable=_DEPTH_KEY,
-            value=depth_threshold,
+            value=surface_depth_threshold,
             operator=lambda x, y: x <= y,
         ),
     )
