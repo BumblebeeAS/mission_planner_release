@@ -1,6 +1,5 @@
 import py_trees
 import py_trees_ros
-from bb_perception_msgs.action import ClusterTf
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
 from std_srvs.srv import Trigger
@@ -15,7 +14,6 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goal,
     create_stamped_pose,
 )
 from mission_planner_2.commons.search import create_search_front_root
