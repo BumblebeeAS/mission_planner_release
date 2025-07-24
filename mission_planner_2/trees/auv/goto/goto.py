@@ -101,12 +101,16 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         pose_key: str,
         anchor_frame_name: str = "auv4/base_link_ned",
         specified_heading: bool = True,
+        ignore_depth: bool = False,
+        x_threshold: float = 0.03,
+        y_threshold: float = 0.03,
+        z_threshold: float = 0.03,
+        yaw_threshold: float = 0.01,
+        stabilize_duration: int = 5,
         generate_feedback_message: Callable | None = None,
         wait_for_server_timeout_sec: int = -3,
         wait_for_service_timeout_sec: int = -3,
-        ignore_depth: bool = False,
     ):
-        # FIXME: this convert to safe name seems useless @advaypakhale
         namespace = py_trees.blackboard.Blackboard.absolute_name(
             "/", convert_to_safe_name(name) + "/" + str(uuid.uuid4()).replace("-", "")
         )
@@ -124,6 +128,12 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         self.wait_for_service_timeout_sec = wait_for_service_timeout_sec
         self.anchor_frame_name = anchor_frame_name
         self.specified_heading = specified_heading
+        self.ignore_depth = ignore_depth
+        self.x_threshold = x_threshold
+        self.y_threshold = y_threshold
+        self.z_threshold = z_threshold
+        self.yaw_threshold = yaw_threshold
+        self.stabilize_duration = stabilize_duration
 
         # Register the pose_key on the BB as the req to be converted
         # pose_key entry should be a pose stamped
@@ -137,7 +147,6 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         )
 
         self.service_client = None
-        self.ignore_depth = ignore_depth
 
     def setup(self, **kwargs):
         """
@@ -325,6 +334,12 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         goal_msg.pitch_setpoints = [0.0 for i in range(len(output_poses))]
         goal_msg.altitude_setpoints = []
 
+        goal_msg.forward_tolerance = self.x_threshold
+        goal_msg.sidemove_tolerance = self.y_threshold
+        goal_msg.depth_tolerance = self.z_threshold
+        goal_msg.heading_tolerance = self.yaw_threshold
+        goal_msg.max_correction_time = self.stabilize_duration
+
         return goal_msg
 
     def _check_srv_setup(self):
@@ -421,10 +436,15 @@ class FromConstant(FromBlackboard):
         pose: PoseStamped | list[PoseStamped],
         anchor_frame_name="auv4/base_link_ned",
         specified_heading: bool = True,
+        ignore_depth: bool = False,
+        x_threshold: float = 0.03,
+        y_threshold: float = 0.03,
+        z_threshold: float = 0.03,
+        yaw_threshold: float = 0.01,
+        stabilize_duration: int = 5,
         generate_feedback_message=None,
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
-        ignore_depth: bool = False,
     ):
         if not isinstance(pose, list):
             pose = [pose]
@@ -441,10 +461,15 @@ class FromConstant(FromBlackboard):
             pose_key=pose_key,
             anchor_frame_name=anchor_frame_name,
             specified_heading=specified_heading,
+            ignore_depth=ignore_depth,
+            x_threshold=x_threshold,
+            y_threshold=y_threshold,
+            z_threshold=z_threshold,
+            yaw_threshold=yaw_threshold,
+            stabilize_duration=stabilize_duration,
             generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
-            ignore_depth=ignore_depth,
         )
 
         self.blackboard.register_key(
@@ -465,21 +490,31 @@ class NFromBlackboard(FromBlackboard):
         pose_key: str,
         anchor_frame_name="auv4/base_link_ned",
         specified_heading: bool = True,
+        ignore_depth: bool = False,
+        x_threshold: float = 0.03,
+        y_threshold: float = 0.03,
+        z_threshold: float = 0.03,
+        yaw_threshold: float = 0.01,
+        stabilize_duration: int = 5,
         generate_feedback_message=None,
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
         wait_between_moves_sec=10.0,
-        ignore_depth: bool = False,
     ):
         super().__init__(
             name,
             pose_key=pose_key,
             anchor_frame_name=anchor_frame_name,
             specified_heading=specified_heading,
+            ignore_depth=ignore_depth,
+            x_threshold=x_threshold,
+            y_threshold=y_threshold,
+            z_threshold=z_threshold,
+            yaw_threshold=yaw_threshold,
+            stabilize_duration=stabilize_duration,
             generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
-            ignore_depth=ignore_depth,
         )
 
         self.wait_between_moves_sec = wait_between_moves_sec
@@ -662,11 +697,16 @@ class NFromConstant(NFromBlackboard):
         poses: list[PoseStamped],
         anchor_frame_name="auv4/base_link_ned",
         specified_heading: bool = True,
+        ignore_depth: bool = False,
+        x_threshold: float = 0.03,
+        y_threshold: float = 0.03,
+        z_threshold: float = 0.03,
+        yaw_threshold: float = 0.01,
+        stabilize_duration: int = 5,
         generate_feedback_message=None,
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
         wait_between_moves_sec=10.0,
-        ignore_depth: bool = False,
     ):
         if not isinstance(poses, list):
             poses = [poses]
@@ -683,11 +723,16 @@ class NFromConstant(NFromBlackboard):
             pose_key=pose_key,
             anchor_frame_name=anchor_frame_name,
             specified_heading=specified_heading,
+            ignore_depth=ignore_depth,
+            x_threshold=x_threshold,
+            y_threshold=y_threshold,
+            z_threshold=z_threshold,
+            yaw_threshold=yaw_threshold,
+            stabilize_duration=stabilize_duration,
             generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
             wait_between_moves_sec=wait_between_moves_sec,
-            ignore_depth=ignore_depth,
         )
 
         self.blackboard.register_key(
