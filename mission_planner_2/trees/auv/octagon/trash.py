@@ -30,6 +30,7 @@ def create_align_actuate_surface_root(
     depth_rate: float = 0.1,
     cluster_duration: int = 10,
     z_distance: float = 0.15,
+    cutoff_z_distance: float = 0.3,
     surface_depth_threshold: float = 0.2,
 ):
     """Cluster the trash / bucket pose, then pass control to the AlignAndCollect action which
@@ -83,7 +84,7 @@ def create_align_actuate_surface_root(
             command=command,
             depth_rate=depth_rate,
             z_distance=z_distance,
-            cutoff_z_distance=z_distance,
+            cutoff_z_distance=cutoff_z_distance,
         ),
     )
 

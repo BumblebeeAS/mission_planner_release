@@ -3,8 +3,6 @@ import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect
 from bb_perception_msgs.srv import ClusterTfSrv
 from lifecycle_msgs.srv import ChangeState
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -23,6 +21,7 @@ from mission_planner_2.commons.pose_utils import (
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
 from mission_planner_2.trees.auv.octagon.trash import create_align_actuate_surface_root
+from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -279,13 +278,13 @@ def create_octagon_root():
             srv_get_choice,
             srv_start_vision,
             check_start_vision_succeeded,
-            par_search,
-            look_at_target,
-            # seq_bottle_0,
-            # seq_bottle_1,
-            # seq_ladle_0,
-            # seq_ladle_1,
-            # goto_rotations,
+            # par_search,
+            # look_at_target,
+            seq_bottle_0,
+            seq_bottle_1,
+            seq_ladle_0,
+            seq_ladle_1,
+            goto_rotations,
             srv_end_vision,
             check_end_vision_succeeded,
         ]

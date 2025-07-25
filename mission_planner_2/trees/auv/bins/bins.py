@@ -17,9 +17,7 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.node_registry import SharedAction
-from mission_planner_2.commons.pose_utils import (
-    within_threshold_xyz,
-)
+from mission_planner_2.commons.pose_utils import within_threshold_xyz
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.bins.template_selector import (
@@ -52,8 +50,8 @@ TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 ACTUATION_TOPIC = "/auv4/actuation/dropper"
 ACTUATION_UINT = UInt8(data=6)
 
-NUM_SQUARES = 3
-OFFSET_COEFF = 0.2
+NUM_SQUARES = 1
+OFFSET_COEFF = 1.0
 CLUSTERING_DURATION = 4
 REALIGN_CLUSTER_DURATION = 2
 STABILIZE_CONTROLS_DURATION = 5.0

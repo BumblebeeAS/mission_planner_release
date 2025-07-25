@@ -2,8 +2,6 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -13,21 +11,20 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import (
-    create_stamped_pose,
-)
+from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.commons.search import create_search_front_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_and_shoot_seq import (
     create_move_and_shoot_generator,
 )
+from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-SELECTED_TEMPLATE = 2  # MUST be 1 or 2
+SELECTED_TEMPLATE = 1  # MUST be 1 or 2
 
 VISION_SERVER_TOPIC = "/auv4/torpedo/manage_nodes"
 TOGGLE_TEMPLATE_TOPIC = "/auv4/torpedo/image_matching/toggle_template"
