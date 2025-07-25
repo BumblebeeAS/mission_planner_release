@@ -10,6 +10,7 @@ from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import qos_profile_sensor_data
 
+from mission_planner_2.commons.node_registry import TreeNode
 from mission_planner_2.trees.auv.goto import goto
 
 RED = ColorRgb(
@@ -148,7 +149,7 @@ def create_led_tree(
     root: py_trees.behaviour.Behaviour,
     display_only_visited_behaviours=True,
 ) -> tuple[py_trees_ros.trees.BehaviourTree, Node]:
-    node = Node("tree_node")
+    node = TreeNode("tree_node")
     led_publisher = node.create_publisher(
         ColorRgb, LED_TOPIC, qos_profile=qos_profile_sensor_data
     )
