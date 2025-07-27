@@ -1,10 +1,15 @@
 import py_trees
+import py_trees_ros
 from lifecycle_msgs.srv import ChangeState
+from py_trees.decorators import Retry
+
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
 )
+from mission_planner_2.commons.fallback import create_clustering_fallback_root
+from mission_planner_2.commons.log_errors import LogOnFailure
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -14,6 +19,7 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
+from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
@@ -27,7 +33,9 @@ STABILIZE_DURATION = 5.0
 
 GATE_APPROACH_HEIGHT = 0.40
 FORWARD_DISTANCE = 3.0
+NUM_RETRIES = 3
 
+WORLD_FRAME = "world_ned"
 CAMERA_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_YOLO = "gate"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
@@ -35,7 +43,7 @@ GATE_CENTRE_FRAME = "gate/centre"
 #########################################################################
 
 
-def create_return_root():
+def create_return_single_root():
     # Root sequence
     seq_return_root = py_trees.composites.Sequence(
         name="Return root",
@@ -49,6 +57,13 @@ def create_return_root():
         service_request=create_start_vision_req(),
         key_response=fk("gate_start_vision"),
         check_func=lambda x: x.success,
+    )
+    srv_start_vision_logged = LogOnFailure(srv_start_vision)
+
+    retry_start_vision = Retry(
+        name="Retry Start Vision",
+        child=srv_start_vision_logged,
+        num_failures=NUM_RETRIES,
     )
 
     # Step 1: Move towards gate
@@ -67,6 +82,16 @@ def create_return_root():
             duration=CLUSTERING_DURATION,
             use_cache=False,
         ),
+    )
+
+    sel_clustering_with_fallback = create_clustering_fallback_root(
+        cluster_node=action_cluster_gate,
+        world_frame=WORLD_FRAME,
+        object_frame=TEMPLATE_FRAME_YOLO,
+        clustered_frame=TEMPLATE_FRAME_YOLO_CLUSTERED,
+        key=fk("latest_yolo_tf"),
+        num_retries=NUM_RETRIES,
+        name="YOLO",
     )
 
     # Step 3: Move to after center position to align
@@ -93,18 +118,40 @@ def create_return_root():
         key_response=fk("gate_end_vision"),
         check_func=lambda x: x.success,
     )
+    srv_end_vision_logged = LogOnFailure(srv_end_vision)
+
+    retry_end_vision = Retry(
+        name="Retry End Vision",
+        child=srv_end_vision_logged,
+        num_failures=NUM_RETRIES,
+    )
 
     # Assemble tree in execution order
     seq_return_root.add_children(
         children=[
-            srv_start_vision,
+            retry_start_vision,
             goto_after_gate,
-            action_cluster_gate,
+            sel_clustering_with_fallback,
             goto_after_gate_center,
             timer_stabilize,
             goto_through_gate,
-            srv_end_vision,
+            retry_end_vision,
         ]
     )
 
     return seq_return_root
+
+
+def create_return_root() -> py_trees.composites.Selector:
+    sel_task_fallback_root = py_trees.composites.Selector(
+        name="Return home with fallback root", memory=True
+    )
+
+    sel_task_fallback_root.add_children(
+        [
+            create_return_single_root(),
+            py_trees.behaviours.Success(name="Fallback success"),
+        ]
+    )
+
+    return sel_task_fallback_root

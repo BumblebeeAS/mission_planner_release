@@ -3,11 +3,18 @@ import operator
 import py_trees
 import py_trees_ros
 from lifecycle_msgs.srv import ChangeState
-from mission_planner_2.commons import shared_action_client
+from py_trees.decorators import Retry
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
+
+from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
 )
+from mission_planner_2.commons.fallback import create_clustering_fallback_root
+from mission_planner_2.commons.log_errors import LogOnFailure
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -17,10 +24,8 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
+from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import String
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -32,7 +37,10 @@ CLUSTERING_DURATION = 4
 STABILIZE_DURATION = 3.0
 
 FORWARD_DISTANCE = 3.0
+NUM_RETRIES = 3
 
+BASE_LINK_FRAME = "auv4/base_link_ned"
+WORLD_FRAME = "world_ned"
 CAMERA_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_YOLO = "gate"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
@@ -54,7 +62,7 @@ _START_VISION_KEY = fk("gate_start_vision")
 _STOP_VISION_KEY = fk("gate_stop_vision")
 
 
-def create_gate_root():
+def create_gate_single_root():
     """
     For sim.
 
@@ -69,20 +77,22 @@ def create_gate_root():
         name="Gate root",
         memory=True,
     )
-    srv_start_vision = py_trees_ros.service_clients.FromConstant(
-        name="Start vision pipeline",
-        service_name=VISION_SERVER_TOPIC,
+
+    srv_start_vision = checked_service.FromConstant(
+        name="Start vision",
         service_type=ChangeState,
+        service_name=VISION_SERVER_TOPIC,
         service_request=create_start_vision_req(),
         key_response=_START_VISION_KEY,
+        check_func=lambda x: x.success,
     )
-    check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify start vision pipeline succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=_START_VISION_KEY,
-            value=True,
-            operator=lambda x, y: operator.eq(x.success, y),
-        ),
+
+    srv_start_vision_logged = LogOnFailure(srv_start_vision)
+
+    retry_start_vision = Retry(
+        name="Retry Start Vision",
+        child=srv_start_vision_logged,
+        num_failures=NUM_RETRIES,
     )
 
     # Step 3: Cluster gate transforms
@@ -97,6 +107,16 @@ def create_gate_root():
         ),
     )
 
+    sel_clustering_with_fallback = create_clustering_fallback_root(
+        cluster_node=action_cluster_gate,
+        world_frame=WORLD_FRAME,
+        object_frame=TEMPLATE_FRAME_YOLO,
+        clustered_frame=TEMPLATE_FRAME_YOLO_CLUSTERED,
+        key=fk("latest_yolo_tf"),
+        num_retries=NUM_RETRIES,
+        name="YOLO",
+    )
+
     # Step 5: Move to picture position
     goto_see_pictures = goto.FromConstant(
         "Goto picture position", create_stamped_pose(GATE_CENTRE_FRAME)
@@ -107,7 +127,7 @@ def create_gate_root():
         "Stabilize before task", STABILIZE_DURATION
     )
 
-    # Step 7: Get fish choice
+    # Step 7a: Get fish choice
     srv_get_fish_choice = py_trees_ros.service_clients.FromConstant(
         name="Get fish choice",
         service_type=Trigger,
@@ -115,6 +135,27 @@ def create_gate_root():
         service_request=Trigger.Request(),
         key_response=_CHOICE_KEY,
     )
+    srv_get_fish_choice_logged = LogOnFailure(srv_get_fish_choice)
+
+    retry_get_fish_choice = Retry(
+        name="Retry Get Choice",
+        child=srv_get_fish_choice_logged,
+        num_failures=NUM_RETRIES,
+    )
+
+    # Step 7b: Fallback - set default choice to fish
+    set_choice_default_fish = py_trees.behaviours.SetBlackboardVariable(
+        name="Set default fish choice",
+        variable_name=_CHOICE_KEY,
+        variable_value=True,
+        overwrite=True,
+    )
+
+    # Step 7: Selector to attempt service call first, fallback to default
+    sel_get_choice = py_trees.composites.Selector(
+        name="Get choice selector", memory=True
+    )
+    sel_get_choice.add_children([retry_get_fish_choice, set_choice_default_fish])
 
     # Step 8: Get gate orientation
     sub_gate_orientation = py_trees_ros.subscribers.ToBlackboard(
@@ -192,38 +233,52 @@ def create_gate_root():
     )
     goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
 
-    srv_end_vision = py_trees_ros.service_clients.FromConstant(
-        name="End vision pipeline",
-        service_name=VISION_SERVER_TOPIC,
+    srv_end_vision = checked_service.FromConstant(
+        name="End vision",
         service_type=ChangeState,
+        service_name=VISION_SERVER_TOPIC,
         service_request=create_end_vision_req(),
         key_response=_STOP_VISION_KEY,
+        check_func=lambda x: x.success,
     )
-    check_end_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify end vision pipeline succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=_STOP_VISION_KEY,
-            value=True,
-            operator=lambda x, y: operator.eq(x.success, y),
-        ),
+    srv_end_vision_logged = LogOnFailure(srv_end_vision)
+
+    retry_end_vision = Retry(
+        name="Retry End Vision",
+        child=srv_end_vision_logged,
+        num_failures=NUM_RETRIES,
     )
+
     # Assemble tree in execution order
     seq_gate_root.add_children(
         children=[
             # goto_towards_gate,
-            srv_start_vision,
-            check_start_vision_succeeded,
-            action_cluster_gate,
+            retry_start_vision,
+            sel_clustering_with_fallback,
             goto_see_pictures,
             timer_stabilize_main,
-            srv_get_fish_choice,
+            sel_get_choice,
             sub_gate_orientation,
             sel_gate_side,
             timer_stabilize_final,
             goto_through_gate,
-            srv_end_vision,
-            check_end_vision_succeeded,
+            retry_end_vision,
         ]
     )
 
     return seq_gate_root
+
+
+def create_gate_root() -> py_trees.composites.Selector:
+    sel_task_fallback_root = py_trees.composites.Selector(
+        name="Gate with fallback root", memory=True
+    )
+
+    sel_task_fallback_root.add_children(
+        [
+            create_gate_single_root(),
+            py_trees.behaviours.Success(name="Fallback success"),
+        ]
+    )
+
+    return sel_task_fallback_root
