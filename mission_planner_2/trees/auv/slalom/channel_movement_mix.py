@@ -5,7 +5,6 @@ import numpy as np
 import py_trees
 import py_trees_ros
 from geometry_msgs.msg import PoseStamped, TransformStamped
-
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
@@ -64,7 +63,8 @@ SWEEP_RECLUSTER_DURATION = 10
 
 
 def create_yawed_pose(tf: TransformStamped) -> PoseStamped:
-    yaw = np.arctan2(tf.transform.translation.y, tf.transform.translation.x)
+    yaw = np.arctan2(tf.transform.translation.x, tf.transform.translation.z)
+    print(f"Yaw angle for pose: {yaw} radians")
     return create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=yaw, use_radians=True)
 
 
@@ -593,6 +593,7 @@ def create_movement_strategy_root():
             None,
             None,
         ],
+        timeout=30.0,
     )
 
     # Having valid clusters implies that the clustered layers are not None and are spaced apart correctly.

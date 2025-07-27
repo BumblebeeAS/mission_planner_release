@@ -255,14 +255,14 @@ def create_mother():
             # move_to_gate,
             # gate_root,
             # move_to_slalom,
-            # slalom_root,
+            slalom_root,
             # move_to_bin,
             # bin_root,
             # move_to_torpedo,
             # torpedo_root,
             # move_to_space,
             # move_to_octagon,
-            octagon_root,
+            # octagon_root,
             # return_root,
         ]
     )
