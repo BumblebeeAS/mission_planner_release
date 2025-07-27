@@ -2,6 +2,9 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
+from py_trees.decorators import Retry
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -17,7 +20,6 @@ from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_and_shoot_seq import (
     create_move_and_shoot_generator,
 )
-from std_srvs.srv import Trigger
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -42,6 +44,7 @@ ACTUATION_TOPIC_RIGHT = "/auv4/actuation/torpedo/right"
 CLUSTER_DURATION = 4
 REALIGN_CLUSTER_DURATION = 2
 STABILIZE_DURATION = 3
+NUM_RETRIES = 3
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -49,8 +52,6 @@ STABILIZE_DURATION = 3
 _CHOICE_KEY = fk("choice")
 _POSE_KEY = fk("pose")
 _POSE_FRAME_KEY = fk("pose_frame")
-_START_VISION_KEY = fk("torp_start_vision")
-_STOP_VISION_KEY = fk("torp_stop_vision")
 _ANCHOR_FRAME_KEY = fk("anchor_frame")
 
 
@@ -106,6 +107,7 @@ def create_torpedo_root():
         yaw_threshold=1.0,
         retries=8,
         stabilization_duration=2.5,
+        num_retries_clustering=NUM_RETRIES,
     )
 
     seq_torpedo_root = py_trees.composites.Sequence(
@@ -118,21 +120,18 @@ def create_torpedo_root():
         memory=True,
     )
 
-    srv_start_vision = py_trees_ros.service_clients.FromConstant(
-        name="Start vision pipeline",
-        service_name=VISION_SERVER_TOPIC,
+    srv_start_vision = checked_service.FromConstant(
+        name="Start vision",
         service_type=ChangeState,
+        service_name=VISION_SERVER_TOPIC,
         service_request=create_start_vision_req(),
-        key_response=_START_VISION_KEY,
+        check_func=lambda x: x.success,
     )
 
-    check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify start vision pipeline succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=_START_VISION_KEY,
-            value=True,
-            operator=lambda x, y: x.success == y,
-        ),
+    retry_start_vision = py_trees.decorators.Retry(
+        name="Retry start vision",
+        child=srv_start_vision,
+        num_failures=3,
     )
 
     seq_search = create_search_front_root(
@@ -183,6 +182,11 @@ def create_torpedo_root():
         check_func=lambda x: x.new_state,  # check if the service call was successful
     )
 
+    retry_enable_detections = py_trees.decorators.Retry(
+        name="Retry enable detections",
+        child=srv_enable_detections,
+        num_failures=NUM_RETRIES,
+    )
     move_and_shoot_first = move_and_shoot_gen(first=True)
 
     goto_back_centre = goto.FromConstant(
@@ -198,34 +202,46 @@ def create_torpedo_root():
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
-        key_response=fk("torpedo_disable_detections"),
-        check_func=lambda x: not x.new_state,  # check if the service call was successful
+        check_func=lambda x: not x is not None and x.new_state == False,
+    )
+
+    retry_disable_detections = py_trees.decorators.FailureIsSuccess(
+        name="Force success after retry disable detections",
+        child=py_trees.decorators.Retry(
+            name="Retry Disable Detections",
+            child=srv_disable_detections,
+            num_failures=NUM_RETRIES,
+        ),
     )
 
     srv_end_vision = checked_service.FromConstant(
-        name="End vision pipeline",
-        service_name=VISION_SERVER_TOPIC,
+        name="End vision",
         service_type=ChangeState,
+        service_name=VISION_SERVER_TOPIC,
         service_request=create_end_vision_req(),
-        key_response=_STOP_VISION_KEY,
-        check_func=lambda x: x.success,  # check if the service call was successful
+        check_func=lambda x: x.success,
+    )
+
+    retry_end_vision = py_trees.decorators.Retry(
+        name="Retry End Vision",
+        child=srv_end_vision,
+        num_failures=NUM_RETRIES,
     )
 
     seq_launch_torpedo.add_children(
         children=[
             srv_get_choice,
-            srv_start_vision,
-            check_start_vision_succeeded,
+            retry_start_vision,
             seq_search,
             # cluster_board_centre,
             goto_torp_centre,
             stabilise_before_matching,
-            srv_enable_detections,
+            retry_enable_detections,
             move_and_shoot_first,
             goto_back_centre,
             move_and_shoot_second,
-            srv_disable_detections,
-            srv_end_vision,
+            retry_disable_detections,
+            retry_end_vision,
         ],
     )
 

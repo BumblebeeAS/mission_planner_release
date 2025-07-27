@@ -5,7 +5,11 @@ import py_trees_ros
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from mission_planner_2.commons import cache_tf, shared_action_client
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
+
+from mission_planner_2.commons import cache_tf, checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
 from mission_planner_2.commons.detection_utils import (
@@ -24,9 +28,6 @@ from mission_planner_2.trees.auv.bins.template_selector import (
     create_template_selector_root,
 )
 from mission_planner_2.trees.auv.goto import goto
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -56,11 +57,7 @@ CLUSTERING_DURATION = 4
 REALIGN_CLUSTER_DURATION = 2
 STABILIZE_CONTROLS_DURATION = 5.0
 RETRIES = 5
-
-FISH_BIN_FRAME = "bin/fish"
-SHARK_BIN_FRAME = "bin/shark"
-ROTATED_FISH_BIN_FRAME = "bin/fish/rotated"
-ROTATED_SHARK_BIN_FRAME = "bin/shark/rotated"
+NUM_RETRIES = 3
 
 FISH_BIN_VIEW_FRAME = "bin/fish/view"
 SHARK_BIN_VIEW_FRAME = "bin/shark/view"
@@ -83,15 +80,10 @@ _GOTO_FRAME_KEY = fk("goto_frame")
 _ANCHOR_FRAME_KEY = fk("anchor_frame")
 _POINTS_1_KEY = fk("points_1")
 _POINTS_2_KEY = fk("points_2")
-_START_VISION_KEY = fk("bin_start_vision")
-_STOP_VISION_KEY = fk("bin_stop_vision")
 _IS_ROTATED_KEY = fk("is_rotated")
 _CLUSTERING_GOAL_KEY = fk("clustering_goal")
-_BIN_ENABLE_DETECTIONS_KEY = fk("bin_enable_detections")
-_BIN_ROTATED_ENABLE_DETECTIONS_KEY = fk("bin_rotated_enable_detections")
 _BIN_CORRECT_DETECTIONS_REQ_KEY = fk("enable_correct_detections_req")
 _BIN_CORRECT_ENABLE_DETECTIONS_KEY = fk("bin_correct_enable_detections")
-_BIN_DISABLE_DETECTIONS_KEY = fk("bin_disable_detections")
 _BIN_CENTRE_TF_KEY = fk("bin_centre_tf")
 _BIN_CENTRE_ACUTE_POSE_KEY = fk("bin_centre_acute_pose")
 
@@ -120,21 +112,25 @@ def create_bin_root():
         key_response=_CHOICE_KEY,
     )
 
-    # Step 0: Enable vision pipeline
-    srv_start_vision = py_trees_ros.service_clients.FromConstant(
-        name="Start vision pipeline",
-        service_name=VISION_SERVER_TOPIC,
-        service_type=ChangeState,
-        service_request=create_start_vision_req(),
-        key_response=_START_VISION_KEY,
+    retry_get_fish_choice = py_trees.decorators.Retry(
+        name="Retry get choice",
+        child=srv_get_fish_choice,
+        num_failures=NUM_RETRIES,
     )
-    check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify start vision pipeline succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=_START_VISION_KEY,
-            value=True,
-            operator=lambda x, y: operator.eq(x.success, y),
-        ),
+
+    # Step 0: Enable vision pipeline
+    srv_start_vision = checked_service.FromConstant(
+        name="Start vision",
+        service_type=ChangeState,
+        service_name=VISION_SERVER_TOPIC,
+        service_request=create_start_vision_req(),
+        check_func=lambda x: x.success,
+    )
+
+    retry_start_vision = py_trees.decorators.Retry(
+        name="Retry start vision",
+        child=srv_start_vision,
+        num_failures=NUM_RETRIES,
     )
 
     seq_search = create_search_bot_layered_square_root(
@@ -172,7 +168,7 @@ def create_bin_root():
     stabilise = py_trees.timers.Timer("Stabilise", duration=STABILIZE_CONTROLS_DURATION)
 
     # Step 3: Enable image matching detections
-    srv_enable_detections = py_trees_ros.service_clients.FromConstant(
+    srv_enable_detections = checked_service.FromConstant(
         name="Enable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
@@ -181,20 +177,16 @@ def create_bin_root():
             camera_frame_id=CAMERA_FRAME,
             template_name=TEMPLATE_NAME,
         ),
-        key_response=_BIN_ENABLE_DETECTIONS_KEY,
+        check_func=lambda x: x.new_state == True,
     )
 
-    # Step 4: Verify enable succeeded
-    check_enable_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify enable succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=_BIN_ENABLE_DETECTIONS_KEY,
-            value=True,
-            operator=lambda x, y: operator.eq(x.new_state, y),
-        ),
+    retry_enable_detections = py_trees.decorators.Retry(
+        name="Retry enable detections",
+        child=srv_enable_detections,
+        num_failures=NUM_RETRIES,
     )
 
-    # Step 5a: Get first set of point correspondences
+    # Step 4a: Get first set of point correspondences
     sub_get_points_first = py_trees_ros.subscribers.ToBlackboard(
         name="Get points",
         topic_name=POINT_CORRESPONDENCES_TOPIC,
@@ -237,7 +229,7 @@ def create_bin_root():
         num_failures=100,
     )
 
-    srv_enable_detections_rotated = py_trees_ros.service_clients.FromConstant(
+    srv_enable_detections_rotated = checked_service.FromConstant(
         name="Enable detections (rotated)",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
@@ -246,19 +238,17 @@ def create_bin_root():
             camera_frame_id=CAMERA_FRAME,
             template_name=ROTATED_TEMPLATE_NAME,
         ),
-        key_response=_BIN_ROTATED_ENABLE_DETECTIONS_KEY,
+        check_func=lambda x: x.new_state
+        == True,  # check if the service call was successful
     )
 
-    check_enable_succeeded_rotated = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify enable succeeded (rotated)",
-        check=py_trees.common.ComparisonExpression(
-            variable=_BIN_ROTATED_ENABLE_DETECTIONS_KEY,
-            value=True,
-            operator=lambda x, y: operator.eq(x.new_state, y),
-        ),
+    retry_enable_rotated_detections = py_trees.decorators.Retry(
+        name="Retry enable rotated detections",
+        child=srv_enable_detections_rotated,
+        num_failures=NUM_RETRIES,
     )
 
-    # Step 5b: Get second set of point correspondences
+    # Step 4b: Get second set of point correspondences
     sub_get_points_second = py_trees_ros.subscribers.ToBlackboard(
         name="Get points (rotated)",
         topic_name=POINT_CORRESPONDENCES_TOPIC,
@@ -323,21 +313,20 @@ def create_bin_root():
         shark_bin_view_rotated_frame=SHARK_BIN_VIEW_ROTATED_FRAME,
     )
 
-    srv_enable_correct_detections = py_trees_ros.service_clients.FromBlackboard(
+    srv_enable_correct_detections = checked_service.FromBlackboard(
         "Enable correct detection template",
         service_type=IMPoseEstimatorToggleTemplate,
         service_name=TOGGLE_TEMPLATE_TOPIC,
         key_request=_BIN_CORRECT_DETECTIONS_REQ_KEY,
         key_response=_BIN_CORRECT_ENABLE_DETECTIONS_KEY,
+        check_func=lambda x: x.new_state
+        == True,  # check if the service call was successful
     )
 
-    check_enable_succeeded_correct = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify enable correct succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=_BIN_CORRECT_ENABLE_DETECTIONS_KEY,
-            value=True,
-            operator=lambda x, y: operator.eq(x.new_state, y),
-        ),
+    retry_enable_correct_detections = py_trees.decorators.Retry(
+        name="Retry enable correct detections",
+        child=srv_enable_correct_detections,
+        num_failures=NUM_RETRIES,
     )
 
     action_cluster_for_goto = shared_action_client.FromBlackboard(
@@ -346,13 +335,25 @@ def create_bin_root():
         key=_CLUSTERING_GOAL_KEY,
     )
 
+    retry_action_cluster_for_goto = py_trees.decorators.Retry(
+        name="Retry cluster transforms for dropping",
+        child=action_cluster_for_goto,
+        num_failures=NUM_RETRIES,
+    )
+
     action_cluster_for_goto_check = shared_action_client.FromBlackboard(
         name="Cluster transforms for dropping",
         shared_action=SharedAction.CLUSTER,
         key=_CLUSTERING_GOAL_KEY,
     )
 
-    # Step 10: Align to precise target
+    retry_action_cluster_for_goto_check = py_trees.decorators.Retry(
+        name="Retry cluster transforms for dropping",
+        child=action_cluster_for_goto_check,
+        num_failures=NUM_RETRIES,
+    )
+
+    # Step 9: Align to precise target
     goto_align_to_target = goto.FromBlackboard(
         name="Align to target",
         pose_key=_POSE_KEY,
@@ -367,11 +368,12 @@ def create_bin_root():
     )
 
     # distance_threshold=0.05
+    # TODO: check if want to retry inside the create_goto_cluster root instead
     seq_goto_cluster = py_trees.decorators.FailureIsSuccess(
         name="Goto cluster",
         child=create_goto_cluster_from_bb_root(
-            cluster_node=action_cluster_for_goto,
-            cluster_node_check=action_cluster_for_goto_check,
+            cluster_node=retry_action_cluster_for_goto,
+            cluster_node_check=retry_action_cluster_for_goto_check,
             goto_node=goto_align_to_target,
             retries=RETRIES,
             start_frame_keys=[_ANCHOR_FRAME_KEY],
@@ -397,7 +399,7 @@ def create_bin_root():
         "Stabilise before dropping", duration=STABILIZE_CONTROLS_DURATION
     )
 
-    # Step 11: Set dropper actuation value
+    # Step 10: Set dropper actuation value
     set_dropper_actuation = py_trees.behaviours.SetBlackboardVariable(
         name="Set dropper actuation",
         variable_name=fk("bin_actuation"),
@@ -405,7 +407,7 @@ def create_bin_root():
         overwrite=True,
     )
 
-    # Step 12: Fire first dropper
+    # Step 11: Fire first dropper
     pub_fire_dropper_first = py_trees_ros.service_clients.FromConstant(
         name="Fire dropper first",
         service_name=ACTUATION_TOPIC,
@@ -413,7 +415,7 @@ def create_bin_root():
         service_request=Trigger.Request(),
     )
 
-    # Step 13: Fire second dropper
+    # Step 12: Fire second dropper
     pub_fire_dropper_second = py_trees_ros.service_clients.FromConstant(
         name="Fire dropper second",
         service_name=ACTUATION_TOPIC,
@@ -421,72 +423,63 @@ def create_bin_root():
         service_request=Trigger.Request(),
     )
 
-    # Step 14: Disable detections
-    srv_disable_detections = py_trees_ros.service_clients.FromConstant(
+    # Step 13: Disable detections
+    srv_disable_detections = checked_service.FromConstant(
         name="Disable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
         service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
-        key_response=_BIN_DISABLE_DETECTIONS_KEY,
+        check_func=lambda x: x is not None and x.new_state == False,
     )
 
-    # Step 15: Verify disable succeeded
-    check_disable_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify disable succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=_BIN_DISABLE_DETECTIONS_KEY,
-            value=False,
-            operator=lambda x, y: operator.eq(x.new_state, y),
+    force_succeed_retry_disable_detections = py_trees.decorators.FailureIsSuccess(
+        name="Force success after retry disable detections",
+        child=py_trees.decorators.Retry(
+            name="Retry Disable Detections",
+            child=srv_disable_detections,
+            num_failures=NUM_RETRIES,
         ),
     )
 
-    # Step 16: End vision pipeline
-    srv_end_vision = py_trees_ros.service_clients.FromConstant(
+    # Step 14: End vision pipeline
+    srv_end_vision = checked_service.FromConstant(
         name="End vision pipeline",
-        service_name=VISION_SERVER_TOPIC,
         service_type=ChangeState,
+        service_name=VISION_SERVER_TOPIC,
         service_request=create_end_vision_req(),
-        key_response=_STOP_VISION_KEY,
+        check_func=lambda x: x.success,
     )
-    check_end_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Verify end vision pipeline succeeded",
-        check=py_trees.common.ComparisonExpression(
-            variable=_STOP_VISION_KEY,
-            value=True,
-            operator=lambda x, y: operator.eq(x.success, y),
-        ),
+
+    retry_end_vision = py_trees.decorators.Retry(
+        name="Retry end vision",
+        child=srv_end_vision,
+        num_failures=NUM_RETRIES,
     )
 
     # Build main drop sequence
     seq_drop_into_bin.add_children(
         children=[
-            srv_get_fish_choice,
-            srv_start_vision,
-            check_start_vision_succeeded,
+            retry_get_fish_choice,
+            retry_start_vision,
             seq_search,
             extract_tf,
             calculate_acute_pose,
             goto_bin_centre,
             stabilise,
-            srv_enable_detections,
-            check_enable_succeeded,
+            retry_enable_detections,
             sub_get_points_first_sequence_retry,
-            srv_enable_detections_rotated,
-            check_enable_succeeded_rotated,
+            retry_enable_rotated_detections,
             sub_get_points_second_sequence_retry,
             sel_update_template,
-            srv_enable_correct_detections,
-            check_enable_succeeded_correct,
+            retry_enable_correct_detections,
             set_anchor_frame,
             seq_goto_cluster,
             set_dropper_actuation,
             pub_fire_dropper_first,
             py_trees.timers.Timer(name="Wait between drops", duration=3.5),
             pub_fire_dropper_second,
-            srv_disable_detections,
-            check_disable_succeeded,
-            srv_end_vision,
-            check_end_vision_succeeded,
+            force_succeed_retry_disable_detections,
+            retry_end_vision,
         ],
     )
 

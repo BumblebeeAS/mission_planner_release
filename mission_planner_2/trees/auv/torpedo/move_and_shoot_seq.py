@@ -1,5 +1,7 @@
 import py_trees
 import py_trees_ros
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
@@ -11,7 +13,6 @@ from mission_planner_2.commons.pose_utils import (
     within_threshold_xyz,
 )
 from mission_planner_2.trees.auv.goto import goto
-from std_srvs.srv import Trigger
 
 
 def create_move_and_shoot_generator(
@@ -33,6 +34,7 @@ def create_move_and_shoot_generator(
     yaw_threshold=3.0,
     retries=3,
     stabilization_duration=2.5,
+    num_retries_clustering=3,
 ):
     def f(first=True):
         if first:
@@ -90,6 +92,12 @@ def create_move_and_shoot_generator(
             ),
         )
 
+        retry_cluster_node = py_trees.decorators.Retry(
+            name="Retry cluster node",
+            child=cluster_node,
+            num_failures=num_retries_clustering,
+        )
+
         cluster_node_check = shared_action_client.FromConstant(
             name=f"Cluster the transforms before {torp_string} shot",
             shared_action=SharedAction.CLUSTER,
@@ -101,6 +109,12 @@ def create_move_and_shoot_generator(
             ),
         )
 
+        retry_cluster_node_check = py_trees.decorators.Retry(
+            name="Retry cluster node check",
+            child=cluster_node_check,
+            num_failures=num_retries_clustering,
+        )
+
         goto_target = goto.FromBlackboard(
             name=f"Go to {torp_string} target",
             pose_key=pose_key,
@@ -110,8 +124,8 @@ def create_move_and_shoot_generator(
         goto_cluster = py_trees.decorators.FailureIsSuccess(
             name=f"Cluster and goto {torp_string}",
             child=create_goto_cluster_from_bb_root(
-                cluster_node=cluster_node,
-                cluster_node_check=cluster_node_check,
+                cluster_node=retry_cluster_node,
+                cluster_node_check=retry_cluster_node_check,
                 goto_node=goto_target,
                 start_frame_keys=[anchor_frame_key, "/global/base_link"],
                 retries=retries,
