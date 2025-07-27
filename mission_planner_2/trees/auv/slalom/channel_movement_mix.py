@@ -135,7 +135,7 @@ def create_move_to_layer_zero_root():
         2. Move to the clustered pose.
     B. Invalid Clusters:
         0. At this point, we assume that the clusters are invalid.
-        1. Set the is_valid_clusters to False.
+        1. Set the is_valid_clusters to False. Just in case.
         2. Create a pose based on the hardcoded layer zero.
         3. Move to the hardcoded pose.
     """
@@ -219,25 +219,36 @@ def create_move_between_layers_root(
         "zero",
         "one",
     ],
-    next_layer: Literal["one", "two"],
+    next_layer: Literal[
+        "one",
+        "two",
+    ],
 ):
     """
     Create a root node that moves between layers of the slalom channel.
     The movement strategy is as follows:
-    A. Valid Clusters:
-        0. Check that we haven't encountered invalid clusters yet.
-        1. Check if the transform between the current layer and the next layer is valid.
-        2. If valid, create a yawed pose based on the transform and move to that yawed pose.
-        3. Recluster the next layer and write the reclustered transform to the blackboard.
-        4. Validate the reclustered layer and set the next layer's pose.
-    B. Invalid Clusters:
-        0. At this point, we assume that the clusters are invalid.
-        1. Set the is_valid_clusters to False.
-        2. Sweep left and right, recluster during the sweep, and write the reclustered transform to the blackboard.
-        3. Validate the reclustered layer and set the next layer's pose.
-    C. Hardcoded Pose:
-        0. Set the is_valid_clusters to False.
-        1. Set the next layer's pose to a hardcoded pose.
+    A. Valid Clusters with Yaw Reclustering:
+        0. Check that we have valid clusters. Valid clusters implies that the clusters are not None and are spaced apart correctly.
+        1. Get the transform from the current layer to the next layer.
+        2. Create a yawed pose based on the transform.
+        3. Move to the yawed pose.
+        4. Recluster the next layer.
+        5. Write the reclustered transform to the blackboard.
+        6. Validate the reclustered layer.
+        7. Check if the reclustering was valid.
+        8. Set the next layer's pose to the reclustered pose.
+    B. Valid Clusters Direct Move:
+        0. Check that we have valid clusters.
+        1. Set the next layer's pose to the direct next layer pose.
+    C. Invalid Clusters with Sweeping:
+        0. Sweep left and right, while reclustering the next layer.
+        1. Write the reclustered transform to the blackboard.
+        2. Validate the reclustered layer.
+        3. Check if the reclustering was valid.
+        4. Set the next layer's pose to the reclustered pose.
+    D. Hardcoded Pose:
+        0. Set the is_valid_clusters to False. Just in case.
+        1. Set the next layer's pose to the hardcoded pose.
 
     Finally, move to the next layer's pose.
     """
@@ -278,16 +289,17 @@ def create_move_between_layers_root(
         memory=True,
     )
 
-    sel_yaw_or_sweep_or_hardcoded = py_trees.composites.Selector(
+    sel_yaw_or_direct_or_sweep_or_hardcoded = py_trees.composites.Selector(
         name=f"Selector for Layer {current_layer} to Layer {next_layer}",
         memory=True,
     )
 
-    seq_valid_clusters = py_trees.composites.Sequence(
-        name=f"Movement from Layer {current_layer} to Layer {next_layer} with Valid Clusters",
+    seq_valid_clusters_yaw_recluster = py_trees.composites.Sequence(
+        name=f"Movement from Layer {current_layer} to Layer {next_layer} with Valid Clusters and Yaw Reclustering",
         memory=True,
     )
 
+    # Having valid clusters implies that the clusters are not None and are spaced apart correctly.
     check_is_valid_clusters = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Check Valid Clusters",
         check=py_trees.common.ComparisonExpression(
@@ -302,25 +314,6 @@ def create_move_between_layers_root(
         end_frames=[next_layer_frame],
         update_keys=[LAYER_TO_LAYER_TF_KEY],
         fallback_val=[None],
-    )
-
-    validate_current_to_next_tf = DynamicSetBlackboard(
-        name=f"Validate Transform from Layer {current_layer} to Layer {next_layer}",
-        key=LAYER_TO_LAYER_TF_KEY,
-        update_key=IS_VALID_CLUSTERS_KEY,
-        overwrite=True,
-        func=lambda tf: validate_reclustered_layer(tf),
-    )
-
-    check_is_still_valid_pre_recluster = (
-        py_trees.behaviours.CheckBlackboardVariableValue(
-            name="Check if Transform is Still Valid Before Reclustering",
-            check=py_trees.common.ComparisonExpression(
-                variable=IS_VALID_CLUSTERS_KEY,
-                value=True,
-                operator=operator.eq,
-            ),
-        )
     )
 
     create_yaw_view_pose = DynamicSetBlackboard(
@@ -365,6 +358,7 @@ def create_move_between_layers_root(
         func=lambda tf: validate_reclustered_layer(tf),
     )
 
+    # Having valid reclustered layer implies that the transform is not None and the z distance is within the expected range.
     check_is_still_valid = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Check if Reclustering was Valid",
         check=py_trees.common.ComparisonExpression(
@@ -382,12 +376,10 @@ def create_move_between_layers_root(
         func=lambda f: f(LAYER_ZERO_RECLUSTERED),
     )
 
-    seq_valid_clusters.add_children(
+    seq_valid_clusters_yaw_recluster.add_children(
         [
             check_is_valid_clusters,  # Check that we have not encountered invalid clusters
             get_current_to_next_tf,  # Get transform from current layer to next layer
-            validate_current_to_next_tf,  # Write the validation of the transform to the blackboard
-            check_is_still_valid_pre_recluster,  # Check validation of the transform
             create_yaw_view_pose,  # Create a yawed pose based on the transform
             goto_yaw_view_pose,  # Move to the yawed pose
             recluster_action,  # Recluster the next layer
@@ -398,17 +390,39 @@ def create_move_between_layers_root(
         ]
     )
 
-    seq_invalid_clusters = py_trees.composites.Sequence(
-        name=f"Movement from Layer {current_layer} to Layer {next_layer} with Invalid Clusters",
+    seq_valid_clusters_direct_move = py_trees.composites.Sequence(
+        name=f"Movement from Layer {current_layer} to Layer {next_layer} with Valid Clusters Direct Move",
         memory=True,
     )
 
-    set_is_invalid_clusters = DynamicSetBlackboard(
-        name="Set Is Invalid Clusters",
-        key=IS_VALID_CLUSTERS_KEY,
-        update_key=IS_VALID_CLUSTERS_KEY,
+    check_is_still_valid_clusters = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check Valid Clusters",
+        check=py_trees.common.ComparisonExpression(
+            variable=IS_VALID_CLUSTERS_KEY,
+            value=True,
+            operator=operator.eq,
+        ),
+    )
+
+    set_next_layer_direct_pose = DynamicSetBlackboard(
+        name=f"Set Next Layer {next_layer} Direct Pose",
+        key=POSE_FUNC_KEY,
+        update_key=LAYER_TO_LAYER_POSE_KEY,
         overwrite=True,
-        func=lambda: False,
+        func=lambda f: f(next_layer_frame),
+    )
+
+    seq_valid_clusters_direct_move.add_children(
+        [
+            check_is_still_valid_clusters,  # Check that we have not encountered invalid clusters
+            set_next_layer_direct_pose,  # Set the next layer's pose to the direct pose
+            # No need to move to a yawed pose, we can directly move to the next layer's pose
+        ]
+    )
+
+    seq_invalid_clusters_sweep = py_trees.composites.Sequence(
+        name=f"Movement from Layer {current_layer} to Layer {next_layer} with Invalid Clusters and Sweeping",
+        memory=True,
     )
 
     par_sweep_recluster = py_trees.composites.Parallel(
@@ -452,6 +466,7 @@ def create_move_between_layers_root(
         ]
     )
 
+    # FIXME: After sweeping, the check must be instead be done from base link to the next layer. This is because with invalid clusters, we might not have current layer transform.
     write_sweep_reclustered_to_bb = create_tf_checker_from_constant_root(
         start_frames=[current_layer_frame],
         end_frames=[LAYER_ZERO_RECLUSTERED],
@@ -484,10 +499,9 @@ def create_move_between_layers_root(
         func=lambda f: f(LAYER_ZERO_RECLUSTERED),
     )
 
-    seq_invalid_clusters.add_children(
+    seq_invalid_clusters_sweep.add_children(
         [
-            set_is_invalid_clusters,  # Set the is_valid_clusters to False
-            par_sweep_recluster,  # Sweep left and right, recluster during the sweep
+            par_sweep_recluster,  # Parallel sweep and recluster
             write_sweep_reclustered_to_bb,  # Write the reclustered transform to the blackboard
             validate_sweep_recluster_layer,  # Write the validation of the reclustered layer to the blackboard
             check_is_still_valid_after_sweep,  # Check if the reclustering was valid
@@ -523,10 +537,11 @@ def create_move_between_layers_root(
         ]
     )
 
-    sel_yaw_or_sweep_or_hardcoded.add_children(
+    sel_yaw_or_direct_or_sweep_or_hardcoded.add_children(
         [
-            seq_valid_clusters,
-            seq_invalid_clusters,
+            seq_valid_clusters_yaw_recluster,
+            seq_valid_clusters_direct_move,
+            seq_invalid_clusters_sweep,
             seq_hardcoded,
         ]
     )
@@ -538,7 +553,7 @@ def create_move_between_layers_root(
 
     root.add_children(
         [
-            sel_yaw_or_sweep_or_hardcoded,  # Selector for yawed pose, sweep and recluster, or hardcoded pose
+            sel_yaw_or_direct_or_sweep_or_hardcoded,  # Selector for yaw, direct, sweep, or hardcoded
             goto_next_layer,
         ]
     )
@@ -592,6 +607,7 @@ def create_movement_strategy_root():
         fallback_val=[None, None, None],
     )
 
+    # Having valid clusters impplies that the clusters are not None and are spaced apart correctly.
     set_is_valid_clusters = DynamicSetBlackboard(
         name="Set Is Valid Clusters",
         key=[
