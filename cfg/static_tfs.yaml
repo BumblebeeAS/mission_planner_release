@@ -102,7 +102,7 @@ urdf:
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/torpedo_shooter_right"
   - name: dropper
-    x:  -0.14964
+    x: -0.14964
     y: -0.093029
     z: 0.06985
     parent_frame_id: "auv4/bot_cam_optical"
@@ -114,12 +114,51 @@ urdf:
     parent_frame_id: auv4/bot_cam_optical
     child_frame_id: auv4/grabber
 map:
-  - name: slalom
-    x: 10.75
-    y: 6.75
-    z: 0.0
-    roll: -90
-    yaw: -90
-    parent_frame_id: "map"
-    child_frame_id: "map/slalom"
-
+  - name: gate_start
+    x: 0.0
+    y: 0.0
+    z: 0.3
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/gate/start"
+  - name: gate_end
+    x: 5.0
+    y: 0.0
+    z: 0.3
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/gate/end"
+  - name: slalom_start
+    x: 5.0
+    y: 0.0
+    z: 0.3
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/slalom/start"
+  - name: slalom_end
+    x: 12.0
+    y: 0.0
+    z: 0.3
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/slalom/end"
+  - name: bin
+    x: 15.0
+    y: 0.0
+    z: 0.3
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/bin"
+  - name: torpedo_start
+    x: 15.0
+    y: 0.0
+    z: 0.3
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/torpedo/start"
+  - name: torpedo_post
+    x: 15.0
+    y: -3.0
+    z: 0.3
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/torpedo/post"
+  - name: octagon
+    x: 17.0
+    y: -3.0
+    z: 0.3
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/octagon"
