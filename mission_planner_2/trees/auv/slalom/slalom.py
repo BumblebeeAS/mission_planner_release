@@ -20,15 +20,26 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
-from mission_planner_2.trees.auv.slalom.channel_movement_recluster import (
-    create_channel_movement_one_root,
-    create_channel_movement_two_root,
-    create_channel_movement_zero_root,
-)
 from std_srvs.srv import SetBool
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
+
+RECLUSTER = False
+
+if RECLUSTER:
+    from mission_planner_2.trees.auv.slalom.channel_movement_recluster import (
+        create_channel_movement_one_root,
+        create_channel_movement_two_root,
+        create_channel_movement_zero_root,
+    )
+else:
+    from mission_planner_2.trees.auv.slalom.channel_movement import (
+        create_channel_movement_one_root,
+        create_channel_movement_two_root,
+        create_channel_movement_zero_root,
+    )
+
 
 ########################## UPDATE CONSTANTS HERE #########################
 VISION_SERVER_TOPIC = "/auv4/slalom/manage_nodes"
@@ -51,7 +62,7 @@ SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
 
 TRANSFORM_TIMEOUT_DURATION = 5.0
 CLUSTER_VIEW_DURATION = 40
-WAIT_BETWEEN_MOVES_SEC = 4.0
+WAIT_BETWEEN_MOVES_SEC = 0.1
 MIN_CLUSTER_SIZE = 10
 
 """
@@ -183,6 +194,7 @@ def create_slalom_root():
             position_z=FIRST_VIEW["position_z"],
             yaw=FIRST_VIEW["yaw"],
         ),
+        ignore_depth=True,
     )
 
     move_view_two = goto.FromConstant(
@@ -194,6 +206,7 @@ def create_slalom_root():
             position_z=SECOND_VIEW["position_z"],
             yaw=SECOND_VIEW["yaw"],
         ),
+        ignore_depth=True,
     )
 
     move_view_three = goto.FromConstant(
@@ -205,6 +218,7 @@ def create_slalom_root():
             position_z=THIRD_VIEW["position_z"],
             yaw=THIRD_VIEW["yaw"],
         ),
+        ignore_depth=True,
     )
 
     move_and_cluster_par = py_trees.composites.Parallel(
@@ -285,28 +299,51 @@ def create_slalom_root():
     )
 
     # Generate movement options based on the number of missing transforms, generation done in compile time, execution done in runtime
-    move_channel_one = create_channel_movement_zero_root(
-        slalom_frame_centre=CHANNEL_CENTRE_FRAME,
-        slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-        slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-        slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-        is_left_key=IS_LEFT_KEY,
-        wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
-    )
-    move_channel_two = create_channel_movement_one_root(
-        slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-        slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-        slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-        is_left_key=IS_LEFT_KEY,
-        wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
-    )
-    move_channel_three = create_channel_movement_two_root(
-        slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-        slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-        slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-        is_left_key=IS_LEFT_KEY,
-        wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
-    )
+    if RECLUSTER:
+        move_channel_one = create_channel_movement_zero_root(
+            slalom_frame_centre=CHANNEL_CENTRE_FRAME,
+            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+            slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            is_left_key=IS_LEFT_KEY,
+        )
+        move_channel_two = create_channel_movement_one_root(
+            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+            slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            is_left_key=IS_LEFT_KEY,
+        )
+        move_channel_three = create_channel_movement_two_root(
+            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+            slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            is_left_key=IS_LEFT_KEY,
+        )
+    else:
+        move_channel_one = create_channel_movement_zero_root(
+            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+            slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            create_func_key=_CREATE_POSE_FUNC_KEY,
+            wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
+        )
+        move_channel_two = create_channel_movement_one_root(
+            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+            slalom_frame_zero_key=_CHANNEL_ZERO_KEY,
+            slalom_frame_one_key=_CHANNEL_ONE_KEY,
+            slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
+            slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
+            create_func_key=_CREATE_POSE_FUNC_KEY,
+            wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
+        )
+        move_channel_three = create_channel_movement_two_root(
+            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+            slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
+            slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
+            create_func_key=_CREATE_POSE_FUNC_KEY,
+            wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
+        )
 
     # helper function to check num missing tfs
     def check(num_missing):
@@ -404,7 +441,6 @@ def create_slalom_root():
             seq_check_transforms,
             move_to_centre,
             select_movement_strategy,
-            py_trees.timers.Timer(name="timer", duration=2.0),
             goto_pass_through,
             srv_end_vision,
             check_end_vision_succeeded,

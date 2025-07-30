@@ -2,7 +2,6 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from py_trees.decorators import Retry
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import checked_service
@@ -235,7 +234,7 @@ def create_torpedo_root():
             seq_search,
             # cluster_board_centre,
             goto_torp_centre,
-            stabilise_before_matching,
+            # stabilise_before_matching,
             retry_enable_detections,
             move_and_shoot_first,
             goto_back_centre,

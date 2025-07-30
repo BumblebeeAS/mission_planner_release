@@ -6,6 +6,7 @@ import py_trees
 import py_trees_ros
 from bb_planner_msgs.srv import MapRelocalize
 from geometry_msgs.msg import PoseStamped, TransformStamped
+
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
@@ -36,8 +37,6 @@ BASE_LINK_FRAME = "auv4/base_link_ned"
 #########################################################################
 
 _MISSING_LAYER_KEY = fk("missing_layer")  # key for missing layer
-_POSE_LIST_KEY = fk("pose_list")
-_LAYER_0_POSE = fk("layer_0_pose")
 _LAYER_TO_LAYER_TF_KEY = fk("layer_tf")
 _LAYER_TO_LAYER_POSE_KEY = fk("layer_pose")
 
@@ -47,7 +46,7 @@ def _recluster_and_goto_sequence(
     next_frame: str,
     clustering_in_children: list[str],
     is_left: bool = True,
-    missing_layers: int = 1,
+    missing_layers: int | None = 1,
 ):
     """
     Creates a recluster and goto sequence that:
@@ -123,7 +122,7 @@ def _sweep_and_goto_sequence(
     clustering_in_children: list[str],
     is_left: bool = True,
     sweep_angle_degrees: float = 45.0,
-    missing_layers: int = 1,
+    missing_layers: int | None = 1,
 ):
     """
     Creates a sweep and goto sequence that:
@@ -207,7 +206,6 @@ def create_channel_movement_zero_root(
     slalom_frame_one_clustered: str = "slalom_layer_1/clustered",
     slalom_frame_two_clustered: str = "slalom_layer_2/clustered",
     is_left_key: str = "is_left_key",
-    wait_between_moves_sec: float = 4.0,
 ):
     """
     Zero case: Check if is left, if yes then recluster and goto on layer 0 to layer 1,
@@ -464,7 +462,6 @@ def create_channel_movement_one_root(
     slalom_frame_one_clustered: str = "slalom_layer_1/clustered",
     slalom_frame_two_clustered: str = "slalom_layer_2/clustered",
     is_left_key: str = "is_left_key",
-    wait_between_moves_sec: float = 4.0,
 ):
     seq_channel_movement_one_missing = py_trees.composites.Sequence(
         name="Channel Movement: One Layer Missing",
@@ -612,7 +609,6 @@ def create_channel_movement_two_root(
     slalom_frame_one_clustered: str = "slalom_layer_1/clustered",
     slalom_frame_two_clustered: str = "slalom_layer_2/clustered",
     is_left_key: str = "is_left_key",
-    wait_between_moves_sec: float = 4.0,
 ):
     clustering_in_children = [
         slalom_frame_zero_clustered.split("/")[-2],

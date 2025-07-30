@@ -37,7 +37,7 @@ def create_wait_for_button_root(
         check=py_trees.common.ComparisonExpression(
             variable=_BUTTON_RESPONSE_KEY,
             value=True,
-            operator=operator.eq,
+            operator=lambda x, y: operator.eq(x.data, y),
         ),
     )
 

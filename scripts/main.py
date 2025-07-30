@@ -6,9 +6,9 @@ import py_trees_ros
 import rclpy
 
 from mission_planner_2.commons.hooks import stop_on_success_or_failure
-from mission_planner_2.commons.node_registry import TreeNode
 
 # from mission_planner_2.commons.led_management import create_led_tree
+from mission_planner_2.commons.node_registry import TreeNode
 from mission_planner_2.trees.auv.mother.mother import create_mother
 
 
@@ -30,7 +30,7 @@ def main():
     tree.add_post_tick_handler(stop_on_success_or_failure)
     tree.tick_tock(period_ms=100)
     try:
-        rclpy.spin(tree.node)
+        rclpy.spin(node)
     except KeyboardInterrupt:
         console.loginfo(console.yellow + "interrupted" + console.reset)
     except SystemExit:

@@ -24,7 +24,6 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
@@ -256,11 +255,11 @@ def create_gate_single_root():
             retry_start_vision,
             sel_clustering_with_fallback,
             goto_see_pictures,
-            timer_stabilize_main,
+            # timer_stabilize_main,
             sel_get_choice,
             sub_gate_orientation,
             sel_gate_side,
-            timer_stabilize_final,
+            # timer_stabilize_final,
             goto_through_gate,
             retry_end_vision,
         ]

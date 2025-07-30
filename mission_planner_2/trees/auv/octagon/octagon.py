@@ -18,6 +18,7 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_request,
     create_stamped_pose,
 )
+from mission_planner_2.commons.search import create_search_bot_layered_square_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
 from mission_planner_2.trees.auv.octagon.trash import create_align_actuate_surface_root
@@ -58,6 +59,9 @@ NUM_ROTATIONS = 6
 STABILIZE_DURATION = 5
 WAIT_BETWEEN_ROTATIONS = 3
 LOOK_AT_TARGET_PAUSE_DURATION = 4
+NUM_SQUARES = 1
+OFFSET_COEFF = 1.0
+DROP_Z_DISTANCE = 0.40
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -108,14 +112,14 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
         bucket_frame,
         command=AlignAndCollect.Goal.OPEN,
         cluster_duration=CLUSTER_DURATION,
-        z_distance=0.30,
+        z_distance=DROP_Z_DISTANCE,
     )
     seq_trash.add_children(
         children=[
             seq_trash_pick_up,
             cluster_table_centre,
             goto_table_centre,
-            stabilize_before_drop,
+            # stabilize_before_drop,
             seq_trash_drop,
         ]
     )
@@ -222,6 +226,24 @@ def create_octagon_root():
         pause_duration=LOOK_AT_TARGET_PAUSE_DURATION,
     )
 
+    seq_search = create_search_bot_layered_square_root(
+        fwd=1.0,
+        back=0.3,
+        left=0.5,
+        right=0.5,
+        num_squares=NUM_SQUARES,
+        object_frame=TABLE_CENTER_FRAME,
+        object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+        offset_coeff=OFFSET_COEFF,
+        wait_between_moves=1.0,
+    )
+
+    goto_table_center = goto.FromConstant(
+        name="Goto table center",
+        pose=create_stamped_pose(TABLE_CENTER_FRAME_CLUSTERED),
+        ignore_depth=True,
+    )
+
     ################## BOTTLE PART #################
     seq_bottle_0 = create_collection_root(
         trash_name="Bottle 0",
@@ -278,6 +300,8 @@ def create_octagon_root():
             srv_get_choice,
             srv_start_vision,
             check_start_vision_succeeded,
+            # seq_search,
+            # goto_table_center,
             # par_search,
             # look_at_target,
             seq_bottle_0,

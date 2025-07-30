@@ -46,7 +46,7 @@ gate:
   - name: centre_view
     parents:
       - "gate/centre"
-    y: 0.5
+    y: 0.7
     z: -2.0
     roll: -90.0
     pitch: -90.0
@@ -54,7 +54,7 @@ gate:
     parents:
       - "gate/left"
       - "gate/right"
-    y: 0.5
+    y: 0.7
     z: -1.0
     roll: -90.0
     pitch: -90.0

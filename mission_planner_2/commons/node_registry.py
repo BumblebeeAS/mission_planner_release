@@ -6,10 +6,12 @@ import rclpy
 import rclpy.action
 import rclpy.client
 import rclpy.node
+from bb_auv_msgs.msg import ColorRgb
 from bb_behavior_msgs.action import AlignAndCollect
 from bb_controls_msgs.action import Locomotion
 from bb_perception_msgs.action import ClusterTfAction
 from bb_planner_msgs.srv import GetPoseToControlsFrame
+from rclpy.qos import qos_profile_sensor_data
 
 
 @dataclass
@@ -38,6 +40,8 @@ class SharedService(Enum):
 
 
 class TreeNode(rclpy.node.Node):
+    LED_TOPIC = "/auv4/led"
+
     def __init__(self, node_name: str = "tree_node"):
         super().__init__(node_name=node_name)
         self.action_clients: dict[str, rclpy.action.ActionClient] = dict()
@@ -54,3 +58,7 @@ class TreeNode(rclpy.node.Node):
                 srv_type=service.value.type,
                 srv_name=service.value.topic,
             )
+
+        self.led_publisher = self.create_publisher(
+            ColorRgb, self.LED_TOPIC, qos_profile=qos_profile_sensor_data
+        )

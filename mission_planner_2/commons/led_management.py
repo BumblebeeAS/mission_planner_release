@@ -8,7 +8,6 @@ from bb_auv_msgs.msg import ColorRgb
 from py_trees.visitors import VisitorBase
 from rclpy.node import Node
 from rclpy.publisher import Publisher
-from rclpy.qos import qos_profile_sensor_data
 
 from mission_planner_2.commons.node_registry import TreeNode
 from mission_planner_2.trees.auv.goto import goto
@@ -79,8 +78,6 @@ BEHAVIOUR_REGISTRY = [
     ),
 ]
 
-LED_TOPIC = "/auv4/led"
-
 
 class LedVisitor(VisitorBase):
     def __init__(self, full: bool = False):
@@ -149,10 +146,8 @@ def create_led_tree(
     root: py_trees.behaviour.Behaviour,
     display_only_visited_behaviours=True,
 ) -> tuple[py_trees_ros.trees.BehaviourTree, Node]:
-    node = TreeNode("tree_node")
-    led_publisher = node.create_publisher(
-        ColorRgb, LED_TOPIC, qos_profile=qos_profile_sensor_data
-    )
+    node = TreeNode()
+    led_publisher = node.led_publisher
 
     tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
     tree.snapshot_visitor.display_only_visited_behaviours = (

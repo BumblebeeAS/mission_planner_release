@@ -1,15 +1,22 @@
 import py_trees
 import py_trees_ros
-from bb_behavior_msgs.action import AlignAndCollect
-from bb_controls_msgs.srv import Controller
+from bb_behavior_msgs.action import AlignAndCollect, ControlledAscent
+from bb_controls_msgs.srv import Controller, Limits
 from bb_perception_msgs.action import ClusterTfAction
 from bb_perception_msgs.srv import TrashToggleFrame
 from mission_planner_2.commons import checked_service
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_clustering_goal
+from mission_planner_2.commons.pose_utils import (
+    create_clustering_goal,
+    create_limits_srv_request,
+    create_stamped_pose,
+)
+from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
+from mission_planner_2.trees.auv.goto import goto
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import Float32
 
@@ -21,6 +28,19 @@ fk = full_key_generator(NAMESPACE)
 _DEPTH_KEY = fk("depth")
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 TOGGLE_TRASH_FRAME_CLUSTERED_TOPIC = "/auv4/trash/toggle_trash_frame_clustered"
+WORLD_TO_BASE_LINK_KEY = fk("world_to_base_link")
+SURFACE_POSE_KEY = fk("surface_pose")
+SURFACE_CONSTANT = 0.1
+MAX_XY_VEL = 0.5
+MAX_XY_ACC = 1.0
+MAX_XY_JERK = 1.5
+MAX_Z_VEL = 0.2
+MAX_Z_ACC = 1.0
+MAX_Z_JERK = 1.5
+MAX_YAW_VEL = 0.3
+MAX_YAW_ACC = 0.5
+MAX_YAW_JERK = 0.5
+LIMITS_SERVICE_NAME = "/auv4/controls/limits"
 
 
 def create_align_actuate_surface_root(
@@ -31,7 +51,7 @@ def create_align_actuate_surface_root(
     cluster_duration: int = 10,
     z_distance: float = 0.15,
     cutoff_z_distance: float = 0.3,
-    surface_depth_threshold: float = 0.2,
+    surface_depth_threshold: float = 0.1,
 ):
     """Cluster the trash / bucket pose, then pass control to the AlignAndCollect action which
     aligns the robot to the trash / bucket and actuates the grabber to open / close. After the
@@ -92,20 +112,15 @@ def create_align_actuate_surface_root(
         name=f"Enable at surface ({trash_name})",
         memory=True,
     )
-    sub_depth = py_trees_ros.subscribers.ToBlackboard(
-        name=f"Sub depth ({trash_name})",
-        topic_name="/auv4/depth",
-        topic_type=Float32,
-        qos_profile=qos_profile_system_default,
-        blackboard_variables={_DEPTH_KEY: "data"},
-    )
-    # check if depth is less than or equal to threshold
-    check_depth = py_trees.behaviours.CheckBlackboardVariableValue(
-        name=f"Check depth ({trash_name})",
-        check=py_trees.common.ComparisonExpression(
-            variable=_DEPTH_KEY,
-            value=surface_depth_threshold,
-            operator=lambda x, y: x <= y,
+
+    action_controlled_ascent = py_trees_ros.action_clients.FromConstant(
+        name="Ascent to surface",
+        action_type=ControlledAscent,
+        action_name="/auv4/controlled_ascent",
+        action_goal=ControlledAscent.Goal(
+            desired_depth=surface_depth_threshold,
+            depth_tolerance=0.05,
+            depth_rate=0.05,
         ),
     )
     srv_enable_controls = checked_service.FromConstant(
@@ -120,17 +135,16 @@ def create_align_actuate_surface_root(
     )
     seq_surface.add_children(
         children=[
-            sub_depth,
-            check_depth,
+            action_controlled_ascent,
             srv_enable_controls,
         ]
     )
     # TODO: can consider more targeted retry if want
-    retry_surfacing = py_trees.decorators.Retry(
-        name=f"retry surfacing ({trash_name})",
-        child=seq_surface,
-        num_failures=1e6,
-    )
+    # retry_surfacing = py_trees.decorators.Retry(
+    #     name=f"retry surfacing ({trash_name})",
+    #     child=seq_surface,
+    #     num_failures=1e6,
+    # )
 
     root.add_children(
         children=[
@@ -138,7 +152,7 @@ def create_align_actuate_surface_root(
             srv_toggle_trash_frame_clustered,
             srv_disable_controls,
             call_trash_pickup,
-            retry_surfacing,
+            seq_surface,
         ]
     )
 

@@ -465,7 +465,7 @@ def create_bin_root():
             extract_tf,
             calculate_acute_pose,
             goto_bin_centre,
-            stabilise,
+            # stabilise,
             retry_enable_detections,
             sub_get_points_first_sequence_retry,
             retry_enable_rotated_detections,

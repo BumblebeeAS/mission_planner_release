@@ -29,7 +29,7 @@ ZERO_YAW_POSE_KEY = "/global/zero_yaw_pose_key"
 
 
 MAP_NED_COORDS_GATE_START = {
-    "x": 2.0,
+    "x": 0.0,
     "y": 0.0,
     "z": 0.3,
     "roll": 0.0,
@@ -54,7 +54,7 @@ MAP_NED_COORDS_SLALOM_START = {
 }
 MAP_NED_COORDS_SLALOM_END = {  # TODO: MUST TUNE
     "x": 12.0,
-    "y": -1.5,
+    "y": 0.0,
     "z": 0.3,
     "roll": 0.0,
     "pitch": 0.0,
@@ -62,7 +62,7 @@ MAP_NED_COORDS_SLALOM_END = {  # TODO: MUST TUNE
 }
 MAP_NED_COORDS_BIN = {
     "x": 15.0,
-    "y": -1.5,
+    "y": 0.0,
     "z": 0.3,
     "roll": 0.0,
     "pitch": 0.0,
@@ -70,15 +70,23 @@ MAP_NED_COORDS_BIN = {
 }
 MAP_NED_COORDS_TORPEDO = {
     "x": 15.0,
-    "y": 1.5,
+    "y": 0.0,
+    "z": 0.3,
+    "roll": 0.0,
+    "pitch": 0.0,
+    "yaw": 0.0,
+}
+MAP_NED_COORDS_POST_TORPEDO = {
+    "x": 15.0,
+    "y": -3.0,
     "z": 0.3,
     "roll": 0.0,
     "pitch": 0.0,
     "yaw": 0.0,
 }
 MAP_NED_COORDS_OCTAGON = {
-    "x": 23.0,
-    "y": -1.0,
+    "x": 17.0,
+    "y": -3.0,
     "z": 0.3,
     "roll": 0.0,
     "pitch": 0.0,
@@ -110,6 +118,7 @@ def create_move_to_task(task: str, start: dict, end: dict, stabilise_time: float
     goto_zero_yaw = goto.FromBlackboard(
         name="Goto zero yaw",
         pose_key=ZERO_YAW_POSE_KEY,
+        ignore_depth=True,
     )
 
     timer_stabilise = py_trees.timers.Timer(
@@ -132,6 +141,7 @@ def create_move_to_task(task: str, start: dict, end: dict, stabilise_time: float
     goto_task = goto.FromConstant(
         name=f"Goto {task} start",
         pose=task_pose,
+        ignore_depth=True,
     )
 
     root.add_children(
@@ -139,7 +149,7 @@ def create_move_to_task(task: str, start: dict, end: dict, stabilise_time: float
             get_odom,
             dynamic_create_zero_yaw_pose,
             goto_zero_yaw,
-            timer_stabilise,
+            # timer_stabilise,
             goto_task,
         ]
     )
@@ -213,9 +223,14 @@ def create_mother():
     )
     torpedo_root = create_torpedo_root()
 
+    move_to_space = create_move_to_task(
+        task="post_torpedo",
+        start=MAP_NED_COORDS_TORPEDO,
+        end=MAP_NED_COORDS_POST_TORPEDO,
+    )
     move_to_octagon = create_move_to_task(
         task="octagon",
-        start=MAP_NED_COORDS_TORPEDO,
+        start=MAP_NED_COORDS_POST_TORPEDO,
         end=MAP_NED_COORDS_OCTAGON,
     )
     octagon_root = create_octagon_root()
@@ -235,8 +250,8 @@ def create_mother():
         [
             # wait_for_button,
             # set_is_left,
-            # set_base_link_frame,
-            # set_world_frame,  # TODO: use multi set bb?
+            set_base_link_frame,
+            set_world_frame,  # TODO: use multi set bb?
             # move_to_gate,
             # gate_root,
             # move_to_slalom,
@@ -245,6 +260,7 @@ def create_mother():
             # bin_root,
             # move_to_torpedo,
             # torpedo_root,
+            # move_to_space,
             # move_to_octagon,
             octagon_root,
             # return_root,

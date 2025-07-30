@@ -64,7 +64,7 @@ def _create_goto_cluster_retry(
         memory=True,
         children=[
             goto_node,
-            wait,
+            # wait,
             cluster_node_check,
             tf_checker,
             set_threshold_check,
@@ -241,7 +241,7 @@ def _create_goto_cluster_tf_tf_root(
             cluster_node,
             tf_checker_1,
             goto_node,
-            wait,
+            # wait,
             cluster_node_check,
             tf_checker_2,
             set_threshold_check,
