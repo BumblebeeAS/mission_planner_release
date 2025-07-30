@@ -14,10 +14,10 @@ class RosLoggerDecorator(py_trees.decorators.Decorator):
         self,
         name: str,
         child: py_trees.behaviour.Behaviour,
-        log_tree_on_status: py_trees.common.Status = py_trees.common.Status.RUNNING,
+        log_level: str,
     ):
         super().__init__(name, child)
-        self.log_tree_on_status = log_tree_on_status
+        self.log_level = log_level
         self._root = None
 
     def setup(self, **kwargs: Any) -> None:
@@ -36,11 +36,21 @@ class RosLoggerDecorator(py_trees.decorators.Decorator):
     def update(self) -> py_trees.common.Status:
         status = self.decorated.status
 
-        if self.log_tree_on_status == status:
-            # TODO: is this the correct display function to use ask advay
-            tree_str = py_trees.display.unicode_tree(
-                root=self.decorated, show_status=True, show_only_visited=False
-            )
-            self.logger.info(f"Tree state for {self.decorated.name}:\n{tree_str}")
+        # TODO: is this the correct display function to use ask advay
+        tree_str = py_trees.display.unicode_tree(
+            root=self.decorated, show_status=True, show_only_visited=False
+        )
+
+        msg = f"Tree state for {self.decorated.name}:\n{tree_str}"
+        if self.log_level == "info":
+            self.logger.info(msg)
+        elif self.log_level == "debug":
+            self.logger.debug(msg)
+        elif self.log_level == "error":
+            self.logger.error(msg)
+        elif self.log_level == "warn":
+            self.logger.warn(msg)
+        else:
+            raise ValueError(f"loglevel unknown {self.log_level}")
 
         return status
