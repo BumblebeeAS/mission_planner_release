@@ -5,6 +5,7 @@ import numpy as np
 import py_trees
 import py_trees_ros
 from geometry_msgs.msg import PoseStamped, TransformStamped
+
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
@@ -30,7 +31,6 @@ LAYER_TWO = "slalom_layer_2"
 LAYER_ZERO_CLUSTERED = "slalom_layer_0/clustered"
 LAYER_ONE_CLUSTERED = "slalom_layer_1/clustered"
 LAYER_TWO_CLUSTERED = "slalom_layer_2/clustered"
-LAYER_ZERO_HARDCODED = "slalom_layer_0/hardcoded"
 LAYER_ONE_HARDCODED = "slalom_layer_1/hardcoded"
 LAYER_TWO_HARDCODED = "slalom_layer_2/hardcoded"
 LAYER_ZERO_TO_ONE_CLUSTERED_TF_KEY = fk("layer_zero_to_one_clustered_tf")
@@ -126,33 +126,14 @@ def create_move_to_layer_zero_root():
     """
     Create a root node that moves to the zero layer of the slalom channel.
     The movement strategy is as follows:
-    A. Valid Clusters:
-        0. Check that we have valid clusters.
+    A. Valid Clusters AND Invalid Clusters:
         1. Create a pose based on the clustered layer zero.
         2. Move to the clustered pose.
-    B. Invalid Clusters:
-        0. At this point, we assume that the clusters are invalid.
-        1. Set the is_valid_clusters to False. Just in case.
-        2. Create a pose based on the hardcoded layer zero.
-        3. Move to the hardcoded pose.
+    We operate under the assumption that we always have the clustered pose for layer zero.
     """
     root = py_trees.composites.Selector(
         name="Move to Layer Zero",
         memory=True,
-    )
-
-    seq_valid_clusters = py_trees.composites.Sequence(
-        name="Movement to Layer Zero with Valid Clusters",
-        memory=True,
-    )
-
-    check_is_valid_clusters = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check Valid Clusters",
-        check=py_trees.common.ComparisonExpression(
-            variable=IS_VALID_CLUSTERS_KEY,
-            value=True,
-            operator=operator.eq,
-        ),
     )
 
     set_layer_zero_clustered_pose = DynamicSetBlackboard(
@@ -168,43 +149,10 @@ def create_move_to_layer_zero_root():
         pose_key=LAYER_ZERO_POSE_KEY,
     )
 
-    seq_valid_clusters.add_children(
-        [
-            check_is_valid_clusters,
-            set_layer_zero_clustered_pose,
-            goto_layer_zero_clustered,
-        ],
-    )
-
-    seq_invalid_clusters = py_trees.composites.Sequence(
-        name="Movement to Layer Zero with Invalid Clusters",
-        memory=True,
-    )
-
-    set_layer_zero_hardcoded_pose = DynamicSetBlackboard(
-        name="Set Layer Zero Hardcoded Pose",
-        key=POSE_FUNC_KEY,
-        update_key=LAYER_ZERO_POSE_KEY,
-        overwrite=True,
-        func=lambda f: f(LAYER_ZERO_HARDCODED),
-    )
-
-    goto_layer_zero_hardcoded = goto.FromBlackboard(
-        name="Goto Layer Zero Hardcoded",
-        pose_key=LAYER_ZERO_POSE_KEY,
-    )
-
-    seq_invalid_clusters.add_children(
-        [
-            set_layer_zero_hardcoded_pose,
-            goto_layer_zero_hardcoded,
-        ]
-    )
-
     root.add_children(
         [
-            seq_valid_clusters,
-            seq_invalid_clusters,
+            set_layer_zero_clustered_pose,  # Set the pose for layer zero
+            goto_layer_zero_clustered,  # Move to the clustered pose for layer zero
         ]
     )
 

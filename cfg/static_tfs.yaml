@@ -65,23 +65,16 @@ slalom:
   - name: centre_right
     parent_frame_id: "slalom/centre"
     child_frame_id: "slalom/centre/right"
-  # One Missing Transform
   - name: slalom_layer_2_from_1_hardcoded
     x: 1.00
     z: 2.0
-    parent_frame_id: "slalom_layer_1/clustered"
+    parent_frame_id: "slalom_layer_1/hardcoded"
     child_frame_id: "slalom_layer_2/hardcoded"
-  # Two Missing Transforms
   - name: slalom_layer_1_from_0_hardcoded
     x: -0.50
     z: 2.0
     parent_frame_id: "slalom_layer_0/clustered"
     child_frame_id: "slalom_layer_1/hardcoded"
-  - name: slalom_layer_2_from_1_hardcoded_hardcoded # forgive my naming sins
-    x: 1.00
-    z: 2.0
-    parent_frame_id: "slalom_layer_1/hardcoded"
-    child_frame_id: "slalom_layer_2/hardcoded/hardcoded"
 octagon:
   - name: symbols_hardcoded_shark
     x: 0.1525
