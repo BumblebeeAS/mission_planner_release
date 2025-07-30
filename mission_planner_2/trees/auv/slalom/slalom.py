@@ -3,6 +3,8 @@ import operator
 import py_trees
 import py_trees_ros
 from lifecycle_msgs.srv import ChangeState
+from std_srvs.srv import SetBool
+
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
@@ -18,9 +20,10 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
-from std_srvs.srv import SetBool
+from mission_planner_2.trees.auv.slalom.channel_movement_mix import (
+    create_movement_strategy_root,
+)
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -261,135 +264,7 @@ def create_slalom_root():
 
     move_and_cluster_par.add_children([cluster_action, seq_move_and_cluster])
 
-    check_transforms = create_tf_checker_from_constant_root(
-        start_frames=[
-            BASE_LINK_FRAME,
-            BASE_LINK_FRAME,
-            BASE_LINK_FRAME,
-        ],
-        end_frames=[
-            CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-            CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-            CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-        ],
-        update_keys=[
-            _CHANNEL_ZERO_KEY,
-            _CHANNEL_ONE_KEY,
-            _CHANNEL_TWO_KEY,
-        ],
-        fallback_val=[None, None, None],
-    )
-
-    update_missing_transforms_qty = DynamicSetBlackboard(
-        name="Update number of missing transforms",
-        key=[_CHANNEL_ZERO_KEY, _CHANNEL_ONE_KEY, _CHANNEL_TWO_KEY],
-        update_key=_MISSING_TRANSFORMS_KEY,
-        overwrite=True,
-        func=lambda tf_1, tf_2, tf_3: (tf_1 is None) + (tf_2 is None) + (tf_3 is None),
-    )
-
-    # Sequence to check transforms and update the number of missing transforms
-    seq_check_transforms = py_trees.composites.Sequence(
-        name="Check transforms",
-        memory=True,
-        children=[
-            check_transforms,
-            update_missing_transforms_qty,
-        ],
-    )
-
-    # Generate movement options based on the number of missing transforms, generation done in compile time, execution done in runtime
-    if RECLUSTER:
-        move_channel_one = create_channel_movement_zero_root(
-            slalom_frame_centre=CHANNEL_CENTRE_FRAME,
-            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-            slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-            is_left_key=IS_LEFT_KEY,
-        )
-        move_channel_two = create_channel_movement_one_root(
-            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-            slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-            is_left_key=IS_LEFT_KEY,
-        )
-        move_channel_three = create_channel_movement_two_root(
-            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-            slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-            is_left_key=IS_LEFT_KEY,
-        )
-    else:
-        move_channel_one = create_channel_movement_zero_root(
-            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-            slalom_frame_two_clustered=CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-            create_func_key=_CREATE_POSE_FUNC_KEY,
-            wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
-        )
-        move_channel_two = create_channel_movement_one_root(
-            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-            slalom_frame_one_clustered=CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-            slalom_frame_zero_key=_CHANNEL_ZERO_KEY,
-            slalom_frame_one_key=_CHANNEL_ONE_KEY,
-            slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
-            slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
-            create_func_key=_CREATE_POSE_FUNC_KEY,
-            wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
-        )
-        move_channel_three = create_channel_movement_two_root(
-            slalom_frame_zero_clustered=CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-            slalom_one_from_zero_hardcoded=SLALOM_ONE_FROM_ZERO_HARDCODED,
-            slalom_two_from_one_hardcoded=SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED,
-            create_func_key=_CREATE_POSE_FUNC_KEY,
-            wait_between_moves_sec=WAIT_BETWEEN_MOVES_SEC,
-        )
-
-    # helper function to check num missing tfs
-    def check(num_missing):
-        return py_trees.common.ComparisonExpression(
-            variable=_MISSING_TRANSFORMS_KEY,
-            value=num_missing,
-            operator=operator.eq,
-        )
-
-    check_missing_transforms_one = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check missing zero transforms",
-        check=check(0),
-    )
-    check_missing_transforms_two = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check missing one transform", check=check(1)
-    )
-    check_missing_transforms_three = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check missing two transforms", check=check(2)
-    )
-
-    move_to_centre = goto.FromConstant(
-        name="Move to centre", pose=create_stamped_pose(CHANNEL_CENTRE_FRAME)
-    )
-
-    # Selector to choose the movement strategy based on the number of missing transforms
-    select_movement_strategy = py_trees.composites.Selector(
-        name="Select movement strategy",
-        memory=True,
-        children=[
-            py_trees.composites.Sequence(
-                name="Zero missing transforms",
-                memory=True,
-                children=[check_missing_transforms_one, move_channel_one],
-            ),
-            py_trees.composites.Sequence(
-                name="One missing transform",
-                memory=True,
-                children=[check_missing_transforms_two, move_channel_two],
-            ),
-            py_trees.composites.Sequence(
-                name="Two missing transforms",
-                memory=True,
-                children=[check_missing_transforms_three, move_channel_three],
-            ),
-        ],
-    )
+    seq_movement_strategy = create_movement_strategy_root()
 
     goto_pass_through = goto.FromConstant(
         "Pass through gate",
@@ -438,9 +313,7 @@ def create_slalom_root():
             check_start_depth_succeeded,
             dynamic_set_create_pose_func,
             move_and_cluster_par,
-            seq_check_transforms,
-            move_to_centre,
-            select_movement_strategy,
+            seq_movement_strategy,
             goto_pass_through,
             srv_end_vision,
             check_end_vision_succeeded,
