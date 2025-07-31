@@ -5,11 +5,8 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.srv import ClusterTfSrv
 from geometry_msgs.msg import PoseStamped
+
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
-from mission_planner_2.commons.namespace_utils import (
-    full_key_generator,
-    generate_namespace,
-)
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_clustering_request,
@@ -350,24 +347,45 @@ def create_search_bot_bb_root(
     return root
 
 
+def _gen_yaw_points(max_left: float, max_right: float, s: float) -> List[PoseStamped]:
+    """
+    Generate yaw points for searching. Floors the max angles by step size s.
+    """
+    num_points_l = int(max_left // s)
+    num_points_r = int(max_right // s)
+    points = [create_stamped_pose(_BASE_LINK_FRAME, yaw=s) for _ in range(num_points_r)]
+
+    offset = (num_points_r + 1) * s
+    points.append(create_stamped_pose(_BASE_LINK_FRAME, yaw=-offset - s))
+    for _ in range(num_points_l - 1):
+        points.append(create_stamped_pose(_BASE_LINK_FRAME, yaw=-s))
+
+    return points
+
+
 def create_search_front_root(
     object_frame: str,
     object_frame_clustered: str,
+    yaw_left_deg: float = 30.0,
+    yaw_right_deg: float = 30.0,
+    step: float = 15.0,
     wait_between_moves: float = 5.0,
 ):
+    """Search front yaw angles will be done in multiple of 15 degrees."""
     root = py_trees.composites.Sequence(
         name="Search seq (front cam)",
         memory=True,
     )
 
+    points = _gen_yaw_points(
+        max_left=yaw_left_deg,
+        max_right=yaw_right_deg,
+        s=step,
+    )
+
     goto_yaw = goto.NFromConstant(
         name="Goto search pattern",
-        poses=[
-            create_stamped_pose(_BASE_LINK_FRAME, yaw=15.0),
-            create_stamped_pose(_BASE_LINK_FRAME, yaw=15.0),
-            create_stamped_pose(_BASE_LINK_FRAME, yaw=-45.0),
-            create_stamped_pose(_BASE_LINK_FRAME, yaw=-15.0),
-        ],
+        poses=points,
         wait_between_moves_sec=wait_between_moves,
         ignore_depth=True,
         # specified_heading=True,
