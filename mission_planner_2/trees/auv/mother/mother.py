@@ -46,9 +46,6 @@ def load_mission_coordinates():
     return coords
 
 
-coords = load_mission_coordinates()
-
-
 def create_mother(coords: dict):
     root = py_trees.composites.Sequence(
         name="mother",
@@ -98,7 +95,7 @@ def create_mother(coords: dict):
     move_to_torpedo = create_move_to_task(
         task="torpedo",
         start=coords["bin"],
-        end=coords["torpedo"],
+        end=coords["torpedo_start"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
@@ -106,7 +103,7 @@ def create_mother(coords: dict):
 
     move_to_space = create_move_to_task(
         task="post_torpedo",
-        start=coords["torpedo"],
+        start=coords["torpedo_start"],
         end=coords["torpedo_post"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
@@ -137,10 +134,10 @@ def create_mother(coords: dict):
             # set_is_left,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
-            # move_to_gate,
+            move_to_gate,
             # gate_root,
             # move_to_slalom,
-            slalom_root,
+            # slalom_root,
             # move_to_bin,
             # bin_root,
             # move_to_torpedo,
