@@ -147,6 +147,8 @@ def led_handler(
 def create_led_tree(
     root: py_trees.behaviour.Behaviour,
     display_only_visited_behaviours=True,
+    display_blackboard=False,
+    display_activity_stream=False,
 ) -> tuple[py_trees_ros.trees.BehaviourTree, Node]:
     node = TreeNode()
     led_publisher = node.led_publisher
@@ -155,6 +157,8 @@ def create_led_tree(
     tree.snapshot_visitor.display_only_visited_behaviours = (
         display_only_visited_behaviours
     )
+    tree.snapshot_visitor.display_blackboard = display_blackboard
+    tree.snapshot_visitor.display_activity_stream = display_activity_stream
 
     led_visitor = LedVisitor()
     tree.add_visitor(led_visitor)
