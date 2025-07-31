@@ -84,7 +84,9 @@ class LedVisitor(VisitorBase):
         super().__init__(full)
 
         self.state = {}
-        self.previous_state = {}
+        for led_behaviour in BEHAVIOUR_REGISTRY:
+            self.state[led_behaviour.name] = py_trees.common.Status.INVALID
+        self.previous_state = self.state.copy()
 
     def initialise(self) -> None:
         super().initialise()
