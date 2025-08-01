@@ -25,7 +25,7 @@ class LoggingSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         display_activity_stream: bool = False,
     ):
         super().__init__()
-        self.node = node if node not None else Node("tree_logger")
+        self.node = node if node is not None else Node("tree_logger")
         self.display_only_visited_behaviours = display_only_visited_behaviours
         self.display_blackboard = display_blackboard
         self.display_activity_stream = display_activity_stream
