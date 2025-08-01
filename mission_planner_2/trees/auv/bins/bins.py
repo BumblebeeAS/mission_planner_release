@@ -423,6 +423,11 @@ def create_bin_root():
         service_request=Trigger.Request(),
     )
 
+    seq_stop_vision = py_trees.composites.Sequence(
+        name="Stop vision",
+        memory=True,
+    )
+
     # Step 13: Disable detections
     srv_disable_detections = checked_service.FromConstant(
         name="Disable detections",
@@ -432,13 +437,15 @@ def create_bin_root():
         check_func=lambda x: x is not None and x.new_state == False,
     )
 
-    force_succeed_retry_disable_detections = py_trees.decorators.FailureIsSuccess(
-        name="Force success after retry disable detections",
-        child=py_trees.decorators.Retry(
-            name="Retry Disable Detections",
-            child=srv_disable_detections,
-            num_failures=NUM_RETRIES,
-        ),
+    retry_disable_detections = py_trees.decorators.Retry(
+        name="Retry Disable Detections",
+        child=srv_disable_detections,
+        num_failures=NUM_RETRIES,
+    )
+
+    force_success_disable_detections = py_trees.decorators.FailureIsSuccess(
+        name="Force success disable detections",
+        child=retry_disable_detections,
     )
 
     # Step 14: End vision pipeline
@@ -454,6 +461,18 @@ def create_bin_root():
         name="Retry end vision",
         child=srv_end_vision,
         num_failures=NUM_RETRIES,
+    )
+
+    force_success_end_vision = py_trees.decorators.FailureIsSuccess(
+        name="Force success end vision",
+        child=retry_end_vision,
+    )
+
+    seq_stop_vision.add_children(
+        children=[
+            force_success_disable_detections,
+            force_success_end_vision,
+        ],
     )
 
     # Build main drop sequence
@@ -478,8 +497,7 @@ def create_bin_root():
             pub_fire_dropper_first,
             py_trees.timers.Timer(name="Wait between drops", duration=3.5),
             pub_fire_dropper_second,
-            force_succeed_retry_disable_detections,
-            retry_end_vision,
+            seq_stop_vision,
         ],
     )
 

@@ -170,6 +170,12 @@ def create_torpedo_root():
         key_response=_CHOICE_KEY,
     )
 
+    retry_get_choice = py_trees.decorators.Retry(
+        name="Retry get choice",
+        child=srv_get_choice,
+        num_failures=NUM_RETRIES,
+    )
+
     srv_enable_detections = checked_service.FromConstant(
         name="Enable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
@@ -196,6 +202,11 @@ def create_torpedo_root():
 
     move_and_shoot_second = move_and_shoot_gen(first=False)
 
+    seq_stop_vision = py_trees.composites.Sequence(
+        name="Stop vision",
+        memory=True,
+    )
+
     srv_disable_detections = checked_service.FromConstant(
         name="Disable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
@@ -204,13 +215,15 @@ def create_torpedo_root():
         check_func=lambda x: not x is not None and x.new_state == False,
     )
 
-    retry_disable_detections = py_trees.decorators.FailureIsSuccess(
-        name="Force success after retry disable detections",
-        child=py_trees.decorators.Retry(
-            name="Retry Disable Detections",
-            child=srv_disable_detections,
-            num_failures=NUM_RETRIES,
-        ),
+    retry_disable_detections = py_trees.decorators.Retry(
+        name="Retry Disable Detections",
+        child=srv_disable_detections,
+        num_failures=NUM_RETRIES,
+    )
+
+    force_success_disable_detections = py_trees.decorators.FailureIsSuccess(
+        name="Force success disable detections",
+        child=retry_disable_detections,
     )
 
     srv_end_vision = checked_service.FromConstant(
@@ -227,9 +240,21 @@ def create_torpedo_root():
         num_failures=NUM_RETRIES,
     )
 
+    force_success_end_vision = py_trees.decorators.FailureIsSuccess(
+        name="Force success end vision",
+        child=retry_end_vision,
+    )
+
+    seq_stop_vision.add_children(
+        children=[
+            force_success_disable_detections,
+            force_success_end_vision,
+        ],
+    )
+
     seq_launch_torpedo.add_children(
         children=[
-            srv_get_choice,
+            retry_get_choice,
             retry_start_vision,
             seq_search,
             # cluster_board_centre,
@@ -239,8 +264,7 @@ def create_torpedo_root():
             move_and_shoot_first,
             goto_back_centre,
             move_and_shoot_second,
-            retry_disable_detections,
-            retry_end_vision,
+            seq_stop_vision,
         ],
     )
 

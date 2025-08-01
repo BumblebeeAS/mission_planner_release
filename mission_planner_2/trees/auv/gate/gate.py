@@ -13,8 +13,6 @@ from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
 )
-from mission_planner_2.commons.fallback import create_clustering_fallback_root
-from mission_planner_2.commons.log_errors import LogOnFailure
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
@@ -54,14 +52,12 @@ GATE_ORIENTATION_TOPIC = "/auv4/gate/shark_fish"
 # DONT go move it in the section to be updated
 _CHOICE_KEY = fk("choice")
 _GATE_ORIENTATION_KEY = fk("orientation")
-_GATE_LEFT_POSE_KEY = fk("gate_left_pose")
-_GATE_RIGHT_POSE_KEY = fk("gate_right_pose")
 _IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 _START_VISION_KEY = fk("gate_start_vision")
 _STOP_VISION_KEY = fk("gate_stop_vision")
 
 
-def create_gate_single_root():
+def create_gate_root():
     """
     For sim.
 
@@ -86,11 +82,9 @@ def create_gate_single_root():
         check_func=lambda x: x.success,
     )
 
-    srv_start_vision_logged = LogOnFailure(srv_start_vision)
-
     retry_start_vision = Retry(
         name="Retry Start Vision",
-        child=srv_start_vision_logged,
+        child=srv_start_vision,
         num_failures=NUM_RETRIES,
     )
 
@@ -106,14 +100,10 @@ def create_gate_single_root():
         ),
     )
 
-    sel_clustering_with_fallback = create_clustering_fallback_root(
-        cluster_node=action_cluster_gate,
-        world_frame=WORLD_FRAME,
-        object_frame=TEMPLATE_FRAME_YOLO,
-        clustered_frame=TEMPLATE_FRAME_YOLO_CLUSTERED,
-        key=fk("latest_yolo_tf"),
-        num_retries=NUM_RETRIES,
-        name="YOLO",
+    retry_cluster_gate = py_trees.decorators.Retry(
+        name="Retry Cluster Gate",
+        child=action_cluster_gate,
+        num_failures=NUM_RETRIES,
     )
 
     # Step 5: Move to picture position
@@ -134,27 +124,12 @@ def create_gate_single_root():
         service_request=Trigger.Request(),
         key_response=_CHOICE_KEY,
     )
-    srv_get_fish_choice_logged = LogOnFailure(srv_get_fish_choice)
 
     retry_get_fish_choice = Retry(
         name="Retry Get Choice",
-        child=srv_get_fish_choice_logged,
+        child=srv_get_fish_choice,
         num_failures=NUM_RETRIES,
     )
-
-    # Step 7b: Fallback - set default choice to fish
-    set_choice_default_fish = py_trees.behaviours.SetBlackboardVariable(
-        name="Set default fish choice",
-        variable_name=_CHOICE_KEY,
-        variable_value=True,
-        overwrite=True,
-    )
-
-    # Step 7: Selector to attempt service call first, fallback to default
-    sel_get_choice = py_trees.composites.Selector(
-        name="Get choice selector", memory=True
-    )
-    sel_get_choice.add_children([retry_get_fish_choice, set_choice_default_fish])
 
     # Step 8: Get gate orientation
     sub_gate_orientation = py_trees_ros.subscribers.ToBlackboard(
@@ -240,44 +215,33 @@ def create_gate_single_root():
         key_response=_STOP_VISION_KEY,
         check_func=lambda x: x.success,
     )
-    srv_end_vision_logged = LogOnFailure(srv_end_vision)
 
     retry_end_vision = Retry(
         name="Retry End Vision",
-        child=srv_end_vision_logged,
+        child=srv_end_vision,
         num_failures=NUM_RETRIES,
+    )
+
+    force_success_stop_vision = py_trees.decorators.FailureIsSuccess(
+        name="Force success stop vision",
+        child=retry_end_vision,
     )
 
     # Assemble tree in execution order
     seq_gate_root.add_children(
         children=[
             # goto_towards_gate,
+            retry_get_fish_choice,
             retry_start_vision,
-            sel_clustering_with_fallback,
+            retry_cluster_gate,
             goto_see_pictures,
             # timer_stabilize_main,
-            sel_get_choice,
             sub_gate_orientation,
             sel_gate_side,
             # timer_stabilize_final,
             goto_through_gate,
-            retry_end_vision,
+            force_success_stop_vision,
         ]
     )
 
     return seq_gate_root
-
-
-def create_gate_root() -> py_trees.composites.Selector:
-    sel_task_fallback_root = py_trees.composites.Selector(
-        name="Gate with fallback root", memory=True
-    )
-
-    sel_task_fallback_root.add_children(
-        [
-            create_gate_single_root(),
-            py_trees.behaviours.Success(name="Fallback success"),
-        ]
-    )
-
-    return sel_task_fallback_root
