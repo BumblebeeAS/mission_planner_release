@@ -112,6 +112,7 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         wait_for_server_timeout_sec: int = -3,
         wait_for_service_timeout_sec: int = -3,
         is_relative_movement: bool = False,
+        depth_override_value: float | None = None,
     ):
         namespace = py_trees.blackboard.Blackboard.absolute_name(
             "/", convert_to_safe_name(name) + "/" + str(uuid.uuid4()).replace("-", "")
@@ -137,6 +138,7 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         self.yaw_threshold = yaw_threshold
         self.stabilize_duration = stabilize_duration
         self.is_relative_movement = is_relative_movement
+        self.depth_override_value = depth_override_value
 
         # Register the pose_key on the BB as the req to be converted
         # pose_key entry should be a pose stamped
@@ -311,6 +313,9 @@ class FromBlackboard(shared_action_client.FromBlackboard):
 
         goal_msg = Locomotion.Goal()
 
+        if self.ignore_depth and self.depth_override_value is not None:
+            raise ValueError("ignore_depth is True and depth_override_value provided")
+
         # Set the required fields
         goal_msg.move_rel = self.is_relative_movement
         goal_msg.depth_rel = self.ignore_depth
@@ -343,7 +348,12 @@ class FromBlackboard(shared_action_client.FromBlackboard):
 
             forward_setpoints.append(output_pose.position.x)
             sidemove_setpoints.append(output_pose.position.y)
-            depth_setpoints.append(0.0 if self.ignore_depth else output_pose.position.z)
+            if self.depth_override_value is not None:
+                depth_setpoints.append(self.depth_override_value)
+            elif self.ignore_depth:
+                depth_setpoints.append(0.0)
+            else:
+                depth_setpoints.append(output_pose.position.z)
             heading_setpoints.append(yaw)
 
         # Set the setpoints
@@ -476,6 +486,7 @@ class FromConstant(FromBlackboard):
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
         is_relative_movement: bool = False,
+        depth_override_value: float | None = None,
     ):
         if not isinstance(pose, list):
             pose = [pose]
@@ -502,6 +513,7 @@ class FromConstant(FromBlackboard):
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
             is_relative_movement=is_relative_movement,
+            depth_override_value=depth_override_value,
         )
 
         self.blackboard.register_key(
@@ -533,6 +545,7 @@ class NFromBlackboard(FromBlackboard):
         wait_for_service_timeout_sec=-3,
         wait_between_moves_sec=10.0,
         is_relative_movement: bool = False,
+        depth_override_value: float | None = None,
     ):
         super().__init__(
             name,
@@ -549,6 +562,7 @@ class NFromBlackboard(FromBlackboard):
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
             is_relative_movement=is_relative_movement,
+            depth_override_value=depth_override_value,
         )
 
         self.wait_between_moves_sec = wait_between_moves_sec
@@ -734,6 +748,7 @@ class NFromConstant(NFromBlackboard):
         wait_for_service_timeout_sec=-3,
         wait_between_moves_sec=10.0,
         is_relative_movement: bool = False,
+        depth_override_value: float | None = None,
     ):
         if not isinstance(poses, list):
             poses = [poses]
@@ -761,6 +776,7 @@ class NFromConstant(NFromBlackboard):
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
             wait_between_moves_sec=wait_between_moves_sec,
             is_relative_movement=is_relative_movement,
+            depth_override_value=depth_override_value,
         )
 
         self.blackboard.register_key(
