@@ -62,3 +62,8 @@ class TreeNode(rclpy.node.Node):
         self.led_publisher = self.create_publisher(
             ColorRgb, self.LED_TOPIC, qos_profile=qos_profile_sensor_data
         )
+
+    def destroy_node(self):
+        for action_client in self.action_clients.values():
+            action_client.destroy()
+        super().destroy_node()

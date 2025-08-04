@@ -75,6 +75,9 @@ class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):
                 "{}[{}]".format(self.feedback_message, self.qualified_name)
             )
 
+    def shutdown(self):
+        return
+
 
 class FromConstant(FromBlackboard):
     def __init__(
