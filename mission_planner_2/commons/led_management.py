@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-import functools
-from dataclasses import dataclass, field
-from typing import Callable, Any
+
+from dataclasses import dataclass
+from typing import Callable
 
 import py_trees
 import py_trees_ros
@@ -9,10 +9,8 @@ from py_trees.visitors import VisitorBase
 
 from bb_auv_msgs.msg import ColorRgb
 
-from rclpy.node import Node
 from rclpy.publisher import Publisher
 
-from mission_planner_2.commons.node_registry import TreeNode
 from mission_planner_2.trees.auv.goto import goto
 
 
