@@ -120,6 +120,19 @@ map:
     z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/gate/start"
+  - name: rel_gate_start
+    x: 0.0
+    y: 0.0
+    z: 0.3
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/rel_gate/start"
+  - name: rel_gate_start_flip
+    x: 0.0
+    y: 0.0
+    z: 0.3
+    yaw: 180
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/rel_gate_flip/start"
   - name: gate_end
     x: 5.0
     y: 0.0
