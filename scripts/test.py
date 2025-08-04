@@ -22,15 +22,16 @@ import rclpy
 # )
 from mission_planner_2.commons.hooks import stop_on_success_or_failure
 from mission_planner_2.commons.node_registry import TreeNode
-from mission_planner_2.trees.auv.tests.test_goto import create_goto_test as tree_root
+# from mission_planner_2.trees.auv.tests.test_goto import create_goto_test as tree_root
 
+from mission_planner_2.trees.turtlesim.turtle_circle import create_turtle_circle_root as tree_root
+from mission_planner_2.commons.led_management import create_led_tree
 
 def main():
     rclpy.init(args=None)
     root = tree_root()
     py_trees.logging.level = py_trees.logging.Level.DEBUG
-    tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
-    node = TreeNode()
+    tree, node = create_led_tree(root)
     try:
         tree.setup(node=node, timeout=60.0)
     except:

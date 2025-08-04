@@ -1,170 +1,94 @@
 #!/usr/bin/env python3
 import functools
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Callable, Any
 
 import py_trees
 import py_trees_ros
-from bb_auv_msgs.msg import ColorRgb
 from py_trees.visitors import VisitorBase
+
+from bb_auv_msgs.msg import ColorRgb
+
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 
 from mission_planner_2.commons.node_registry import TreeNode
 from mission_planner_2.trees.auv.goto import goto
 
-RED = ColorRgb(
-    red=255,
-    green=0,
-    blue=0,
-)
-GREEN = ColorRgb(
-    red=0,
-    green=255,
-    blue=0,
-)
-BLUE = ColorRgb(
-    red=0,
-    green=0,
-    blue=255,
-)
-YELLOW = ColorRgb(
-    red=255,
-    green=255,
-    blue=0,
-)
-PURPLE = ColorRgb(
-    red=128,
-    green=0,
-    blue=128,
-)
-ORANGE = ColorRgb(
-    red=255,
-    green=165,
-    blue=0,
-)
-WHITE = ColorRgb(
-    red=255,
-    green=255,
-    blue=255,
-)
+
+RED     = ColorRgb(red=255, green=0, blue=0)
+GREEN   = ColorRgb(red=0, green=255, blue=0)
+BLUE    = ColorRgb(red=0, green=0, blue=255)
+YELLOW  = ColorRgb(red=255, green=255, blue=0)
+PURPLE  = ColorRgb(red=255, green=0, blue=255)
+CYAN    = ColorRgb(red=0, green=255, blue=255)
+ORANGE  = ColorRgb(red=255, green=128, blue=0)
+WHITE   = ColorRgb(red=255, green=255, blue=255)
 
 
 @dataclass
 class LedBehaviour:
+    """A data class to hold LED behavior configuration."""
     name: str
-    class_type: type
-    search_str: list[str] | None = None
-    color: ColorRgb = WHITE
+    color: ColorRgb
+    match_func: Callable[[py_trees.behaviour.Behaviour], bool]
 
 
-BEHAVIOUR_REGISTRY = [
-    LedBehaviour(
+BEHAVIOUR_REGISTRY = {
+    "goto": LedBehaviour(
         name="goto",
-        class_type=goto.FromBlackboard,
-        search_str=None,
         color=YELLOW,
+        match_func=lambda x: isinstance(x, goto.FromBlackboard)
     ),
-    LedBehaviour(
+    "cluster": LedBehaviour(
         name="cluster",
-        class_type=py_trees_ros.action_clients.FromBlackboard,
-        search_str=["cluster"],
         color=PURPLE,
-    ),
-    LedBehaviour(
-        name="stabilise",
-        class_type=py_trees.timers.Timer,
-        search_str=["stabilise", "stabilize"],
-        color=ORANGE,
-    ),
-]
+        match_func=lambda x: (
+            isinstance(x, py_trees_ros.action_clients.FromBlackboard) 
+            and "cluster" in x.name.lower()
+        )
+    )
+}
 
 
 class LedVisitor(VisitorBase):
+
     def __init__(self, full: bool = False):
         super().__init__(full)
 
-        self.state = {}
-        for led_behaviour in BEHAVIOUR_REGISTRY:
-            self.state[led_behaviour.name] = py_trees.common.Status.INVALID
+        self.state = {name: py_trees.common.Status.INVALID for name in BEHAVIOUR_REGISTRY}
         self.previous_state = self.state.copy()
+        self.running_behavior_color = None
 
     def initialise(self) -> None:
         super().initialise()
 
         self.changed = False
         self.previous_state = self.state.copy()
-
-        for led_behaviour in BEHAVIOUR_REGISTRY:
-            self.state[led_behaviour.name] = py_trees.common.Status.INVALID
+        self.state = {name: py_trees.common.Status.INVALID for name in BEHAVIOUR_REGISTRY}
+        self.running_behavior_color = None
 
     def run(self, behaviour: py_trees.behaviour.Behaviour) -> None:
         super().run(behaviour)
 
-        for led_behaviour in BEHAVIOUR_REGISTRY:
-            if led_behaviour.search_str is None:
-                if isinstance(behaviour, led_behaviour.class_type):
-                    self.state[led_behaviour.name] = behaviour.status
-                    self.changed = self.changed or (
-                        self.state[led_behaviour.name]
-                        != self.previous_state[led_behaviour.name]
-                    )
-                    return
-            else:
-                contains_str = False
-                cleaned_name = behaviour.name.lower()
-
-                for search_str in led_behaviour.search_str:
-                    if search_str in cleaned_name:
-                        contains_str = True
-                        break
-
-                if contains_str and isinstance(behaviour, led_behaviour.class_type):
-                    self.state[led_behaviour.name] = behaviour.status
-                    self.changed = self.changed or (
-                        self.state[led_behaviour.name]
-                        != self.previous_state[led_behaviour.name]
-                    )
-                    return
+        for name, led_behaviour in BEHAVIOUR_REGISTRY.items():
+            if led_behaviour.match_func(behaviour):
+                self.state[name] = behaviour.status
+                return
 
     def finalise(self) -> None:
         super().finalise()
 
+        for name, current_status in self.state.items():
+            previous_status = self.previous_state[name]
 
-def led_handler(
-    visitor: LedVisitor,
-    led_publisher: Publisher,
-    tree: py_trees_ros.trees.BehaviourTree,
-) -> None:
-    if not visitor.changed:
-        return
-
-    for led_behaviour in BEHAVIOUR_REGISTRY:
-        if visitor.state[led_behaviour.name] == py_trees.common.Status.RUNNING:
-            led_publisher.publish(led_behaviour.color)
-            break
+            if (current_status == py_trees.common.Status.RUNNING 
+                    and previous_status != py_trees.common.Status.RUNNING):
+                self.running_behavior_color = BEHAVIOUR_REGISTRY[name].color
+                break
 
 
-def create_led_tree(
-    root: py_trees.behaviour.Behaviour,
-    display_only_visited_behaviours=True,
-    display_blackboard=False,
-    display_activity_stream=False,
-) -> tuple[py_trees_ros.trees.BehaviourTree, Node]:
-    node = TreeNode()
-    led_publisher = node.led_publisher
-
-    tree = py_trees_ros.trees.BehaviourTree(root=root, unicode_tree_debug=True)
-    tree.snapshot_visitor.display_only_visited_behaviours = (
-        display_only_visited_behaviours
-    )
-    tree.snapshot_visitor.display_blackboard = display_blackboard
-    tree.snapshot_visitor.display_activity_stream = display_activity_stream
-
-    led_visitor = LedVisitor()
-    tree.add_visitor(led_visitor)
-
-    tree.add_post_tick_handler(
-        functools.partial(led_handler, led_visitor, led_publisher)
-    )
-
-    return tree, node
+def led_handler(visitor: LedVisitor, led_publisher: Publisher, 
+                tree: py_trees_ros.trees.BehaviourTree) -> None:
+    if visitor.running_behavior_color:
+        led_publisher.publish(visitor.running_behavior_color)
