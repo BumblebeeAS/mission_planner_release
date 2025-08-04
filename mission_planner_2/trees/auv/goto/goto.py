@@ -188,6 +188,7 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         self.is_goal_sent = False
 
         poses = self.blackboard.get("request")
+        # self.node.get_logger().info(f"poses: {poses}")
 
         if self.is_relative_movement:
             self._initialise_relative(poses)
@@ -576,7 +577,7 @@ class NFromBlackboard(FromBlackboard):
         self.result_status_string = None
 
         if self.is_relative_movement:
-            self._initialise_relative(self.poses_list[self.current_idx])
+            self._initialise_relative([self.poses_list[self.current_idx]])
         else:
             self._initialise_absolute(self.poses_list[self.current_idx])
 

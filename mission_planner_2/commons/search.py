@@ -120,6 +120,7 @@ def _create_search_bot_root(
         wait_between_moves_sec=wait_between_moves_sec,
         ignore_depth=True,  # TODO: never tested in the pool only in sim
         specified_heading=True,  # dont need to face dir for this search
+        is_relative_movement=True,
     )
 
     root.add_children(
@@ -388,6 +389,7 @@ def create_search_front_root(
         poses=points,
         wait_between_moves_sec=wait_between_moves,
         ignore_depth=True,
+        is_relative_movement=True,
         # specified_heading=True,
     )
 
