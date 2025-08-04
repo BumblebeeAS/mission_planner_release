@@ -7,6 +7,7 @@ from std_srvs.srv import Trigger
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
+    create_img_matching_request,
     create_start_vision_req,
 )
 from mission_planner_2.commons.namespace_utils import (
@@ -180,8 +181,10 @@ def create_torpedo_root():
         name="Enable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
-        service_request=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True, template_name=template_name
+        service_request=create_img_matching_request(
+            enable=True,
+            camera_frame_id=CAMERA_FRAME,
+            template_name=template_name,
         ),
         key_response=fk("torpedo_enable_detections"),
         check_func=lambda x: x.new_state,  # check if the service call was successful
@@ -211,7 +214,11 @@ def create_torpedo_root():
         name="Disable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
-        service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
+        service_request=create_img_matching_request(
+            enable=False,
+            camera_frame_id=CAMERA_FRAME,
+            template_name=template_name,
+        ),
         check_func=lambda x: not x is not None and x.new_state == False,
     )
 

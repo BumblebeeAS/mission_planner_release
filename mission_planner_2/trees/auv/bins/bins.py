@@ -14,6 +14,7 @@ from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
+    create_img_matching_request,
     create_start_vision_req,
 )
 from mission_planner_2.commons.namespace_utils import (
@@ -172,8 +173,8 @@ def create_bin_root():
         name="Enable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
-        service_request=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True,
+        service_request=create_img_matching_request(
+            enable=True,
             camera_frame_id=CAMERA_FRAME,
             template_name=TEMPLATE_NAME,
         ),
@@ -233,8 +234,8 @@ def create_bin_root():
         name="Enable detections (rotated)",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
-        service_request=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True,
+        service_request=create_img_matching_request(
+            enable=True,
             camera_frame_id=CAMERA_FRAME,
             template_name=ROTATED_TEMPLATE_NAME,
         ),
@@ -433,7 +434,11 @@ def create_bin_root():
         name="Disable detections",
         service_name=TOGGLE_TEMPLATE_TOPIC,
         service_type=IMPoseEstimatorToggleTemplate,
-        service_request=IMPoseEstimatorToggleTemplate.Request(enabled=False),
+        service_request=create_img_matching_request(
+            enable=False,
+            camera_frame_id=CAMERA_FRAME,
+            template_name=TEMPLATE_NAME,
+        ),
         check_func=lambda x: x is not None and x.new_state == False,
     )
 

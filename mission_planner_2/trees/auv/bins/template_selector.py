@@ -1,12 +1,10 @@
 import operator
 
 import py_trees
-from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
-from mission_planner_2.commons.pose_utils import (
-    create_clustering_goal,
-)
+from mission_planner_2.commons.detection_utils import create_img_matching_request
+from mission_planner_2.commons.pose_utils import create_clustering_goal
 from mission_planner_2.trees.auv.bins.choice_selector import create_choice_selector_root
 
 
@@ -66,8 +64,8 @@ def create_template_selector_root(
     set_enable_detections_req = py_trees.behaviours.SetBlackboardVariable(
         name="Set enable detections request",
         variable_name=bin_correct_detections_req_key,
-        variable_value=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True,
+        variable_value=create_img_matching_request(
+            enable=True,
             camera_frame_id=camera_frame,
             template_name=template_name,
         ),
@@ -107,8 +105,8 @@ def create_template_selector_root(
     set_rotated_enable_detections_req = py_trees.behaviours.SetBlackboardVariable(
         name="Set enable detections request (rotated)",
         variable_name=bin_correct_detections_req_key,
-        variable_value=IMPoseEstimatorToggleTemplate.Request(
-            enabled=True,
+        variable_value=create_img_matching_request(
+            enable=True,
             camera_frame_id=camera_frame,
             template_name=rotated_template_name,
         ),
