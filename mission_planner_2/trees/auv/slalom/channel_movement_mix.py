@@ -28,6 +28,10 @@ BASE_LINK_FRAME = "auv4/base_link_ned"
 LAYER_ZERO = "slalom_layer_0"
 LAYER_ONE = "slalom_layer_1"
 LAYER_TWO = "slalom_layer_2"
+LAYER_ZERO_NEAR = "slalom_layer_near_0"
+LAYER_ONE_NEAR = "slalom_layer_near_1"
+LAYER_TWO_NEAR = "slalom_layer_near_2"
+
 LAYER_ZERO_CLUSTERED = "slalom_layer_0/clustered"
 LAYER_ONE_CLUSTERED = "slalom_layer_1/clustered"
 LAYER_TWO_CLUSTERED = "slalom_layer_2/clustered"
@@ -51,6 +55,11 @@ CLUSTERING_IN_CHILDREN = [
     LAYER_ZERO,
     LAYER_ONE,
     LAYER_TWO,
+]
+CLUSTERING_IN_CHILDREN_NEAR = [
+    LAYER_ZERO_NEAR,
+    LAYER_ONE_NEAR,
+    LAYER_TWO_NEAR,
 ]
 LAYER_ZERO_RECLUSTERED = "slalom/reclustered"
 LAYER_ONE_RECLUSTERED_DUMMY = "slalom/dummy/one"
@@ -276,7 +285,7 @@ def create_move_between_layers_root(
         name=f"Recluster Transforms from Layer {current_layer} to Layer {next_layer}",
         shared_action=SharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
-            in_children=CLUSTERING_IN_CHILDREN,
+            in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
                 LAYER_ZERO_RECLUSTERED,
                 LAYER_ONE_RECLUSTERED_DUMMY,
@@ -333,7 +342,7 @@ def create_move_between_layers_root(
         name=f"Recluster during Sweep from Layer {current_layer} to Layer {next_layer}",
         shared_action=SharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
-            in_children=CLUSTERING_IN_CHILDREN,
+            in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
                 LAYER_ZERO_RECLUSTERED,
                 LAYER_ONE_RECLUSTERED_DUMMY,
