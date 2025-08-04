@@ -17,6 +17,7 @@ from bb_controls_msgs.action import Locomotion
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 from geometry_msgs.msg import PoseStamped
 from numpy import rad2deg
+from rclpy.task import Future
 from transforms3d.euler import quat2euler
 
 from mission_planner_2.commons import shared_action_client
@@ -110,6 +111,7 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         generate_feedback_message: Callable | None = None,
         wait_for_server_timeout_sec: int = -3,
         wait_for_service_timeout_sec: int = -3,
+        is_relative_movement: bool = False,
     ):
         namespace = py_trees.blackboard.Blackboard.absolute_name(
             "/", convert_to_safe_name(name) + "/" + str(uuid.uuid4()).replace("-", "")
@@ -134,6 +136,7 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         self.z_threshold = z_threshold
         self.yaw_threshold = yaw_threshold
         self.stabilize_duration = stabilize_duration
+        self.is_relative_movement = is_relative_movement
 
         # Register the pose_key on the BB as the req to be converted
         # pose_key entry should be a pose stamped
@@ -154,6 +157,9 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         using the same node instance we will create our service client
         """
         super().setup(**kwargs)
+
+        if self.is_relative_movement:
+            return
 
         self.service_client = self.node.service_clients[
             SharedService.CONVERT_TO_CONTROLS_POSE.name
@@ -181,15 +187,12 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         self.result_status_string = None
         self.is_goal_sent = False
 
-        try:
-            if self.service_client.service_is_ready():
-                self.service_future = self.service_client.call_async(
-                    self._gen_srv_req(self.blackboard.get("request"))
-                )
-            self.feedback_message = "sent service request"
-            self.service_future.add_done_callback(self._srv_done_callback)
-        except (KeyError, TypeError):
-            pass  # self.service_future resolves to None
+        poses = self.blackboard.get("request")
+
+        if self.is_relative_movement:
+            self._initialise_relative(poses)
+        else:
+            self._initialise_absolute(poses)
 
     def update(self):
         """
@@ -273,6 +276,27 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         super().shutdown()
         self.service_client.destroy()
 
+    def _initialise_relative(self, poses):
+        self.service_future = Future()
+        result = GetPoseToControlsFrame.Response()
+        result.tf_success = True
+        result.output_poses = poses
+        # we set as done for the update method
+        self.service_future.set_result(result)
+        self._send_goal_request(poses)
+
+    def _initialise_absolute(self, poses):
+        # this used to be the old intialise method that always calls the convert pose service
+        try:
+            if self.service_client.service_is_ready():
+                self.service_future = self.service_client.call_async(
+                    self._gen_srv_req(poses)
+                )
+                self.feedback_message = "sent service request"
+                self.service_future.add_done_callback(self._srv_done_callback)
+        except (KeyError, TypeError):
+            pass
+
     def _gen_srv_req(self, poses: list[PoseStamped] | PoseStamped):
         request = GetPoseToControlsFrame.Request()
         if isinstance(poses, PoseStamped):
@@ -281,17 +305,15 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         request.anchor_frame_name = self.anchor_frame_name
         return request
 
-    def _gen_goal(
-        self, service_response: list[PoseStamped], specified_heading: bool = True
-    ):
-        output_poses = [p.pose for p in service_response]
+    def _gen_goal(self, poses: list[PoseStamped], specified_heading: bool = True):
+        output_poses = [p.pose for p in poses]
 
         goal_msg = Locomotion.Goal()
 
         # Set the required fields
-        goal_msg.move_rel = False
+        goal_msg.move_rel = self.is_relative_movement
         goal_msg.depth_rel = self.ignore_depth
-        goal_msg.heading_rel = False
+        goal_msg.heading_rel = self.is_relative_movement
 
         try:
             goal_msg.depth_ctrl = Locomotion.Goal.DEPTH_MODE_DEPTH
@@ -383,18 +405,25 @@ class FromBlackboard(shared_action_client.FromBlackboard):
                 "{}[{}]".format(self.feedback_message, self.qualified_name)
             )
 
-    def _srv_done_callback(self, fut):
-        resp = fut.result()
-        if not resp.tf_success:
-            return
-
-        goal = self._gen_goal(resp.output_poses, self.specified_heading)
+    def _send_goal_request(self, poses):
+        """
+        Send the goal request to the action server.
+        This method is called after the service call has been completed and the poses have been converted.
+        """
+        goal = self._gen_goal(poses, specified_heading=self.specified_heading)
 
         # send_goal_request sets teh send_goal_future attr
         self.send_goal_request(goal)
         # separate flag to check goal has been sent in that case the send_goal_future must have been set
         self.is_goal_sent = True
         self.feedback_message = "sent action goal request"
+
+    def _srv_done_callback(self, fut):
+        resp = fut.result()
+        if not resp.tf_success:
+            return
+
+        self._send_goal_request(resp.output_poses)
 
 
 class FromConstant(FromBlackboard):
@@ -445,6 +474,7 @@ class FromConstant(FromBlackboard):
         generate_feedback_message=None,
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
+        is_relative_movement: bool = False,
     ):
         if not isinstance(pose, list):
             pose = [pose]
@@ -470,6 +500,7 @@ class FromConstant(FromBlackboard):
             generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
+            is_relative_movement=is_relative_movement,
         )
 
         self.blackboard.register_key(
@@ -500,6 +531,7 @@ class NFromBlackboard(FromBlackboard):
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
         wait_between_moves_sec=10.0,
+        is_relative_movement: bool = False,
     ):
         super().__init__(
             name,
@@ -515,6 +547,7 @@ class NFromBlackboard(FromBlackboard):
             generate_feedback_message=generate_feedback_message,
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
+            is_relative_movement=is_relative_movement,
         )
 
         self.wait_between_moves_sec = wait_between_moves_sec
@@ -542,18 +575,10 @@ class NFromBlackboard(FromBlackboard):
         self.result_status = None
         self.result_status_string = None
 
-        try:
-            if (
-                self.service_client.service_is_ready()
-                and self.current_idx < self.num_poses
-            ):
-                self.service_future = self.service_client.call_async(
-                    self._gen_srv_req(self.poses_list[self.current_idx])
-                )
-            self.feedback_message = "sent first service request"
-            self.service_future.add_done_callback(super()._srv_done_callback)
-        except (KeyError, TypeError):
-            pass
+        if self.is_relative_movement:
+            self._initialise_relative(self.poses_list[self.current_idx])
+        else:
+            self._initialise_absolute(self.poses_list[self.current_idx])
 
     # change initialise abit because the service request is one pose
     def initialise(self):
@@ -707,6 +732,7 @@ class NFromConstant(NFromBlackboard):
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
         wait_between_moves_sec=10.0,
+        is_relative_movement: bool = False,
     ):
         if not isinstance(poses, list):
             poses = [poses]
@@ -733,6 +759,7 @@ class NFromConstant(NFromBlackboard):
             wait_for_server_timeout_sec=wait_for_server_timeout_sec,
             wait_for_service_timeout_sec=wait_for_service_timeout_sec,
             wait_between_moves_sec=wait_between_moves_sec,
+            is_relative_movement=is_relative_movement,
         )
 
         self.blackboard.register_key(
