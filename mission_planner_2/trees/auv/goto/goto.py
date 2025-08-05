@@ -277,7 +277,6 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         Clean up service client when shutting down
         """
         super().shutdown()
-        self.service_client.destroy()
 
     def _initialise_relative(self, poses):
         self.service_future = Future()
