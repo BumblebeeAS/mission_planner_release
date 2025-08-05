@@ -39,7 +39,7 @@ torpedo:
       - "torpedo_1/shark"
       - "torpedo_2/fish"
       - "torpedo_2/shark"
-    z: -0.4
+    z: -0.45
     roll: -90.0
     pitch: -90.0
 gate:
