@@ -39,7 +39,7 @@ GATE_CENTRE_FRAME = "gate/centre"
 
 
 def create_return_root():
-    # Root sequence
+
     seq_return_root = py_trees.composites.Sequence(
         name="Return root",
         memory=True,
@@ -60,13 +60,11 @@ def create_return_root():
         num_failures=NUM_RETRIES,
     )
 
-    # Step 1: Move towards gate
     # TODO: Eventually, we should cache some position after passing through the gate
     #       and return to this position after doing all the tasks
     gate_init_pose = create_stamped_pose("world_ned", position_z=GATE_APPROACH_HEIGHT)
     goto_after_gate = goto.FromConstant("Goto after gate", gate_init_pose)
 
-    # Step 2: Cluster gate transforms
     action_cluster_gate = shared_action_client.FromConstant(
         name="Cluster gate transforms",
         shared_action=SharedAction.CLUSTER,
@@ -84,17 +82,10 @@ def create_return_root():
         num_failures=NUM_RETRIES,
     )
 
-    # Step 3: Move to after center position to align
     goto_after_gate_center = goto.FromConstant(
         "Goto after gate centre", create_stamped_pose(GATE_CENTRE_FRAME)
     )
 
-    # Step 4: Wait to stabilize
-    timer_stabilize = py_trees.timers.Timer(
-        "Stabilize before pass through", STABILIZE_DURATION
-    )
-
-    # Step 5: Move through gate
     forward_pose = create_stamped_pose(
         "auv4/base_link_ned", position_x=FORWARD_DISTANCE
     )
@@ -120,15 +111,12 @@ def create_return_root():
         child=retry_end_vision,
     )
 
-    # Assemble tree in execution order
     seq_return_root.add_children(
         children=[
             retry_start_vision,
             goto_after_gate,
             retry_cluster_gate,
-            # sel_clustering_with_fallback,
             goto_after_gate_center,
-            timer_stabilize,
             goto_through_gate,
             force_success_end_vision,
         ]
