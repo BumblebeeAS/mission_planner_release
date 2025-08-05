@@ -42,7 +42,6 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/main.py
   scripts/test.py
-  scripts/tree_monitor.py
   scripts/mission_tfs.py
   DESTINATION lib/${PROJECT_NAME}
 )
