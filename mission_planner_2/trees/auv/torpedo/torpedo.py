@@ -14,7 +14,9 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import create_stamped_pose
+from mission_planner_2.commons.pose_utils import (
+    create_stamped_pose,
+)
 from mission_planner_2.commons.search import create_search_front_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_and_shoot_seq import (
@@ -26,13 +28,15 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-SELECTED_TEMPLATE = 1  # MUST be 1 or 2
+SELECTED_TEMPLATE = 2  # MUST be 1 or 2
 
 VISION_SERVER_TOPIC = "/auv4/torpedo/manage_nodes"
 TOGGLE_TEMPLATE_TOPIC = "/auv4/torpedo/image_matching/toggle_template"
 CAMERA_FRAME = "auv4/front_cam_optical"
 TORPEDO_SHOOTER_LEFT_FRAME = "auv4/torpedo_shooter_left"
 TORPEDO_SHOOTER_RIGHT_FRAME = "auv4/torpedo_shooter_right"
+# TORPEDO_SHOOTER_LEFT_FRAME = "auv4/front_cam_optical"
+# TORPEDO_SHOOTER_RIGHT_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_YOLO = "torpedo/yolo"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "torpedo/yolo/clustered"
 
@@ -41,10 +45,14 @@ CENTRE_VIEW_FRAME = "torpedo/centre/view"
 ACTUATION_TOPIC_LEFT = "/auv4/actuation/torpedo/left"
 ACTUATION_TOPIC_RIGHT = "/auv4/actuation/torpedo/right"
 
+DISTANCE_THRESHOLD = 0.025
+YAW_THRESHOLD = 1.0
+
 CLUSTER_DURATION = 4
-REALIGN_CLUSTER_DURATION = 2
+REALIGN_CLUSTER_DURATION = 4
 STABILIZE_DURATION = 3
 NUM_RETRIES = 3
+SEARCH_DEPTH = 1.2
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -103,8 +111,8 @@ def create_torpedo_root():
         realign_cluster_duration=REALIGN_CLUSTER_DURATION,
         actuation_topic_left=ACTUATION_TOPIC_LEFT,
         actuation_topic_right=ACTUATION_TOPIC_RIGHT,
-        distance_threshold=0.025,
-        yaw_threshold=1.0,
+        distance_threshold=DISTANCE_THRESHOLD,
+        yaw_threshold=YAW_THRESHOLD,
         retries=8,
         stabilization_duration=2.5,
         num_retries_clustering=NUM_RETRIES,
@@ -137,19 +145,18 @@ def create_torpedo_root():
     seq_search = create_search_front_root(
         object_frame=TEMPLATE_FRAME_YOLO,
         object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,
-        wait_between_moves=7.0,
+        wait_between_moves=2.0,
+        search_depth=SEARCH_DEPTH,
     )
 
     # use this if not seq_search
-    # cluster_board_centre = py_trees_ros.action_clients.FromConstant(
-    #     name="Cluster centre",
-    #     action_type=ClusterTf,
-    #     action_name="/auv4/cluster_tf",
+    # cluster_board_centre = shared_action_client.FromConstant(
+    #     name="Cluster centre (debug)",
+    #     shared_action=SharedAction.CLUSTER,
     #     action_goal=create_clustering_goal(
     #         in_children=TEMPLATE_FRAME_YOLO,
     #         out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
     #         duration=CLUSTER_DURATION,
-    #         use_cache=False,
     #     ),
     # )
 
@@ -195,6 +202,7 @@ def create_torpedo_root():
         child=srv_enable_detections,
         num_failures=NUM_RETRIES,
     )
+
     move_and_shoot_first = move_and_shoot_gen(first=True)
 
     goto_back_centre = goto.FromConstant(
