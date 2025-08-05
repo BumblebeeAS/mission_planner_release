@@ -11,7 +11,12 @@ from mission_planner_2.trees.auv.goto import goto
 
 
 def create_move_to_task(
-    task: str, start: dict, end: dict, odom_key: str, zero_yaw_pose_key: str
+    task: str,
+    start: dict,
+    end: dict,
+    odom_key: str,
+    zero_yaw_pose_key: str,
+    goto_depth: float = 0.3
 ):
     root = py_trees.composites.Sequence(
         name=f"Move to {task}",
@@ -36,7 +41,7 @@ def create_move_to_task(
     goto_zero_yaw = goto.FromBlackboard(
         name="Goto zero yaw",
         pose_key=zero_yaw_pose_key,
-        ignore_depth=True,
+        depth_override_value=goto_depth
     )
 
     coords = compute_start_to_end_vector(start, end)
@@ -54,7 +59,7 @@ def create_move_to_task(
     goto_task = goto.FromConstant(
         name=f"Goto {task} start",
         pose=task_pose,
-        ignore_depth=True,
+        depth_override_value=goto_depth
     )
 
     root.add_children(

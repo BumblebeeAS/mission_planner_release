@@ -108,6 +108,7 @@ def _create_search_bot_root(
     cluster_node_start,
     cluster_node_end,
     wait_between_moves_sec: float = 5.0,
+    search_depth: float = 0.3
 ):
     root = py_trees.composites.Sequence(
         name="Search seq (bot cam)",
@@ -118,9 +119,9 @@ def _create_search_bot_root(
         name=f"Goto search pattern",
         poses=poses,
         wait_between_moves_sec=wait_between_moves_sec,
-        ignore_depth=True,  # TODO: never tested in the pool only in sim
         specified_heading=True,  # dont need to face dir for this search
         is_relative_movement=True,
+        depth_override_value=search_depth
     )
 
     root.add_children(
@@ -371,6 +372,7 @@ def create_search_front_root(
     yaw_right_deg: float = 30.0,
     step: float = 15.0,
     wait_between_moves: float = 5.0,
+    search_depth: float = 0.3
 ):
     """Search front yaw angles will be done in multiple of 15 degrees."""
     root = py_trees.composites.Sequence(
@@ -388,9 +390,9 @@ def create_search_front_root(
         name="Goto search pattern",
         poses=points,
         wait_between_moves_sec=wait_between_moves,
-        ignore_depth=True,
         is_relative_movement=True,
         # specified_heading=True,
+        depth_override_value=search_depth
     )
 
     cluster_node_start = py_trees_ros.service_clients.FromConstant(

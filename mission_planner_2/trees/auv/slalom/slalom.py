@@ -68,6 +68,8 @@ CLUSTER_VIEW_DURATION = 40
 WAIT_BETWEEN_MOVES_SEC = 0.1
 MIN_CLUSTER_SIZE = 10
 
+MOVE_VIEW_DEPTH = 0.3
+
 """
 For sim.
 FIRST_VIEW = {"position_x": 6.0, "position_y": -0.8, "position_z": 1.0, "yaw": -90.0}
@@ -197,7 +199,7 @@ def create_slalom_root():
             position_z=FIRST_VIEW["position_z"],
             yaw=FIRST_VIEW["yaw"],
         ),
-        ignore_depth=True,
+        depth_override_value=MOVE_VIEW_DEPTH
     )
 
     move_view_two = goto.FromConstant(
@@ -209,7 +211,7 @@ def create_slalom_root():
             position_z=SECOND_VIEW["position_z"],
             yaw=SECOND_VIEW["yaw"],
         ),
-        ignore_depth=True,
+        depth_override_value=MOVE_VIEW_DEPTH
     )
 
     move_view_three = goto.FromConstant(
@@ -221,7 +223,7 @@ def create_slalom_root():
             position_z=THIRD_VIEW["position_z"],
             yaw=THIRD_VIEW["yaw"],
         ),
-        ignore_depth=True,
+        depth_override_value=MOVE_VIEW_DEPTH
     )
 
     move_and_cluster_par = py_trees.composites.Parallel(
