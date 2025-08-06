@@ -191,6 +191,17 @@ def create_gate_root():
     )
     goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
 
+    yaw_poses = []
+    for i in range(8):
+        yaw_deg = i * 90
+        pose = create_stamped_pose(
+            frame_id="auv4/base_link_ned",
+            yaw=yaw_deg,
+        )
+        yaw_poses.append(pose)
+
+    yaw = goto.NFromConstant("Rotate 360 twice", yaw_poses, stabilize_duration=1)
+
     srv_end_vision = checked_service.FromConstant(
         name="End vision",
         service_type=ChangeState,
@@ -223,6 +234,7 @@ def create_gate_root():
             sel_gate_side,
             # timer_stabilize_final,
             goto_through_gate,
+            # yaw,
             force_success_stop_vision,
         ]
     )
