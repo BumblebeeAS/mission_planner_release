@@ -1,8 +1,10 @@
 import os
 
 import py_trees
+import py_trees_ros
 import yaml
 from ament_index_python.packages import get_package_share_directory
+from std_srvs.srv import Trigger
 
 from mission_planner_2.trees.auv.bins.bins import create_bin_root
 from mission_planner_2.trees.auv.button.wait_for_button import (
@@ -22,6 +24,7 @@ BASE_LINK_KEY = "/global/base_link"
 WORLD_KEY = "/global/world"
 CURRENT_ODOM_KEY = "/global/current_odom"
 ZERO_YAW_POSE_KEY = "/global/zero_yaw_pose_key"
+CHOICE_KEY = "/global/choice_is_fish"
 
 
 def load_mission_coordinates():
@@ -69,6 +72,14 @@ def create_mother(coords: dict):
         variable_name=WORLD_KEY,
         variable_value="world_ned",
         overwrite=True,
+    )
+
+    srv_get_choice = py_trees_ros.service_clients.FromConstant(
+        name="Get Choice",
+        service_name="/auv4/choice/get_is_fish",
+        service_type=Trigger,
+        service_request=Trigger.Request(),
+        key_response=CHOICE_KEY,
     )
 
     gate_root = create_gate_root()
@@ -137,15 +148,16 @@ def create_mother(coords: dict):
     root.add_children(
         [
             # wait_for_button,
+            srv_get_choice,
             # set_is_left,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
-            move_to_gate,
+            # move_to_gate,
             # gate_root,
             # move_to_slalom,
             # slalom_root,
             # move_to_bin,
-            # bin_root,
+            bin_root,
             # move_to_torpedo,
             # torpedo_root,
             # move_to_space,
