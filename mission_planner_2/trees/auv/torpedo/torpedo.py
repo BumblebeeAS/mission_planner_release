@@ -14,9 +14,7 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.pose_utils import (
-    create_stamped_pose,
-)
+from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.commons.search import create_search_front_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_and_shoot_seq import (
@@ -57,7 +55,6 @@ SEARCH_DEPTH = 1.2
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
-_CHOICE_KEY = fk("choice")
 _POSE_KEY = fk("pose")
 _POSE_FRAME_KEY = fk("pose_frame")
 _ANCHOR_FRAME_KEY = fk("anchor_frame")
@@ -100,7 +97,7 @@ def create_torpedo_root():
         anchor_frame_key=_ANCHOR_FRAME_KEY,
         torpedo_shooter_left_frame=TORPEDO_SHOOTER_LEFT_FRAME,
         torpedo_shooter_right_frame=TORPEDO_SHOOTER_RIGHT_FRAME,
-        choice_key=_CHOICE_KEY,
+        choice_key="/global/choice_is_fish",
         pose_key=_POSE_KEY,
         pose_frame_key=_POSE_FRAME_KEY,
         fish_shoot_frame=fish_shoot_frame,
@@ -168,20 +165,6 @@ def create_torpedo_root():
     stabilise_before_matching = py_trees.timers.Timer(
         name="Stabilise before match",
         duration=STABILIZE_DURATION,
-    )
-
-    srv_get_choice = py_trees_ros.service_clients.FromConstant(
-        name="Get choice",
-        service_name="/auv4/choice/get_is_fish",
-        service_type=Trigger,
-        service_request=Trigger.Request(),
-        key_response=_CHOICE_KEY,
-    )
-
-    retry_get_choice = py_trees.decorators.Retry(
-        name="Retry get choice",
-        child=srv_get_choice,
-        num_failures=NUM_RETRIES,
     )
 
     srv_enable_detections = checked_service.FromConstant(
@@ -269,7 +252,6 @@ def create_torpedo_root():
 
     seq_launch_torpedo.add_children(
         children=[
-            retry_get_choice,
             retry_start_vision,
             seq_search,
             # cluster_board_centre,

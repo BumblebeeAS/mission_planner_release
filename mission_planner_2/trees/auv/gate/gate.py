@@ -50,7 +50,6 @@ GATE_ORIENTATION_TOPIC = "/auv4/gate/shark_fish"
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
-_CHOICE_KEY = fk("choice")
 _GATE_ORIENTATION_KEY = fk("orientation")
 _IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 _START_VISION_KEY = fk("gate_start_vision")
@@ -116,21 +115,6 @@ def create_gate_root():
         "Stabilize before task", STABILIZE_DURATION
     )
 
-    # Step 7a: Get fish choice
-    srv_get_fish_choice = py_trees_ros.service_clients.FromConstant(
-        name="Get fish choice",
-        service_type=Trigger,
-        service_name="/auv4/choice/get_is_fish",
-        service_request=Trigger.Request(),
-        key_response=_CHOICE_KEY,
-    )
-
-    retry_get_fish_choice = Retry(
-        name="Retry Get Choice",
-        child=srv_get_fish_choice,
-        num_failures=NUM_RETRIES,
-    )
-
     # Step 8: Get gate orientation
     sub_gate_orientation = py_trees_ros.subscribers.ToBlackboard(
         name="Get shark fish orientation",
@@ -150,7 +134,7 @@ def create_gate_root():
         name="Check if left side",
         checks=[
             py_trees.common.ComparisonExpression(
-                variable=_CHOICE_KEY,
+                variable="/global/choice_is_fish",
                 value=True,
                 operator=lambda x, y: operator.eq(x.success, y),
             ),
@@ -231,7 +215,6 @@ def create_gate_root():
     seq_gate_root.add_children(
         children=[
             # goto_towards_gate,
-            retry_get_fish_choice,
             retry_start_vision,
             retry_cluster_gate,
             goto_see_pictures,

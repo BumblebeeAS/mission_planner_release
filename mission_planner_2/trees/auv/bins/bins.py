@@ -75,7 +75,6 @@ SEARCH_PATTERN = [
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
-_CHOICE_KEY = fk("choice")
 _POSE_KEY = fk("pose")
 _GOTO_FRAME_KEY = fk("goto_frame")
 _ANCHOR_FRAME_KEY = fk("anchor_frame")
@@ -102,21 +101,6 @@ def create_bin_root():
     seq_drop_into_bin = py_trees.composites.Sequence(
         name="Drop into bin",
         memory=True,
-    )
-
-    # Step -1: Get fish choice
-    srv_get_fish_choice = py_trees_ros.service_clients.FromConstant(
-        name="Get fish choice",
-        service_type=Trigger,
-        service_name="/auv4/choice/get_is_fish",
-        service_request=Trigger.Request(),
-        key_response=_CHOICE_KEY,
-    )
-
-    retry_get_fish_choice = py_trees.decorators.Retry(
-        name="Retry get choice",
-        child=srv_get_fish_choice,
-        num_failures=NUM_RETRIES,
     )
 
     # Step 0: Enable vision pipeline
@@ -305,7 +289,7 @@ def create_bin_root():
         rotated_template_frame_optical=ROTATED_TEMPLATE_FRAME_OPTICAL,
         template_frame_optical_clustered=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
         clustering_duration=CLUSTERING_DURATION,
-        choice_key=_CHOICE_KEY,
+        choice_key="/global/choice_is_fish",
         pose_key=_POSE_KEY,
         goto_frame_key=_GOTO_FRAME_KEY,
         fish_bin_view_frame=FISH_BIN_VIEW_FRAME,
@@ -483,7 +467,6 @@ def create_bin_root():
     # Build main drop sequence
     seq_drop_into_bin.add_children(
         children=[
-            retry_get_fish_choice,
             retry_start_vision,
             seq_search,
             extract_tf,
