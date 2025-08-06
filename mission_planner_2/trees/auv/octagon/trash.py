@@ -1,9 +1,13 @@
 import py_trees
 import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect, ControlledAscent
-from bb_controls_msgs.srv import Controller, Limits
+from bb_controls_msgs.srv import Controller
 from bb_perception_msgs.action import ClusterTfAction
 from bb_perception_msgs.srv import TrashToggleFrame
+from py_trees_ros.subscribers import operator
+from rclpy.qos import qos_profile_sensor_data
+from yolo_msgs.msg import DetectionArray
+
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
@@ -12,13 +16,9 @@ from mission_planner_2.commons.namespace_utils import (
 )
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
-    create_limits_srv_request,
     create_stamped_pose,
 )
-from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
-from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import Float32
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -26,8 +26,15 @@ fk = full_key_generator(NAMESPACE)
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
 _DEPTH_KEY = fk("depth")
+_TABLE_TRASH_DETECTIONS_ARRAY_KEY = fk("table_trash_det_array_key")
+_TABLE_TRASH_DETECTIONS_COUNT_KEY = fk("table_trash_count_key")
+_BUCKET_TRASH_DETECTIONS_ARRAY_KEY = fk("bucket_trash_det_array_key")
+_TRASH_TOTAL_COUNT_KEY = fk("trash_total_count_key")
+_SPIN_GOTO_POSES_KEY = fk("spin_goto_poses_key")
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 TOGGLE_TRASH_FRAME_CLUSTERED_TOPIC = "/auv4/trash/toggle_trash_frame_clustered"
+TABLE_DETECTIONS_TOPIC = "auv4/trash/yolo/detections/on_table"
+BUCKET_DETECTIONS_TOPIC = "auv4/trash/yolo/detections/in_bucket"
 WORLD_TO_BASE_LINK_KEY = fk("world_to_base_link")
 SURFACE_POSE_KEY = fk("surface_pose")
 SURFACE_CONSTANT = 0.1
@@ -40,6 +47,7 @@ MAX_Z_JERK = 1.5
 MAX_YAW_VEL = 0.3
 MAX_YAW_ACC = 0.5
 MAX_YAW_JERK = 0.5
+BASE_LINK_FRAME = "auv4/base_link_ned"
 LIMITS_SERVICE_NAME = "/auv4/controls/limits"
 
 
@@ -153,6 +161,170 @@ def create_align_actuate_surface_root(
             srv_disable_controls,
             call_trash_pickup,
             seq_surface,
+        ]
+    )
+
+    return root
+
+
+def create_checked_collection_root(seq_collection_root: py_trees.composites.Sequence):
+    root = py_trees.composites.Selector(
+        name="Checked collection root",
+        memory=True,
+    )
+
+    seq_check_det = py_trees.composites.Sequence(
+        name="Sequence check 0 trash on table",
+        memory=True,
+    )
+
+    sub_table_object_det = py_trees_ros.subscribers.ToBlackboard(
+        name="Get table object detections",
+        topic_name=TABLE_DETECTIONS_TOPIC,
+        topic_type=DetectionArray,
+        qos_profile=qos_profile_sensor_data,
+        blackboard_variables={_TABLE_TRASH_DETECTIONS_ARRAY_KEY: None},
+    )
+
+    dynamic_count_detections = DynamicSetBlackboard(
+        name="Dynamic count number of detections",
+        key=_TABLE_TRASH_DETECTIONS_ARRAY_KEY,
+        update_key=_TABLE_TRASH_DETECTIONS_COUNT_KEY,
+        func=lambda det_array: len(det_array.detections),
+        overwrite=True,
+    )
+
+    check_count_equals_0 = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check 0 trash on table",
+        check=py_trees.common.ComparisonExpression(
+            variable=_TABLE_TRASH_DETECTIONS_COUNT_KEY,
+            value=0,
+            operator=operator.eq,
+        ),
+    )
+
+    seq_check_det.add_children(
+        [
+            sub_table_object_det,
+            dynamic_count_detections,
+            check_count_equals_0,
+        ]
+    )
+
+    action_controlled_ascent = py_trees_ros.action_clients.FromConstant(
+        name="Ascent to surface",
+        action_type=ControlledAscent,
+        action_name="/auv4/controlled_ascent",
+        action_goal=ControlledAscent.Goal(
+            desired_depth=SURFACE_CONSTANT,
+            depth_tolerance=0.05,
+            depth_rate=0.05,
+        ),
+    )
+
+    root.add_children(
+        [
+            seq_check_det,
+            seq_collection_root,
+            action_controlled_ascent,
+        ]
+    )
+
+    return root
+
+
+def create_spin_root():
+    root = py_trees.composites.Sequence(name="Spin", memory=True)
+
+    sel_set_spin = py_trees.composites.Sequence(
+        name="Set spin according to match",
+        memory=True,
+    )
+
+    seq_if_match = py_trees.composites.Sequence(
+        name="Spin if table + basket match",
+        memory=True,
+    )
+
+    sub_table_object_det = py_trees_ros.subscribers.ToBlackboard(
+        name="Get table object detections",
+        topic_name=TABLE_DETECTIONS_TOPIC,
+        topic_type=DetectionArray,
+        qos_profile=qos_profile_sensor_data,
+        blackboard_variables={_TABLE_TRASH_DETECTIONS_ARRAY_KEY: None},
+    )
+
+    sub_basket_object_det = py_trees_ros.subscribers.ToBlackboard(
+        name="Get bucket object detections",
+        topic_name=BUCKET_DETECTIONS_TOPIC,
+        topic_type=DetectionArray,
+        qos_profile=qos_profile_sensor_data,
+        blackboard_variables={_BUCKET_TRASH_DETECTIONS_ARRAY_KEY: None},
+    )
+
+    dynamic_sum_detection_counts = DynamicSetBlackboard(
+        name="Add detection counts",
+        key=[_TABLE_TRASH_DETECTIONS_ARRAY_KEY, _BUCKET_TRASH_DETECTIONS_ARRAY_KEY],
+        update_key=_TRASH_TOTAL_COUNT_KEY,
+        overwrite=True,
+        func=lambda x, y: len(x.detections) + len(y.detections),
+    )
+
+    check_count_equals_4 = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check total trash = 4",
+        check=py_trees.common.ComparisonExpression(
+            variable=_TRASH_TOTAL_COUNT_KEY,
+            value=4,
+            operator=operator.eq,
+        ),
+    )
+
+    dynamic_set_poses_match = DynamicSetBlackboard(
+        name="Dynamic set goto poses (match)",
+        key=_BUCKET_TRASH_DETECTIONS_ARRAY_KEY,
+        update_key=_SPIN_GOTO_POSES_KEY,
+        func=lambda det_array: [
+            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=359.0)
+            for _ in range(len(det_array.detections))
+        ],
+    )
+
+    seq_if_match.add_children(
+        [
+            sub_table_object_det,
+            sub_basket_object_det,
+            dynamic_sum_detection_counts,
+            check_count_equals_4,
+            dynamic_set_poses_match,
+        ]
+    )
+
+    set_spin_poses_mismatch = py_trees.behaviours.SetBlackboardVariable(
+        name="Set goto poses (mismatch)",
+        variable_name=_SPIN_GOTO_POSES_KEY,
+        variable_value=[
+            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=359.0) for _ in range(3)
+        ],
+        overwrite=True,
+    )
+
+    sel_set_spin.add_children(
+        [
+            seq_if_match,
+            set_spin_poses_mismatch,
+        ]
+    )
+
+    goto_spin = goto.NFromBlackboard(
+        name="Goto spin",
+        pose_key=_SPIN_GOTO_POSES_KEY,
+        stabilize_duration=1,
+    )
+
+    root.add_children(
+        [
+            sel_set_spin,
+            goto_spin,
         ]
     )
 

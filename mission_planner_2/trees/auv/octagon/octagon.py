@@ -3,6 +3,7 @@ import py_trees_ros
 from bb_behavior_msgs.action import AlignAndCollect
 from bb_perception_msgs.srv import ClusterTfSrv
 from lifecycle_msgs.srv import ChangeState
+
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -21,8 +22,11 @@ from mission_planner_2.commons.pose_utils import (
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
-from mission_planner_2.trees.auv.octagon.trash import create_align_actuate_surface_root
-from std_srvs.srv import Trigger
+from mission_planner_2.trees.auv.octagon.trash import (
+    create_align_actuate_surface_root,
+    create_checked_collection_root,
+    create_spin_root,
+)
 
 # Generate namespace automatically from file path DONT set manually
 NAMESPACE = generate_namespace()
@@ -66,23 +70,15 @@ DROP_Z_DISTANCE = 0.40
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
-_CHOICE_KEY = fk("choice")
+_CHOICE_KEY = "/global/choice_is_fish"
 _START_VISION_KEY = fk("bin_start_vision")
 _STOP_VISION_KEY = fk("bin_stop_vision")
 
 
-def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str):
-    """Picks up trash, surfaces, looks at the target, and drops it in the bucket."""
-    seq_trash = py_trees.composites.Sequence(
-        name=trash_name,
+def create_goto_table_centre_root():
+    root = py_trees.composites.Sequence(
+        name="Goto table centre",
         memory=True,
-    )
-    seq_trash_pick_up = create_align_actuate_surface_root(
-        trash_name,
-        trash_frame,
-        command=AlignAndCollect.Goal.CLOSE,
-        depth_rate=0.05,
-        cluster_duration=CLUSTER_DURATION,
     )
 
     cluster_table_centre = shared_action_client.FromConstant(
@@ -95,12 +91,43 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
             use_cache=False,
         ),
     )
+
     # TODO: Rotate additional 90 degrees to table center to be able to see both buckets
     goto_table_centre = goto.FromConstant(
         name="Goto table centre",
         pose=create_stamped_pose(TABLE_CENTER_FRAME_CLUSTERED),
         ignore_depth=True,
     )
+
+    root.add_children(
+        [
+            cluster_table_centre,
+            goto_table_centre,
+        ]
+    )
+
+    return root
+
+
+def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str):
+    """Picks up trash, surfaces, looks at the target, and drops it in the bucket."""
+    seq_trash = py_trees.composites.Sequence(
+        name=trash_name,
+        memory=True,
+    )
+
+    goto_table_centre_pick_up = create_goto_table_centre_root()
+
+    seq_trash_pick_up = create_align_actuate_surface_root(
+        trash_name,
+        trash_frame,
+        command=AlignAndCollect.Goal.CLOSE,
+        depth_rate=0.05,
+        cluster_duration=CLUSTER_DURATION,
+    )
+
+    goto_table_centre_drop = create_goto_table_centre_root()
+
     # FIXME: Somehow need to stabilize or TF lookup for yaw gets the stale values while the
     # robot is turning to table center
     stabilize_before_drop = py_trees.timers.Timer(
@@ -116,9 +143,9 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
     )
     seq_trash.add_children(
         children=[
+            goto_table_centre_pick_up,
             seq_trash_pick_up,
-            cluster_table_centre,
-            goto_table_centre,
+            goto_table_centre_drop,
             # stabilize_before_drop,
             seq_trash_drop,
         ]
@@ -207,13 +234,6 @@ def create_octagon_root():
             operator=lambda x, y: x.success == y,
         ),
     )
-    srv_get_choice = py_trees_ros.service_clients.FromConstant(
-        name="Get choice",
-        service_name="/auv4/choice/get_is_fish",
-        service_type=Trigger,
-        service_request=Trigger.Request(),
-        key_response=_CHOICE_KEY,
-    )
 
     ################## SEARCH PART #################
     par_search = create_search_root()
@@ -245,39 +265,43 @@ def create_octagon_root():
     )
 
     ################## BOTTLE PART #################
-    seq_bottle_0 = create_collection_root(
+    seq_collection_bottle_0 = create_collection_root(
         trash_name="Bottle 0",
         trash_frame=BOTTLE_FRAME,
         bucket_frame=PINK_BUCKET_FRAME,
     )
-    seq_bottle_1 = create_collection_root(
+    seq_collection_bottle_1 = create_collection_root(
         trash_name="Bottle 1",
         trash_frame=BOTTLE_FRAME,
         bucket_frame=PINK_BUCKET_FRAME,
     )
-    seq_ladle_0 = create_collection_root(
+    seq_collection_ladle_0 = create_collection_root(
         trash_name="Ladle 0",
         trash_frame=LADLE_FRAME,
         bucket_frame=YELLOW_BUCKET_FRAME,
     )
-    seq_ladle_1 = create_collection_root(
+    seq_collection_ladle_1 = create_collection_root(
         trash_name="Ladle 1",
         trash_frame=LADLE_FRAME,
         bucket_frame=YELLOW_BUCKET_FRAME,
     )
 
-    ############### ROTATION PARTS ###############
-    # TODO: check the tfs with the within_dist to the basket to count before rotating
-    goto_rotations = goto.NFromConstant(
-        name="Go to rotations",
-        poses=[
-            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=360.0),
-            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=360.0),
-            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=360.0),
-            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=360.0),
-        ],
-        wait_between_moves_sec=WAIT_BETWEEN_ROTATIONS,
+    sel_bottle_0 = create_checked_collection_root(
+        seq_collection_root=seq_collection_bottle_0
     )
+    sel_bottle_1 = create_checked_collection_root(
+        seq_collection_root=seq_collection_bottle_1
+    )
+    sel_ladle_0 = create_checked_collection_root(
+        seq_collection_root=seq_collection_ladle_0
+    )
+    sel_ladle_1 = create_checked_collection_root(
+        seq_collection_root=seq_collection_ladle_1
+    )
+
+    ############### ROTATION PARTS ###############
+
+    seq_spin = create_spin_root()
 
     srv_end_vision = py_trees_ros.service_clients.FromConstant(
         name="End vision pipeline",
@@ -297,18 +321,17 @@ def create_octagon_root():
 
     root.add_children(
         children=[
-            srv_get_choice,
             srv_start_vision,
             check_start_vision_succeeded,
             # seq_search,
             # goto_table_center,
             # par_search,
             # look_at_target,
-            seq_bottle_0,
-            seq_bottle_1,
-            seq_ladle_0,
-            seq_ladle_1,
-            goto_rotations,
+            sel_bottle_0,
+            sel_bottle_1,
+            sel_ladle_0,
+            sel_ladle_1,
+            seq_spin,
             srv_end_vision,
             check_end_vision_succeeded,
         ]
