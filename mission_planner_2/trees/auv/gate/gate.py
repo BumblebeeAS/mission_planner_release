@@ -191,6 +191,19 @@ def create_gate_root():
     )
     goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
 
+    yaw_poses = []
+    # Not sure why but when I tested in sim it should loop 10 times.
+    for i in range(8):
+        pose = create_stamped_pose(
+            frame_id="auv4/base_link_ned",
+            yaw=90,
+        )
+        yaw_poses.append(pose)
+
+    yaw = goto.NFromConstant(
+        "Rotate 90 degrees eight times", yaw_poses, wait_between_moves_sec=1
+    )
+
     srv_end_vision = checked_service.FromConstant(
         name="End vision",
         service_type=ChangeState,
@@ -223,6 +236,7 @@ def create_gate_root():
             sel_gate_side,
             # timer_stabilize_final,
             goto_through_gate,
+            # yaw,
             force_success_stop_vision,
         ]
     )
