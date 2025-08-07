@@ -31,8 +31,8 @@ def main():
     log_visitor = LoggingSnapshotVisitor(
         node=node,
         display_only_visited_behaviours=True,
-        display_blackboard=True,
-        display_activity_stream=False,
+        display_blackboard=False,
+        display_activity_stream=True,
     )
     tree.add_visitor(led_visitor)
     tree.add_visitor(log_visitor)

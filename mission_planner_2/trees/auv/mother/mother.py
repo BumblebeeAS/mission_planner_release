@@ -157,12 +157,12 @@ def create_mother(coords: dict):
             # move_to_slalom,
             # slalom_root,
             # move_to_bin,
-            bin_root,
+            # bin_root,
             # move_to_torpedo,
             # torpedo_root,
             # move_to_space,
             # move_to_octagon,
-            # octagon_root,
+            octagon_root,
             # return_root,
         ]
     )

@@ -22,7 +22,10 @@ from mission_planner_2.commons.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.commons.node_registry import SharedAction
-from mission_planner_2.commons.pose_utils import within_threshold_xyz
+from mission_planner_2.commons.pose_utils import (
+    create_clustering_goal,
+    within_threshold_xyz,
+)
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.bins.template_selector import (
@@ -128,6 +131,16 @@ def create_bin_root():
         object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,
         offset_coeff=OFFSET_COEFF,
         wait_between_moves=3.0,
+    )
+
+    cluster_bin_centre = shared_action_client.FromConstant(
+        name="Cluster bin centre (debug)",
+        shared_action=SharedAction.CLUSTER,
+        action_goal=create_clustering_goal(
+            in_children=TEMPLATE_FRAME_YOLO,
+            out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
+            duration=7,
+        ),
     )
 
     extract_tf = cache_tf.ToBlackboard(
@@ -468,7 +481,8 @@ def create_bin_root():
     seq_drop_into_bin.add_children(
         children=[
             retry_start_vision,
-            seq_search,
+            # seq_search,
+            cluster_bin_centre,
             extract_tf,
             calculate_acute_pose,
             goto_bin_centre,

@@ -1,5 +1,6 @@
 import py_trees
 import py_trees_ros
+from bb_auv_msgs.action import Grabber
 from bb_behavior_msgs.action import AlignAndCollect, ControlledAscent
 from bb_controls_msgs.srv import Controller
 from bb_perception_msgs.action import ClusterTfAction
@@ -23,43 +24,35 @@ from mission_planner_2.trees.auv.goto import goto
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
+CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
+TOGGLE_TRASH_FRAME_CLUSTERED_TOPIC = "/auv4/trash/toggle_trash_frame_clustered"
+TABLE_DETECTIONS_TOPIC = "/auv4/trash/trash/yolo/detections/on_table"
+GRABBER_ACTION_TOPIC = "/auv4/actuation/grabber"
+BUCKET_DETECTIONS_TOPIC = "/auv4/trash/trash/yolo/detections/in_bucket"
+BASE_LINK_FRAME = "auv4/base_link_ned"
+LIMITS_SERVICE_NAME = "/auv4/controls/limits"
+
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
-_DEPTH_KEY = fk("depth")
 _TABLE_TRASH_DETECTIONS_ARRAY_KEY = fk("table_trash_det_array_key")
 _TABLE_TRASH_DETECTIONS_COUNT_KEY = fk("table_trash_count_key")
 _BUCKET_TRASH_DETECTIONS_ARRAY_KEY = fk("bucket_trash_det_array_key")
 _TRASH_TOTAL_COUNT_KEY = fk("trash_total_count_key")
 _SPIN_GOTO_POSES_KEY = fk("spin_goto_poses_key")
-CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
-TOGGLE_TRASH_FRAME_CLUSTERED_TOPIC = "/auv4/trash/toggle_trash_frame_clustered"
-TABLE_DETECTIONS_TOPIC = "auv4/trash/yolo/detections/on_table"
-BUCKET_DETECTIONS_TOPIC = "auv4/trash/yolo/detections/in_bucket"
-WORLD_TO_BASE_LINK_KEY = fk("world_to_base_link")
-SURFACE_POSE_KEY = fk("surface_pose")
-SURFACE_CONSTANT = 0.1
-MAX_XY_VEL = 0.5
-MAX_XY_ACC = 1.0
-MAX_XY_JERK = 1.5
-MAX_Z_VEL = 0.2
-MAX_Z_ACC = 1.0
-MAX_Z_JERK = 1.5
-MAX_YAW_VEL = 0.3
-MAX_YAW_ACC = 0.5
-MAX_YAW_JERK = 0.5
-BASE_LINK_FRAME = "auv4/base_link_ned"
-LIMITS_SERVICE_NAME = "/auv4/controls/limits"
 
 
 def create_align_actuate_surface_root(
     trash_name: str,
     object_frame: str,
     command: int,
-    depth_rate: float = 0.1,
+    depth_rate: float = 0.08,
+    depth_tolerance: float = 0.05,
     cluster_duration: int = 10,
     z_distance: float = 0.15,
     cutoff_z_distance: float = 0.3,
-    surface_depth_threshold: float = 0.1,
+    surface_depth_threshold: float = 0.05,
+    align_collect_timeout_seconds: float = 90.0,
+    controlled_ascent_timeout_seconds: float = 30.0,
 ):
     """Cluster the trash / bucket pose, then pass control to the AlignAndCollect action which
     aligns the robot to the trash / bucket and actuates the grabber to open / close. After the
@@ -113,6 +106,7 @@ def create_align_actuate_surface_root(
             depth_rate=depth_rate,
             z_distance=z_distance,
             cutoff_z_distance=cutoff_z_distance,
+            timeout_seconds=align_collect_timeout_seconds,
         ),
     )
 
@@ -127,8 +121,9 @@ def create_align_actuate_surface_root(
         action_name="/auv4/controlled_ascent",
         action_goal=ControlledAscent.Goal(
             desired_depth=surface_depth_threshold,
-            depth_tolerance=0.05,
-            depth_rate=0.05,
+            depth_tolerance=depth_tolerance,
+            depth_rate=depth_rate,
+            timeout_seconds=controlled_ascent_timeout_seconds,
         ),
     )
     srv_enable_controls = checked_service.FromConstant(
@@ -147,12 +142,6 @@ def create_align_actuate_surface_root(
             srv_enable_controls,
         ]
     )
-    # TODO: can consider more targeted retry if want
-    # retry_surfacing = py_trees.decorators.Retry(
-    #     name=f"retry surfacing ({trash_name})",
-    #     child=seq_surface,
-    #     num_failures=1e6,
-    # )
 
     root.add_children(
         children=[
@@ -167,7 +156,15 @@ def create_align_actuate_surface_root(
     return root
 
 
-def create_checked_collection_root(seq_collection_root: py_trees.composites.Sequence):
+def create_checked_collection_root(
+    seq_collection_root: py_trees.composites.Sequence,
+    collection_result_key: str,
+    trash: str,
+    controlled_ascent_depth_rate: float,
+    controlled_ascent_depth_tolerance: float,
+    surface_depth_threshold: float,
+    controlled_ascent_timeout_seconds: float,
+):
     root = py_trees.composites.Selector(
         name="Checked collection root",
         memory=True,
@@ -178,19 +175,15 @@ def create_checked_collection_root(seq_collection_root: py_trees.composites.Sequ
         memory=True,
     )
 
-    sub_table_object_det = py_trees_ros.subscribers.ToBlackboard(
-        name="Get table object detections",
-        topic_name=TABLE_DETECTIONS_TOPIC,
-        topic_type=DetectionArray,
-        qos_profile=qos_profile_sensor_data,
-        blackboard_variables={_TABLE_TRASH_DETECTIONS_ARRAY_KEY: None},
-    )
-
     dynamic_count_detections = DynamicSetBlackboard(
         name="Dynamic count number of detections",
-        key=_TABLE_TRASH_DETECTIONS_ARRAY_KEY,
+        key=collection_result_key,
         update_key=_TABLE_TRASH_DETECTIONS_COUNT_KEY,
-        func=lambda det_array: len(det_array.detections),
+        func=lambda results: (
+            results.num_bottles_on_table
+            if trash == "bottle"
+            else results.num_ladles_on_table
+        ),
         overwrite=True,
     )
 
@@ -205,10 +198,30 @@ def create_checked_collection_root(seq_collection_root: py_trees.composites.Sequ
 
     seq_check_det.add_children(
         [
-            sub_table_object_det,
             dynamic_count_detections,
             check_count_equals_0,
         ]
+    )
+
+    seq_open_and_ascend = py_trees.composites.Sequence(
+        name="Open grabber and ascend",
+        memory=True,
+    )
+
+    open_grabber = py_trees_ros.action_clients.FromConstant(
+        name="Open grabber",
+        action_type=Grabber,
+        action_name=GRABBER_ACTION_TOPIC,
+        action_goal=Grabber.Goal(
+            command=65535,
+            tolerance=0,
+            timeout_ms=5000,
+        ),
+    )
+
+    force_succeed_open_grabber = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed open grabber",
+        child=open_grabber,
     )
 
     action_controlled_ascent = py_trees_ros.action_clients.FromConstant(
@@ -216,17 +229,33 @@ def create_checked_collection_root(seq_collection_root: py_trees.composites.Sequ
         action_type=ControlledAscent,
         action_name="/auv4/controlled_ascent",
         action_goal=ControlledAscent.Goal(
-            desired_depth=SURFACE_CONSTANT,
-            depth_tolerance=0.05,
-            depth_rate=0.05,
+            timeout_seconds=controlled_ascent_timeout_seconds,
+            desired_depth=surface_depth_threshold,
+            depth_tolerance=controlled_ascent_depth_tolerance,
+            depth_rate=controlled_ascent_depth_rate,
         ),
+    )
+
+    srv_enable_controls = py_trees_ros.service_clients.FromConstant(
+        name="enable controls",
+        service_type=Controller,
+        service_name=CONTROLS_SRV_TOPIC,
+        service_request=Controller.Request(enable=True),
+    )
+
+    seq_open_and_ascend.add_children(
+        [
+            force_succeed_open_grabber,
+            action_controlled_ascent,
+            srv_enable_controls,
+        ]
     )
 
     root.add_children(
         [
             seq_check_det,
             seq_collection_root,
-            action_controlled_ascent,
+            seq_open_and_ascend,
         ]
     )
 
@@ -236,8 +265,8 @@ def create_checked_collection_root(seq_collection_root: py_trees.composites.Sequ
 def create_spin_root():
     root = py_trees.composites.Sequence(name="Spin", memory=True)
 
-    sel_set_spin = py_trees.composites.Sequence(
-        name="Set spin according to match",
+    sel_set_spin = py_trees.composites.Selector(
+        name="Select spin according to match",
         memory=True,
     )
 
@@ -284,8 +313,8 @@ def create_spin_root():
         key=_BUCKET_TRASH_DETECTIONS_ARRAY_KEY,
         update_key=_SPIN_GOTO_POSES_KEY,
         func=lambda det_array: [
-            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=359.0)
-            for _ in range(len(det_array.detections))
+            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=120.0)
+            for _ in range(len(det_array.detections) * 3)
         ],
     )
 
@@ -303,7 +332,7 @@ def create_spin_root():
         name="Set goto poses (mismatch)",
         variable_name=_SPIN_GOTO_POSES_KEY,
         variable_value=[
-            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=359.0) for _ in range(3)
+            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=120) for _ in range(3 * 3)
         ],
         overwrite=True,
     )
@@ -318,7 +347,7 @@ def create_spin_root():
     goto_spin = goto.NFromBlackboard(
         name="Goto spin",
         pose_key=_SPIN_GOTO_POSES_KEY,
-        stabilize_duration=1,
+        wait_between_moves_sec=0.1,
     )
 
     root.add_children(
