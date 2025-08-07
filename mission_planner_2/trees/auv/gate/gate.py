@@ -6,7 +6,6 @@ from lifecycle_msgs.srv import ChangeState
 from py_trees.decorators import Retry
 from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import String
-from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.detection_utils import (
@@ -110,11 +109,6 @@ def create_gate_root():
         "Goto picture position", create_stamped_pose(GATE_CENTRE_FRAME)
     )
 
-    # Step 6: Wait to stabilize
-    timer_stabilize_main = py_trees.timers.Timer(
-        "Stabilize before task", STABILIZE_DURATION
-    )
-
     # Step 8: Get gate orientation
     sub_gate_orientation = py_trees_ros.subscribers.ToBlackboard(
         name="Get shark fish orientation",
@@ -136,12 +130,12 @@ def create_gate_root():
             py_trees.common.ComparisonExpression(
                 variable="/global/choice_is_fish",
                 value=True,
-                operator=lambda x, y: operator.eq(x.success, y),
+                operator=lambda x, y: operator.eq(x.success, y),  # type: ignore
             ),
             py_trees.common.ComparisonExpression(
                 variable=_GATE_ORIENTATION_KEY,
                 value="fish_shark",
-                operator=lambda x, y: operator.eq(x.data, y),
+                operator=lambda x, y: operator.eq(x.data, y),  # type: ignore
             ),
         ],
         operator=operator.eq,
@@ -180,28 +174,21 @@ def create_gate_root():
     )
     sel_gate_side.add_children(children=[seq_try_left_side, seq_go_right_side])
 
-    # Step 10: Wait to stabilize before passage
-    timer_stabilize_final = py_trees.timers.Timer(
-        "Stabilize before passage", STABILIZE_DURATION
-    )
-
     # Step 11: Pass through gate
     forward_pose = create_stamped_pose(
         "auv4/base_link_ned", position_x=FORWARD_DISTANCE
     )
     goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
 
-    yaw_poses = []
-    # Not sure why but when I tested in sim it should loop 10 times.
-    for i in range(8):
-        pose = create_stamped_pose(
-            frame_id="auv4/base_link_ned",
-            yaw=90,
-        )
-        yaw_poses.append(pose)
+    yaw_poses = [
+        create_stamped_pose(frame_id="auv4/base_link_ned", yaw=120.0)
+        for _ in range(2 * 3)
+    ]
 
-    yaw = goto.NFromConstant(
-        "Rotate 90 degrees eight times", yaw_poses, wait_between_moves_sec=1
+    goto_yaw = goto.NFromConstant(
+        name="Goto yaw style",
+        poses=yaw_poses,
+        wait_between_moves_sec=0.1,
     )
 
     srv_end_vision = checked_service.FromConstant(
@@ -231,12 +218,10 @@ def create_gate_root():
             retry_start_vision,
             retry_cluster_gate,
             goto_see_pictures,
-            # timer_stabilize_main,
             sub_gate_orientation,
             sel_gate_side,
-            # timer_stabilize_final,
             goto_through_gate,
-            # yaw,
+            # goto_yaw,
             force_success_stop_vision,
         ]
     )
