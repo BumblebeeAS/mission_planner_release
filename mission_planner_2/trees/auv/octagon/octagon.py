@@ -253,7 +253,7 @@ def create_octagon_root():
         check=py_trees.common.ComparisonExpression(
             variable=_START_VISION_KEY,
             value=True,
-            operator=lambda x, y: x.success == y,
+            operator=lambda x, y: x.success == y,  # type: ignore
         ),
     )
 
@@ -343,7 +343,7 @@ def create_octagon_root():
         check=py_trees.common.ComparisonExpression(
             variable=_COLLECTION_RESULTS_KEY,
             value=0,
-            operator=lambda x, y: x.num_bottles_on_table + x.num_ladles_on_table == y,
+            operator=lambda x, y: x.num_bottles_on_table + x.num_ladles_on_table == y,  # type: ignore
         ),
     )
 
@@ -382,7 +382,7 @@ def create_octagon_root():
 
     goto_table_center_before_spin = create_goto_table_centre_root()
 
-    seq_spin = create_spin_root()
+    seq_spin = create_spin_root(_COLLECTION_RESULTS_KEY)
 
     srv_end_vision = py_trees_ros.service_clients.FromConstant(
         name="End vision pipeline",
@@ -396,7 +396,7 @@ def create_octagon_root():
         check=py_trees.common.ComparisonExpression(
             variable=_STOP_VISION_KEY,
             value=True,
-            operator=lambda x, y: x.success == y,
+            operator=lambda x, y: x.success == y,  # type: ignore
         ),
     )
 
@@ -408,10 +408,6 @@ def create_octagon_root():
             # goto_table_center,
             # par_search,
             # look_at_target,
-            # sel_bottle_0,
-            # sel_bottle_1,
-            # sel_ladle_0,
-            # sel_ladle_1,
             # goto_table_center_before_spin,
             # seq_spin,
             timeout_collection,

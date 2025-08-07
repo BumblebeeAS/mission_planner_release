@@ -6,8 +6,6 @@ from bb_controls_msgs.srv import Controller
 from bb_perception_msgs.action import ClusterTfAction
 from bb_perception_msgs.srv import TrashToggleFrame
 from py_trees_ros.subscribers import operator
-from rclpy.qos import qos_profile_sensor_data
-from yolo_msgs.msg import DetectionArray
 
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -34,10 +32,7 @@ LIMITS_SERVICE_NAME = "/auv4/controls/limits"
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
-_TABLE_TRASH_DETECTIONS_ARRAY_KEY = fk("table_trash_det_array_key")
 _TABLE_TRASH_DETECTIONS_COUNT_KEY = fk("table_trash_count_key")
-_BUCKET_TRASH_DETECTIONS_ARRAY_KEY = fk("bucket_trash_det_array_key")
-_TRASH_TOTAL_COUNT_KEY = fk("trash_total_count_key")
 _SPIN_GOTO_POSES_KEY = fk("spin_goto_poses_key")
 
 
@@ -262,7 +257,7 @@ def create_checked_collection_root(
     return root
 
 
-def create_spin_root():
+def create_spin_root(collection_result_key: str):
     root = py_trees.composites.Sequence(name="Spin", memory=True)
 
     sel_set_spin = py_trees.composites.Selector(
@@ -275,34 +270,10 @@ def create_spin_root():
         memory=True,
     )
 
-    sub_table_object_det = py_trees_ros.subscribers.ToBlackboard(
-        name="Get table object detections",
-        topic_name=TABLE_DETECTIONS_TOPIC,
-        topic_type=DetectionArray,
-        qos_profile=qos_profile_sensor_data,
-        blackboard_variables={_TABLE_TRASH_DETECTIONS_ARRAY_KEY: None},
-    )
-
-    sub_basket_object_det = py_trees_ros.subscribers.ToBlackboard(
-        name="Get bucket object detections",
-        topic_name=BUCKET_DETECTIONS_TOPIC,
-        topic_type=DetectionArray,
-        qos_profile=qos_profile_sensor_data,
-        blackboard_variables={_BUCKET_TRASH_DETECTIONS_ARRAY_KEY: None},
-    )
-
-    dynamic_sum_detection_counts = DynamicSetBlackboard(
-        name="Add detection counts",
-        key=[_TABLE_TRASH_DETECTIONS_ARRAY_KEY, _BUCKET_TRASH_DETECTIONS_ARRAY_KEY],
-        update_key=_TRASH_TOTAL_COUNT_KEY,
-        overwrite=True,
-        func=lambda x, y: len(x.detections) + len(y.detections),
-    )
-
     check_count_equals_4 = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Check total trash = 4",
         check=py_trees.common.ComparisonExpression(
-            variable=_TRASH_TOTAL_COUNT_KEY,
+            variable=collection_result_key,
             value=4,
             operator=operator.eq,
         ),
@@ -310,19 +281,16 @@ def create_spin_root():
 
     dynamic_set_poses_match = DynamicSetBlackboard(
         name="Dynamic set goto poses (match)",
-        key=_BUCKET_TRASH_DETECTIONS_ARRAY_KEY,
+        key=collection_result_key,
         update_key=_SPIN_GOTO_POSES_KEY,
-        func=lambda det_array: [
+        func=lambda results: [
             create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=120.0)
-            for _ in range(len(det_array.detections) * 3)
+            for _ in range(results.num_objects_in_bucket * 3)  # type: ignore
         ],
     )
 
     seq_if_match.add_children(
         [
-            sub_table_object_det,
-            sub_basket_object_det,
-            dynamic_sum_detection_counts,
             check_count_equals_4,
             dynamic_set_poses_match,
         ]
