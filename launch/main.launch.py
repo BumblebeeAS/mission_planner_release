@@ -30,8 +30,8 @@ def generate_launch_description():
     nodes = [
         Node(
             package="mission_planner_2",
-            executable="mission_tfs.py",
-            name="mission_tf_publisher",
+            executable="mission_node.py",
+            name="rs25_mission",
             parameters=[
                 {
                     "static_tf_file": LaunchConfiguration("static_tf_file"),
@@ -39,13 +39,6 @@ def generate_launch_description():
                     "default_suffix": LaunchConfiguration("default_suffix"),
                 }
             ],
-            output="screen",
-        ),
-        Node(
-            package="mission_planner_2",
-            executable="choice_server",
-            name="rs25_choice_server",
-            namespace="auv4",
             output="screen",
         ),
     ]
