@@ -6,7 +6,6 @@ from bb_behavior_msgs.action import AlignAndCollect
 from bb_perception_msgs.srv import ClusterTfSrv, GetObjectCount
 from lifecycle_msgs.srv import ChangeState
 
-from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -15,9 +14,7 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goal,
     create_clustering_request,
     create_stamped_pose,
 )
@@ -27,7 +24,10 @@ from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_ro
 from mission_planner_2.trees.auv.octagon.trash import (
     create_align_actuate_surface_root,
     create_checked_collection_root,
+    create_goto_table_centre_root,
+    create_open_and_ascend_root,
     create_spin_root,
+    create_trash_count_collection_root,
 )
 
 # Generate namespace automatically from file path DONT set manually
@@ -63,7 +63,7 @@ SHARK_VIEW_FRAME_HARDCODED = "trash/shark/clustered/view/hardcoded"
 TRASH_COUNT_SERVICE = "/auv4/trash/object_count/toggle"
 COLLECT_DURATION = 3.0
 
-TOTAL_DURATION = 10000
+TOTAL_DURATION = 480
 ALIGN_AND_COLLECT_TIMEOUT = 90.0
 CONTROLLED_ASCENT_TIMEOUT = 30.0
 
@@ -74,14 +74,23 @@ WAIT_BETWEEN_ROTATIONS = 3
 LOOK_AT_TARGET_PAUSE_DURATION = 4
 NUM_SQUARES = 1
 OFFSET_COEFF = 1.0
-DROP_Z_DISTANCE = 0.35
+DROP_Z_DISTANCE = 0.30
 
 PICKUP_DEPTH_RATE = 0.05
+PICKUP_XY_THRESHOLD = 0.03
 DROP_DEPTH_RATE = 0.05
 CONTROLLED_ASCENT_DEPTH_RATE = 0.05
 
 SURFACE_DEPTH_THRESHOLD = 0.7
 CONTROLLED_ASCENT_DEPTH_TOLERANCE = 0.05
+
+CONTROLLED_SPIN_TOPIC = "/auv4/controlled_spin"
+SPIN_YAW = 270.0
+
+MAX_TABLE_CLUSTER_FAILURE = 3
+
+CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
+GRABBER_ACTION_TOPIC = "/auv4/actuation/grabber"
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -91,47 +100,8 @@ _START_VISION_KEY = fk("bin_start_vision")
 _STOP_VISION_KEY = fk("bin_stop_vision")
 _COLLECTION_RESULTS_KEY = fk("collection_results")
 _OBJECT_TURN_KEY = fk("object_turn")
-
-
-def create_goto_table_centre_root(trash: str | None = "bottle"):
-    if trash == "bottle":
-        pose = create_stamped_pose(frame_id=TABLE_CENTER_FRAME_CLUSTERED, yaw=90.0)
-    elif trash == "ladle":
-        pose = create_stamped_pose(frame_id=TABLE_CENTER_FRAME_CLUSTERED, yaw=-90.0)
-    else:
-        pose = create_stamped_pose(frame_id=TABLE_CENTER_FRAME_CLUSTERED)
-
-    root = py_trees.composites.Sequence(
-        name="Goto table centre",
-        memory=True,
-    )
-
-    cluster_table_centre = shared_action_client.FromConstant(
-        name="Cluster centre",
-        shared_action=SharedAction.CLUSTER,
-        action_goal=create_clustering_goal(
-            in_children=TABLE_CENTER_FRAME,
-            out_children=TABLE_CENTER_FRAME_CLUSTERED,
-            duration=CLUSTER_DURATION,
-            use_cache=False,
-        ),
-    )
-
-    # TODO: Rotate additional 90 degrees to table center to be able to see both buckets
-    goto_table_centre = goto.FromConstant(
-        name="Goto table centre",
-        pose=pose,
-        ignore_depth=True,
-    )
-
-    root.add_children(
-        [
-            cluster_table_centre,
-            goto_table_centre,
-        ]
-    )
-
-    return root
+_TABLE_CLUSTER_FAILURE_COUNT_KEY = fk("table_cluster_failure_count")
+_SPIN_ACTION_GOAL_KEY = fk("spin_action_goal")
 
 
 def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str):
@@ -147,12 +117,19 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
         command=AlignAndCollect.Goal.CLOSE,
         depth_rate=PICKUP_DEPTH_RATE,
         cluster_duration=CLUSTER_DURATION,
+        xy_distance_threshold=PICKUP_XY_THRESHOLD,
         surface_depth_threshold=SURFACE_DEPTH_THRESHOLD,
         align_collect_timeout_seconds=ALIGN_AND_COLLECT_TIMEOUT,
         controlled_ascent_timeout_seconds=CONTROLLED_ASCENT_TIMEOUT,
     )
 
-    goto_table_centre_drop = create_goto_table_centre_root(trash=trash_name)
+    goto_table_centre_drop = create_goto_table_centre_root(
+        trash=trash_name,
+        table_centre_frame=TABLE_CENTER_FRAME,
+        table_centre_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+        table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
+        cluster_duration=CLUSTER_DURATION,
+    )
 
     seq_trash_drop = create_align_actuate_surface_root(
         trash_name=trash_name,
@@ -178,7 +155,11 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
 def create_search_root():
     """Rotate 360 degrees and cluster the poses of the fish and shark tags. At the same time,
     cluster the pose of the table center."""
-    in_children = [FISH_FRAME, SHARK_FRAME, TABLE_CENTER_FRAME]
+    in_children = [
+        FISH_FRAME,
+        SHARK_FRAME,
+        TABLE_CENTER_FRAME,
+    ]
     out_children = [
         FISH_FRAME_CLUSTERED,
         SHARK_FRAME_CLUSTERED,
@@ -255,6 +236,26 @@ def create_octagon_root():
             value=True,
             operator=lambda x, y: x.success == y,  # type: ignore
         ),
+    )
+
+    init_table_clustering_count = py_trees.behaviours.SetBlackboardVariable(
+        name="Initialise table clustering failure count",
+        variable_name=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
+        variable_value=0,
+        overwrite=True,
+    )
+
+    init_collection_results = py_trees.behaviours.SetBlackboardVariable(
+        name="Initialise collection results",
+        variable_name=_COLLECTION_RESULTS_KEY,
+        variable_value=GetObjectCount.Response(
+            success=False,
+            num_bottles_on_table=0,
+            num_ladles_on_table=0,
+            num_objects_in_bucket=0,
+            num_objects_uncollected=4,
+        ),
+        overwrite=True,
     )
 
     ################## SEARCH PART #################
@@ -335,7 +336,11 @@ def create_octagon_root():
 
     seq_trash_counts = create_trash_count_collection_root(
         collection_result_key=_COLLECTION_RESULTS_KEY,
-        duration=1.0,
+        trash_count_service=TRASH_COUNT_SERVICE,
+        table_centre_frame=TABLE_CENTER_FRAME,
+        table_centre_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+        table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
+        cluster_duration=CLUSTER_DURATION,
     )
 
     check_0_on_table = py_trees.behaviours.CheckBlackboardVariableValue(
@@ -354,6 +359,15 @@ def create_octagon_root():
         ]
     )
 
+    check_table_clustering_count = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check table clustering failure count",
+        check=py_trees.common.ComparisonExpression(
+            variable=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
+            value=MAX_TABLE_CLUSTER_FAILURE,
+            operator=operator.eq,
+        ),
+    )
+
     force_fail_seq_alt = py_trees.decorators.SuccessIsFailure(
         name="Force fail seq alternate",
         child=seq_alternate,
@@ -362,6 +376,7 @@ def create_octagon_root():
     sel_main.add_children(
         [
             seq_check_if_0,
+            check_table_clustering_count,
             force_fail_seq_alt,
         ]
     )
@@ -378,11 +393,40 @@ def create_octagon_root():
         duration=TOTAL_DURATION,
     )
 
+    sel_timeout = py_trees.composites.Selector(
+        name="Timeout selector",
+        memory=True,
+    )
+
+    seq_open_and_ascend = create_open_and_ascend_root(
+        grabber_action_topic=GRABBER_ACTION_TOPIC,
+        controls_srv_topic=CONTROLS_SRV_TOPIC,
+        controlled_ascent_timeout_seconds=CONTROLLED_ASCENT_TIMEOUT,
+        surface_depth_threshold=SURFACE_DEPTH_THRESHOLD,
+        controlled_ascent_depth_tolerance=CONTROLLED_ASCENT_DEPTH_TOLERANCE,
+        controlled_ascent_depth_rate=CONTROLLED_ASCENT_DEPTH_RATE,
+        open_grabber_first=False,
+    )
+
+    sel_timeout.add_children(
+        [
+            timeout_collection,
+            seq_open_and_ascend,
+        ]
+    )
+
     ############### ROTATION PARTS ###############
 
-    goto_table_center_before_spin = create_goto_table_centre_root()
-
-    seq_spin = create_spin_root(_COLLECTION_RESULTS_KEY)
+    seq_spin = create_spin_root(
+        collection_result_key=_COLLECTION_RESULTS_KEY,
+        spin_action_goal_key=_SPIN_ACTION_GOAL_KEY,
+        trash_count_service=TRASH_COUNT_SERVICE,
+        table_centre_frame=TABLE_CENTER_FRAME,
+        table_centre_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+        table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
+        cluster_duration=CLUSTER_DURATION,
+        controlled_spin_topic=CONTROLLED_SPIN_TOPIC,
+    )
 
     srv_end_vision = py_trees_ros.service_clients.FromConstant(
         name="End vision pipeline",
@@ -404,62 +448,16 @@ def create_octagon_root():
         children=[
             srv_start_vision,
             check_start_vision_succeeded,
+            init_table_clustering_count,
+            init_collection_results,
             # seq_search,
             # goto_table_center,
             # par_search,
             # look_at_target,
-            # goto_table_center_before_spin,
-            # seq_spin,
-            timeout_collection,
+            sel_timeout,
+            seq_spin,
             srv_end_vision,
             check_end_vision_succeeded,
-        ]
-    )
-
-    return root
-
-
-def create_trash_count_collection_root(
-    collection_result_key: str,
-    duration: float = 5.0,
-):
-    root = py_trees.composites.Sequence(
-        name="Get trash counts sequence",
-        memory=True,
-    )
-
-    goto_table_centre = create_goto_table_centre_root(trash=None)
-
-    srv_activate_count = py_trees_ros.service_clients.FromConstant(
-        name="Activate trash count service",
-        service_type=GetObjectCount,
-        service_name=TRASH_COUNT_SERVICE,
-        service_request=GetObjectCount.Request(
-            enable=True,
-        ),
-    )
-
-    timer_wait_for_collection = py_trees.timers.Timer(
-        name="Wait for data collection",
-        duration=duration,
-    )
-
-    srv_deactivate_count = py_trees_ros.service_clients.FromConstant(
-        name="Deactivate trash count service",
-        service_type=GetObjectCount,
-        service_name=TRASH_COUNT_SERVICE,
-        service_request=GetObjectCount.Request(
-            enable=False,
-        ),
-        key_response=collection_result_key,
-    )
-
-    root.add_children(
-        [
-            goto_table_centre,
-            srv_activate_count,
-            timer_wait_for_collection,
-            srv_deactivate_count,
         ]
     )
 
@@ -480,7 +478,11 @@ def create_item_pickup_root(
 
     seq_collect_trash_counts = create_trash_count_collection_root(
         collection_result_key=_COLLECTION_RESULTS_KEY,
-        duration=COLLECT_DURATION,
+        trash_count_service=TRASH_COUNT_SERVICE,
+        table_centre_frame=TABLE_CENTER_FRAME,
+        table_centre_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+        table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
+        cluster_duration=CLUSTER_DURATION,
     )
 
     sel_item = py_trees.composites.Selector(

@@ -4,20 +4,22 @@ from bb_auv_msgs.action import Grabber
 from bb_behavior_msgs.action import AlignAndCollect, ControlledAscent
 from bb_controls_msgs.srv import Controller
 from bb_perception_msgs.action import ClusterTfAction
-from bb_perception_msgs.srv import TrashToggleFrame
+from bb_perception_msgs.srv import GetObjectCount, TrashToggleFrame
 from py_trees_ros.subscribers import operator
 
-from mission_planner_2.commons import checked_service
+from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
+from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
+from mission_planner_2.trees.auv.octagon.helpers import create_spin_goal
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -43,6 +45,7 @@ def create_align_actuate_surface_root(
     depth_rate: float = 0.08,
     depth_tolerance: float = 0.05,
     cluster_duration: int = 10,
+    xy_distance_threshold: float = 0.05,
     z_distance: float = 0.15,
     cutoff_z_distance: float = 0.3,
     surface_depth_threshold: float = 0.05,
@@ -99,6 +102,7 @@ def create_align_actuate_surface_root(
             object_frame_clustered=object_frame_clustered,
             command=command,
             depth_rate=depth_rate,
+            xy_distance_threshold=xy_distance_threshold,
             z_distance=z_distance,
             cutoff_z_distance=cutoff_z_distance,
             timeout_seconds=align_collect_timeout_seconds,
@@ -110,10 +114,9 @@ def create_align_actuate_surface_root(
         memory=True,
     )
 
-    action_controlled_ascent = py_trees_ros.action_clients.FromConstant(
-        name="Ascent to surface",
-        action_type=ControlledAscent,
-        action_name="/auv4/controlled_ascent",
+    action_controlled_ascent = shared_action_client.FromConstant(
+        name="Ascend to surface",
+        shared_action=SharedAction.CONTROLLED_ASCENT,
         action_goal=ControlledAscent.Goal(
             desired_depth=surface_depth_threshold,
             depth_tolerance=depth_tolerance,
@@ -121,6 +124,7 @@ def create_align_actuate_surface_root(
             timeout_seconds=controlled_ascent_timeout_seconds,
         ),
     )
+
     srv_enable_controls = checked_service.FromConstant(
         name=f"Enable controls ({trash_name})",
         service_name=CONTROLS_SRV_TOPIC,
@@ -198,52 +202,13 @@ def create_checked_collection_root(
         ]
     )
 
-    seq_open_and_ascend = py_trees.composites.Sequence(
-        name="Open grabber and ascend",
-        memory=True,
-    )
-
-    open_grabber = py_trees_ros.action_clients.FromConstant(
-        name="Open grabber",
-        action_type=Grabber,
-        action_name=GRABBER_ACTION_TOPIC,
-        action_goal=Grabber.Goal(
-            command=65535,
-            tolerance=0,
-            timeout_ms=5000,
-        ),
-    )
-
-    force_succeed_open_grabber = py_trees.decorators.FailureIsSuccess(
-        name="Force succeed open grabber",
-        child=open_grabber,
-    )
-
-    action_controlled_ascent = py_trees_ros.action_clients.FromConstant(
-        name="Ascent to surface",
-        action_type=ControlledAscent,
-        action_name="/auv4/controlled_ascent",
-        action_goal=ControlledAscent.Goal(
-            timeout_seconds=controlled_ascent_timeout_seconds,
-            desired_depth=surface_depth_threshold,
-            depth_tolerance=controlled_ascent_depth_tolerance,
-            depth_rate=controlled_ascent_depth_rate,
-        ),
-    )
-
-    srv_enable_controls = py_trees_ros.service_clients.FromConstant(
-        name="enable controls",
-        service_type=Controller,
-        service_name=CONTROLS_SRV_TOPIC,
-        service_request=Controller.Request(enable=True),
-    )
-
-    seq_open_and_ascend.add_children(
-        [
-            force_succeed_open_grabber,
-            action_controlled_ascent,
-            srv_enable_controls,
-        ]
+    seq_open_and_ascend = create_open_and_ascend_root(
+        grabber_action_topic=GRABBER_ACTION_TOPIC,
+        controls_srv_topic=CONTROLS_SRV_TOPIC,
+        controlled_ascent_timeout_seconds=controlled_ascent_timeout_seconds,
+        surface_depth_threshold=surface_depth_threshold,
+        controlled_ascent_depth_tolerance=controlled_ascent_depth_tolerance,
+        controlled_ascent_depth_rate=controlled_ascent_depth_rate,
     )
 
     root.add_children(
@@ -257,71 +222,270 @@ def create_checked_collection_root(
     return root
 
 
-def create_spin_root(collection_result_key: str):
-    root = py_trees.composites.Sequence(name="Spin", memory=True)
-
-    sel_set_spin = py_trees.composites.Selector(
-        name="Select spin according to match",
+def create_open_and_ascend_root(
+    grabber_action_topic: str,
+    controls_srv_topic: str,
+    controlled_ascent_timeout_seconds: float,
+    surface_depth_threshold: float,
+    controlled_ascent_depth_tolerance: float,
+    controlled_ascent_depth_rate: float,
+    open_grabber_first: bool = True,
+):
+    seq_open_and_ascend = py_trees.composites.Sequence(
+        name="Open grabber and ascend",
         memory=True,
     )
 
-    seq_if_match = py_trees.composites.Sequence(
-        name="Spin if table + basket match",
-        memory=True,
-    )
-
-    check_count_equals_4 = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check total trash = 4",
-        check=py_trees.common.ComparisonExpression(
-            variable=collection_result_key,
-            value=4,
-            operator=operator.eq,
+    open_grabber = shared_action_client.FromConstant(
+        name="Open grabber",
+        shared_action=SharedAction.GRABBER,
+        action_goal=Grabber.Goal(
+            command=65535,
+            tolerance=0,
+            timeout_ms=5000,
         ),
     )
 
-    dynamic_set_poses_match = DynamicSetBlackboard(
-        name="Dynamic set goto poses (match)",
-        key=collection_result_key,
-        update_key=_SPIN_GOTO_POSES_KEY,
-        func=lambda results: [
-            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=120.0)
-            for _ in range(results.num_objects_in_bucket * 3)  # type: ignore
-        ],
+    force_succeed_open_grabber = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed open grabber",
+        child=open_grabber,
     )
 
-    seq_if_match.add_children(
-        [
-            check_count_equals_4,
-            dynamic_set_poses_match,
+    action_controlled_ascent = shared_action_client.FromConstant(
+        name="Ascent to surface",
+        shared_action=SharedAction.CONTROLLED_ASCENT,
+        action_goal=ControlledAscent.Goal(
+            timeout_seconds=controlled_ascent_timeout_seconds,
+            desired_depth=surface_depth_threshold,
+            depth_tolerance=controlled_ascent_depth_tolerance,
+            depth_rate=controlled_ascent_depth_rate,
+        ),
+    )
+
+    srv_enable_controls = py_trees_ros.service_clients.FromConstant(
+        name="Enable controls",
+        service_type=Controller,
+        service_name=controls_srv_topic,
+        service_request=Controller.Request(enable=True),
+    )
+
+    if open_grabber_first:
+        children = [
+            force_succeed_open_grabber,
+            action_controlled_ascent,
+            srv_enable_controls,
         ]
+    else:
+        children = [
+            action_controlled_ascent,
+            force_succeed_open_grabber,
+            srv_enable_controls,
+        ]
+
+    seq_open_and_ascend.add_children(children=children)
+
+    return seq_open_and_ascend
+
+
+def create_goto_table_centre_root(
+    table_centre_frame_clustered: str,
+    table_centre_frame: str,
+    cluster_duration: int,
+    table_cluster_failure_count_key: str,
+    trash: str | None = "bottle",
+):
+    if trash == "bottle":
+        pose = create_stamped_pose(frame_id=table_centre_frame_clustered, yaw=90.0)
+    elif trash == "ladle":
+        pose = create_stamped_pose(frame_id=table_centre_frame_clustered, yaw=-90.0)
+    else:
+        pose = create_stamped_pose(frame_id=table_centre_frame_clustered)
+
+    root = py_trees.composites.Sequence(
+        name="Goto table centre",
+        memory=True,
     )
 
-    set_spin_poses_mismatch = py_trees.behaviours.SetBlackboardVariable(
-        name="Set goto poses (mismatch)",
-        variable_name=_SPIN_GOTO_POSES_KEY,
-        variable_value=[
-            create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=120) for _ in range(3 * 3)
-        ],
+    sel_cluster_centre_with_failure_count = py_trees.composites.Selector(
+        name="Cluster table centre with failure count", memory=True
+    )
+
+    cluster_table_centre = shared_action_client.FromConstant(
+        name="Cluster centre",
+        shared_action=SharedAction.CLUSTER,
+        action_goal=create_clustering_goal(
+            in_children=table_centre_frame,
+            out_children=table_centre_frame_clustered,
+            duration=cluster_duration,
+            use_cache=False,
+        ),
+    )
+
+    update_failure_count = DynamicSetBlackboard(
+        name="Update table clustering failure count",
+        key=table_cluster_failure_count_key,
+        update_key=table_cluster_failure_count_key,
         overwrite=True,
+        func=lambda x: x + 1,
     )
 
-    sel_set_spin.add_children(
+    force_fail_update_failure_count = py_trees.decorators.SuccessIsFailure(
+        name="Force fail update failure count",
+        child=update_failure_count,
+    )
+
+    sel_cluster_centre_with_failure_count.add_children(
         [
-            seq_if_match,
-            set_spin_poses_mismatch,
+            cluster_table_centre,
+            force_fail_update_failure_count,
         ]
     )
 
-    goto_spin = goto.NFromBlackboard(
-        name="Goto spin",
-        pose_key=_SPIN_GOTO_POSES_KEY,
-        wait_between_moves_sec=0.1,
+    # TODO: Rotate additional 90 degrees to table center to be able to see both buckets
+    goto_table_centre = goto.FromConstant(
+        name="Goto table centre",
+        pose=pose,
+        ignore_depth=True,
     )
 
     root.add_children(
         [
-            sel_set_spin,
-            goto_spin,
+            sel_cluster_centre_with_failure_count,
+            goto_table_centre,
+        ]
+    )
+
+    return root
+
+
+def create_trash_count_collection_root(
+    collection_result_key: str,
+    trash_count_service: str,
+    table_centre_frame: str,
+    table_centre_frame_clustered: str,
+    table_cluster_failure_count_key: str,
+    cluster_duration: int,
+    trash: str | None = None,
+):
+    root = py_trees.composites.Sequence(
+        name="Get trash counts sequence",
+        memory=True,
+    )
+
+    goto_table_centre = create_goto_table_centre_root(
+        trash=trash,
+        table_centre_frame=table_centre_frame,
+        table_centre_frame_clustered=table_centre_frame_clustered,
+        table_cluster_failure_count_key=table_cluster_failure_count_key,
+        cluster_duration=cluster_duration,
+    )
+
+    srv_activate_count = py_trees_ros.service_clients.FromConstant(
+        name="Activate trash count service",
+        service_type=GetObjectCount,
+        service_name=trash_count_service,
+        service_request=GetObjectCount.Request(
+            enable=True,
+        ),
+    )
+
+    timer_wait_for_collection = py_trees.timers.Timer(
+        name="Wait for data collection",
+        duration=cluster_duration,
+    )
+
+    srv_deactivate_count = py_trees_ros.service_clients.FromConstant(
+        name="Deactivate trash count service",
+        service_type=GetObjectCount,
+        service_name=trash_count_service,
+        service_request=GetObjectCount.Request(
+            enable=False,
+        ),
+        key_response=collection_result_key,
+    )
+
+    root.add_children(
+        [
+            goto_table_centre,
+            srv_activate_count,
+            timer_wait_for_collection,
+            srv_deactivate_count,
+        ]
+    )
+
+    return root
+
+
+def create_spin_root(
+    collection_result_key: str,
+    spin_action_goal_key: str,
+    trash_count_service: str,
+    table_centre_frame: str,
+    table_centre_frame_clustered: str,
+    table_cluster_failure_count_key: str,
+    cluster_duration: int,
+    controlled_spin_topic: str,
+):
+    root = py_trees.composites.Sequence(name="Spin", memory=True)
+
+    collect_trash_counts = create_trash_count_collection_root(
+        collection_result_key=collection_result_key,
+        trash_count_service=trash_count_service,
+        trash="bottle",
+        table_centre_frame=table_centre_frame,
+        table_centre_frame_clustered=table_centre_frame_clustered,
+        table_cluster_failure_count_key=table_cluster_failure_count_key,
+        cluster_duration=cluster_duration,
+    )
+
+    set_spin_action_goal = DynamicSetBlackboard(
+        name="Set spin action goal",
+        key=collection_result_key,
+        update_key=spin_action_goal_key,
+        overwrite=True,
+        func=create_spin_goal,
+    )
+
+    spin = shared_action_client.FromBlackboard(
+        name="Call controlled spin",
+        shared_action=SharedAction.CONTROLLED_SPIN,
+        key=spin_action_goal_key,
+    )
+
+    srv_disable_controls = checked_service.FromConstant(
+        name="Disable controls (for spin)",
+        service_name=CONTROLS_SRV_TOPIC,
+        service_type=Controller,
+        service_request=Controller.Request(
+            enable=False,
+            pause=False,
+            disable_altitude=False,
+        ),
+    )
+
+    force_succeed_spin = py_trees.decorators.FailureIsSuccess(
+        name="Force success spin",
+        child=spin,
+    )
+
+    srv_enable_controls = checked_service.FromConstant(
+        name="Enable controls (for spin)",
+        service_name=CONTROLS_SRV_TOPIC,
+        service_type=Controller,
+        service_request=Controller.Request(
+            enable=True,
+            pause=False,
+            disable_altitude=False,
+        ),
+    )
+
+    root.add_children(
+        [
+            collect_trash_counts,
+            set_spin_action_goal,
+            srv_disable_controls,
+            force_succeed_spin,
+            srv_enable_controls,
         ]
     )
 

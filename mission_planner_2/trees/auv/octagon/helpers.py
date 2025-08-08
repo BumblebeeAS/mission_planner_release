@@ -1,4 +1,6 @@
 import numpy as np
+from bb_behavior_msgs.action import ControlledSpin
+from bb_perception_msgs.srv import GetObjectCount
 from geometry_msgs.msg import PoseStamped, TransformStamped, Vector3
 from std_srvs.srv import Trigger
 
@@ -75,3 +77,14 @@ def trash_view_frame_func(
         return create_stamped_pose(view_frame_1)
 
     raise ValueError("both are in basket how can it be MaGic")  # should not reach here
+
+
+def create_spin_goal(response: GetObjectCount.Response):
+    return ControlledSpin.Goal(
+        yaw_amount=(
+            360.0 * (4 - response.num_bottles_on_table - response.num_ladles_on_table)
+        ),
+        yaw_tolerance=3.0,
+        yaw_rate=20.0,
+        timeout_seconds=30.0,
+    )

@@ -72,7 +72,7 @@ def create_clustering_goal(
     out_children: str | list[str],
     out_parents: str | list[str] = "world_ned",
     duration: int = 20,
-    tf_lookup_interval: float = 0.05,
+    tf_lookup_interval: float = 0.083,
     cache_size: int = 100,
     min_cluster_size: int = 2,
     min_samples: int = 1,

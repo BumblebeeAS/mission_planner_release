@@ -6,8 +6,9 @@ import rclpy
 import rclpy.action
 import rclpy.client
 import rclpy.node
+from bb_auv_msgs.action import Grabber
 from bb_auv_msgs.msg import ColorRgb
-from bb_behavior_msgs.action import AlignAndCollect
+from bb_behavior_msgs.action import AlignAndCollect, ControlledAscent, ControlledSpin
 from bb_controls_msgs.action import Locomotion
 from bb_perception_msgs.action import ClusterTfAction
 from bb_planner_msgs.srv import GetPoseToControlsFrame
@@ -31,6 +32,9 @@ class SharedAction(Enum):
     CLUSTER = ActionRegistry("/auv4/cluster_tf", ClusterTfAction)
     CLUSTER_MULTI = ActionRegistry("/auv4/cluster_tf_multi", ClusterTfAction)
     TRASH = ActionRegistry("/auv4/trash_align_and_collect", AlignAndCollect)
+    CONTROLLED_ASCENT = ActionRegistry("/auv4/controlled_ascent", ControlledAscent)
+    CONTROLLED_SPIN = ActionRegistry("/auv4/controlled_spin", ControlledSpin)
+    GRABBER = ActionRegistry("/auv4/actuation/grabber", Grabber)
 
 
 class SharedService(Enum):
