@@ -254,6 +254,7 @@ class MissionNode(Node):
         )
         return response
 
+
 def main(args=None):
     rclpy.init(args=args)
     mission_tf_publisher = MissionNode()
@@ -263,7 +264,7 @@ def main(args=None):
         pass
     finally:
         mission_tf_publisher.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":
