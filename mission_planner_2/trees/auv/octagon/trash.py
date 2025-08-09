@@ -292,7 +292,8 @@ def create_goto_table_centre_root(
     table_centre_frame: str,
     cluster_duration: int,
     table_cluster_failure_count_key: str,
-    trash: str | None = "bottle",
+    is_grabber_open: bool,
+    trash: str | None,
 ):
     if trash == "bottle":
         pose = create_stamped_pose(frame_id=table_centre_frame_clustered, yaw=90.0)
@@ -310,6 +311,11 @@ def create_goto_table_centre_root(
         name="Cluster table centre with failure count", memory=True
     )
 
+    seq_cluster_table_centre = py_trees.composites.Sequence(
+        name="Cluster table centre and reset count",
+        memory=True,
+    )
+
     cluster_table_centre = shared_action_client.FromConstant(
         name="Cluster centre",
         shared_action=SharedAction.CLUSTER,
@@ -319,6 +325,21 @@ def create_goto_table_centre_root(
             duration=cluster_duration,
             use_cache=False,
         ),
+    )
+
+    reset_failure_count = DynamicSetBlackboard(
+        name="Reset table clustering failure count",
+        key=table_cluster_failure_count_key,
+        update_key=table_cluster_failure_count_key,
+        overwrite=True,
+        func=lambda x: 0,
+    )
+
+    seq_cluster_table_centre.add_children(
+        [
+            cluster_table_centre,
+            reset_failure_count,
+        ]
     )
 
     update_failure_count = DynamicSetBlackboard(
@@ -334,14 +355,18 @@ def create_goto_table_centre_root(
         child=update_failure_count,
     )
 
-    sel_cluster_centre_with_failure_count.add_children(
-        [
-            cluster_table_centre,
+    if is_grabber_open:
+        selector_children = [
+            seq_cluster_table_centre,
             force_fail_update_failure_count,
         ]
-    )
+    else:
+        selector_children = [
+            seq_cluster_table_centre,
+        ]
 
-    # TODO: Rotate additional 90 degrees to table center to be able to see both buckets
+    sel_cluster_centre_with_failure_count.add_children(selector_children)  # type: ignore
+
     goto_table_centre = goto.FromConstant(
         name="Goto table centre",
         pose=pose,
@@ -358,26 +383,14 @@ def create_goto_table_centre_root(
     return root
 
 
-def create_trash_count_collection_root(
+def create_count_table_root(
     collection_result_key: str,
     trash_count_service: str,
-    table_centre_frame: str,
-    table_centre_frame_clustered: str,
-    table_cluster_failure_count_key: str,
-    cluster_duration: int,
-    trash: str | None = None,
+    collect_duration: float,
 ):
     root = py_trees.composites.Sequence(
-        name="Get trash counts sequence",
+        name="Count trash sequence",
         memory=True,
-    )
-
-    goto_table_centre = create_goto_table_centre_root(
-        trash=trash,
-        table_centre_frame=table_centre_frame,
-        table_centre_frame_clustered=table_centre_frame_clustered,
-        table_cluster_failure_count_key=table_cluster_failure_count_key,
-        cluster_duration=cluster_duration,
     )
 
     srv_activate_count = py_trees_ros.service_clients.FromConstant(
@@ -391,7 +404,7 @@ def create_trash_count_collection_root(
 
     timer_wait_for_collection = py_trees.timers.Timer(
         name="Wait for data collection",
-        duration=cluster_duration,
+        duration=collect_duration,
     )
 
     srv_deactivate_count = py_trees_ros.service_clients.FromConstant(
@@ -406,10 +419,96 @@ def create_trash_count_collection_root(
 
     root.add_children(
         [
-            goto_table_centre,
             srv_activate_count,
             timer_wait_for_collection,
             srv_deactivate_count,
+        ]
+    )
+
+    return root
+
+
+def create_check_collections_changed_root(
+    initial_collection_result_key: str,
+    trash_count_service: str,
+    collect_duration: float,
+):
+    new_collect_key = fk("new_collections")
+    is_changed_key = fk("is_count_table_changed")
+
+    root = py_trees.composites.Sequence(
+        name="Check table count changed seq",
+        memory=True,
+    )
+
+    seq_count = create_count_table_root(
+        collection_result_key=new_collect_key,
+        trash_count_service=trash_count_service,
+        collect_duration=collect_duration,
+    )
+
+    dynamic_check_table_changed = DynamicSetBlackboard(
+        name="Check table count drop",
+        key=[initial_collection_result_key, new_collect_key],
+        update_key=is_changed_key,
+        func=lambda initial, after: after.num_bottles_on_table
+        + after.num_ladles_on_table
+        < initial.num_bottles_on_table + initial.num_ladles_on_table,
+    )
+
+    check_is_changed = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check table count dropped",
+        check=py_trees.common.ComparisonExpression(
+            variable=is_changed_key, value=True, operator=operator.eq
+        ),
+    )
+
+    root.add_children(
+        [
+            seq_count,
+            dynamic_check_table_changed,
+            check_is_changed,
+        ]
+    )
+
+    return root
+
+
+def create_trash_count_collection_root(
+    collection_result_key: str,
+    trash_count_service: str,
+    table_centre_frame: str,
+    table_centre_frame_clustered: str,
+    table_cluster_failure_count_key: str,
+    cluster_duration: int,
+    collect_duration: float,
+    trash: str | None,
+    is_grabber_open: bool,
+):
+    root = py_trees.composites.Sequence(
+        name="Get trash counts sequence",
+        memory=True,
+    )
+
+    goto_table_centre = create_goto_table_centre_root(
+        trash=trash,
+        table_centre_frame=table_centre_frame,
+        table_centre_frame_clustered=table_centre_frame_clustered,
+        table_cluster_failure_count_key=table_cluster_failure_count_key,
+        cluster_duration=cluster_duration,
+        is_grabber_open=is_grabber_open,
+    )
+
+    seq_count = create_count_table_root(
+        collection_result_key=collection_result_key,
+        trash_count_service=trash_count_service,
+        collect_duration=collect_duration,
+    )
+
+    root.add_children(
+        [
+            goto_table_centre,
+            seq_count,
         ]
     )
 
@@ -424,6 +523,7 @@ def create_spin_root(
     table_centre_frame_clustered: str,
     table_cluster_failure_count_key: str,
     cluster_duration: int,
+    collect_duration: float,
     controlled_spin_topic: str,
 ):
     root = py_trees.composites.Sequence(name="Spin", memory=True)
@@ -436,6 +536,8 @@ def create_spin_root(
         table_centre_frame_clustered=table_centre_frame_clustered,
         table_cluster_failure_count_key=table_cluster_failure_count_key,
         cluster_duration=cluster_duration,
+        collect_duration=collect_duration,
+        is_grabber_open=True,
     )
 
     set_spin_action_goal = DynamicSetBlackboard(

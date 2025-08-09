@@ -35,6 +35,7 @@ def create_move_and_shoot_generator(
     retries=3,
     stabilization_duration=2.5,
     num_retries_clustering=3,
+    wait_after_fire_duration: float = 3.0,
 ):
     def f(first=True):
         if first:
@@ -155,6 +156,11 @@ def create_move_and_shoot_generator(
             service_request=Trigger.Request(),
         )
 
+        wait_after_fire = py_trees.timers.Timer(
+            name="Wait after fire",
+            duration=wait_after_fire_duration,
+        )
+
         root = py_trees.composites.Sequence(
             f"Move and shoot {torp_string} torpedo",
             memory=True,
@@ -164,6 +170,7 @@ def create_move_and_shoot_generator(
                 dynamic_set_frame,
                 goto_cluster,
                 fire,
+                wait_after_fire,
             ],
         )
 

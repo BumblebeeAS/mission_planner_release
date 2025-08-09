@@ -27,7 +27,7 @@ NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
-VISION_SERVER_TOPIC = "/auv4/gate_front/manage_nodes"
+VISION_SERVER_TOPIC = "/auv4/gate/manage_nodes"
 
 CLUSTERING_DURATION = 4
 STABILIZE_DURATION = 3.0
@@ -38,11 +38,13 @@ NUM_RETRIES = 3
 BASE_LINK_FRAME = "auv4/base_link_ned"
 WORLD_FRAME = "world_ned"
 CAMERA_FRAME = "auv4/front_cam_optical"
-TEMPLATE_FRAME_YOLO = "gate"
+TEMPLATE_FRAME_YOLO = "gate/front"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
 GATE_CENTRE_FRAME = "gate/centre/view"
 GATE_LEFT_FRAME = "gate/left/view"
 GATE_RIGHT_FRAME = "gate/right/view"
+
+GATE_DEPTH = 0.4
 
 GATE_ORIENTATION_TOPIC = "/auv4/gate/shark_fish"
 #########################################################################
@@ -106,7 +108,9 @@ def create_gate_root():
 
     # Step 5: Move to picture position
     goto_see_pictures = goto.FromConstant(
-        "Goto picture position", create_stamped_pose(GATE_CENTRE_FRAME)
+        "Goto picture position",
+        create_stamped_pose(GATE_CENTRE_FRAME),
+        depth_override_value=GATE_DEPTH,
     )
 
     # Step 8: Get gate orientation
@@ -151,9 +155,13 @@ def create_gate_root():
     goto_left_approach = goto.FromConstant(
         name="Goto left approach",
         pose=create_stamped_pose(GATE_LEFT_FRAME),
+        depth_override_value=GATE_DEPTH,
     )
 
-    seq_go_right_side = py_trees.composites.Sequence(name="Go right side", memory=True)
+    seq_go_right_side = py_trees.composites.Sequence(
+        name="Go right side",
+        memory=True,
+    )
 
     write_not_is_left = py_trees.behaviours.SetBlackboardVariable(
         name="Write is left side",
@@ -165,6 +173,7 @@ def create_gate_root():
     goto_right_approach = goto.FromConstant(
         name="Goto right approach",
         pose=create_stamped_pose(GATE_RIGHT_FRAME),
+        depth_override_value=GATE_DEPTH,
     )
 
     seq_go_right_side.add_children(children=[write_not_is_left, goto_right_approach])
@@ -178,13 +187,18 @@ def create_gate_root():
     forward_pose = create_stamped_pose(
         "auv4/base_link_ned", position_x=FORWARD_DISTANCE
     )
-    goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
+    goto_through_gate = goto.FromConstant(
+        name="Goto through gate",
+        pose=forward_pose,
+        depth_override_value=GATE_DEPTH,
+    )
 
     yaw_poses = [
         create_stamped_pose(frame_id="auv4/base_link_ned", yaw=120.0)
         for _ in range(2 * 3)
     ]
 
+    # TODO: change to spin from samuel
     goto_yaw = goto.NFromConstant(
         name="Goto yaw style",
         poses=yaw_poses,

@@ -8,7 +8,6 @@ from geometry_msgs.msg import PoseStamped
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.pose_utils import (
-    create_clustering_goal,
     create_clustering_request,
     create_stamped_pose,
 )
@@ -108,7 +107,7 @@ def _create_search_bot_root(
     cluster_node_start,
     cluster_node_end,
     wait_between_moves_sec: float = 5.0,
-    search_depth: float = 0.3
+    search_depth: float = 0.3,
 ):
     root = py_trees.composites.Sequence(
         name="Search seq (bot cam)",
@@ -116,12 +115,12 @@ def _create_search_bot_root(
     )
 
     goto_search_pattern = goto.NFromConstant(
-        name=f"Goto search pattern",
+        name="Goto search pattern",
         poses=poses,
         wait_between_moves_sec=wait_between_moves_sec,
         specified_heading=True,  # dont need to face dir for this search
         is_relative_movement=True,
-        depth_override_value=search_depth
+        depth_override_value=search_depth,
     )
 
     root.add_children(
@@ -143,6 +142,7 @@ def create_search_bot_constant_root(
     object_frame: str,
     object_frame_clustered: str,
     wait_between_moves: float = 5.0,
+    search_depth: float = 0.3,
 ):
     poses = _generate_square(fwd, back, left, right)
 
@@ -175,6 +175,7 @@ def create_search_bot_constant_root(
         cluster_node_start=cluster_node_start,
         cluster_node_end=cluster_node_stop,
         wait_between_moves_sec=wait_between_moves,
+        search_depth=search_depth,
     )
 
     return root
@@ -190,6 +191,7 @@ def create_search_bot_layered_square_root(
     object_frame_clustered: str,
     offset_coeff: float = 0.2,
     wait_between_moves: float = 5.0,
+    search_depth: float = 0.3,
 ):
     poses = _generate_layered_square_search_bot_pattern(
         fwd, back, left, right, num_squares, offset_coeff
@@ -224,6 +226,7 @@ def create_search_bot_layered_square_root(
         cluster_node_start=cluster_node_start,
         cluster_node_end=cluster_node_stop,
         wait_between_moves_sec=wait_between_moves,
+        search_depth=search_depth,
     )
 
     # cluster start finish one layer stop then go next
@@ -280,6 +283,7 @@ def create_search_bot_bb_root(
     object_frame_key: str,
     object_frame_clustered_key: str,
     wait_between_moves: float = 5.0,
+    search_depth: float = 0.3,
 ):
     poses = _generate_square(fwd, back, left, right)
     # TODO: cant use namspace andfk method?
@@ -336,6 +340,7 @@ def create_search_bot_bb_root(
         cluster_node_start=cluster_node_start,
         cluster_node_end=cluster_node_end,
         wait_between_moves_sec=wait_between_moves,
+        search_depth=search_depth,
     )
 
     root.add_children(
@@ -372,7 +377,7 @@ def create_search_front_root(
     yaw_right_deg: float = 30.0,
     step: float = 15.0,
     wait_between_moves: float = 5.0,
-    search_depth: float = 0.3
+    search_depth: float = 0.3,
 ):
     """Search front yaw angles will be done in multiple of 15 degrees."""
     root = py_trees.composites.Sequence(
@@ -392,7 +397,7 @@ def create_search_front_root(
         wait_between_moves_sec=wait_between_moves,
         is_relative_movement=True,
         # specified_heading=True,
-        depth_override_value=search_depth
+        depth_override_value=search_depth,
     )
 
     cluster_node_start = py_trees_ros.service_clients.FromConstant(

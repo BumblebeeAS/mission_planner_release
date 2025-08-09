@@ -1,8 +1,6 @@
 import py_trees
-import py_trees_ros
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from std_srvs.srv import Trigger
 
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.detection_utils import (
@@ -49,6 +47,7 @@ YAW_THRESHOLD = 1.0
 CLUSTER_DURATION = 4
 REALIGN_CLUSTER_DURATION = 4
 STABILIZE_DURATION = 3
+WAIT_AFTER_FIRE_DURATION = 3.0
 NUM_RETRIES = 3
 SEARCH_DEPTH = 1.2
 #########################################################################
@@ -113,11 +112,7 @@ def create_torpedo_root():
         retries=8,
         stabilization_duration=2.5,
         num_retries_clustering=NUM_RETRIES,
-    )
-
-    seq_torpedo_root = py_trees.composites.Sequence(
-        name="Torpedo root",
-        memory=True,
+        wait_after_fire_duration=WAIT_AFTER_FIRE_DURATION,
     )
 
     seq_launch_torpedo = py_trees.composites.Sequence(
@@ -265,11 +260,4 @@ def create_torpedo_root():
         ],
     )
 
-    seq_torpedo_root.add_children(
-        children=[
-            py_trees.timers.Timer("Stabilise before task", duration=STABILIZE_DURATION),
-            seq_launch_torpedo,
-        ]
-    )
-
-    return seq_torpedo_root
+    return seq_launch_torpedo

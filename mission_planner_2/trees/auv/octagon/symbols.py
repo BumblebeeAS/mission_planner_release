@@ -14,7 +14,6 @@ fk = full_key_generator(NAMESPACE)
 
 _FISH_TF_KEY = fk("fish_tf")
 _SHARK_TF_KEY = fk("shark_tf")
-_TABLE_TF_KEY = fk("table_tf")
 _LOOK_AT_TARGET_POSE_KEY = fk("look_at_target_pose")
 
 

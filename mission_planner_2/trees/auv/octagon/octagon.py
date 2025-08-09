@@ -23,6 +23,7 @@ from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
 from mission_planner_2.trees.auv.octagon.trash import (
     create_align_actuate_surface_root,
+    create_check_collections_changed_root,
     create_checked_collection_root,
     create_goto_table_centre_root,
     create_open_and_ascend_root,
@@ -104,7 +105,12 @@ _TABLE_CLUSTER_FAILURE_COUNT_KEY = fk("table_cluster_failure_count")
 _SPIN_ACTION_GOAL_KEY = fk("spin_action_goal")
 
 
-def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str):
+def create_collection_root(
+    trash_name: str,
+    trash_frame: str,
+    bucket_frame: str,
+    trash_count_service: str,
+):
     """Picks up trash, surfaces, looks at the target, and drops it in the bucket."""
     seq_trash = py_trees.composites.Sequence(
         name=trash_name,
@@ -129,6 +135,13 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
         table_centre_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
         table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
         cluster_duration=CLUSTER_DURATION,
+        is_grabber_open=False,
+    )
+
+    seq_check_changed = create_check_collections_changed_root(
+        initial_collection_result_key=_COLLECTION_RESULTS_KEY,
+        trash_count_service=trash_count_service,
+        collect_duration=COLLECT_DURATION,
     )
 
     seq_trash_drop = create_align_actuate_surface_root(
@@ -146,6 +159,7 @@ def create_collection_root(trash_name: str, trash_frame: str, bucket_frame: str)
         children=[
             seq_trash_pick_up,
             goto_table_centre_drop,
+            seq_check_changed,
             seq_trash_drop,
         ]
     )
@@ -292,12 +306,14 @@ def create_octagon_root():
         trash_name="bottle",
         trash_frame=BOTTLE_FRAME,
         bucket_frame=PINK_BUCKET_FRAME,
+        trash_count_service=TRASH_COUNT_SERVICE,
     )
 
     seq_collection_ladle = create_collection_root(
         trash_name="ladle",
         trash_frame=LADLE_FRAME,
         bucket_frame=YELLOW_BUCKET_FRAME,
+        trash_count_service=TRASH_COUNT_SERVICE,
     )
 
     seq_alternate = py_trees.composites.Sequence(
@@ -341,6 +357,9 @@ def create_octagon_root():
         table_centre_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
         table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
         cluster_duration=CLUSTER_DURATION,
+        collect_duration=COLLECT_DURATION,
+        trash="bottle",
+        is_grabber_open=True,
     )
 
     check_0_on_table = py_trees.behaviours.CheckBlackboardVariableValue(
@@ -425,6 +444,7 @@ def create_octagon_root():
         table_centre_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
         table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
         cluster_duration=CLUSTER_DURATION,
+        collect_duration=COLLECT_DURATION,
         controlled_spin_topic=CONTROLLED_SPIN_TOPIC,
     )
 
@@ -483,6 +503,9 @@ def create_item_pickup_root(
         table_centre_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
         table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
         cluster_duration=CLUSTER_DURATION,
+        collect_duration=COLLECT_DURATION,
+        trash=trash,
+        is_grabber_open=True,
     )
 
     sel_item = py_trees.composites.Selector(
