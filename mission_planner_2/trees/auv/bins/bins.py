@@ -62,6 +62,7 @@ REALIGN_CLUSTER_DURATION = 2
 STABILIZE_CONTROLS_DURATION = 5.0
 RETRIES = 5
 NUM_RETRIES = 3
+BIN_SEARCH_DEPTH = 0.7
 
 FISH_BIN_VIEW_FRAME = "bin/fish/view"
 SHARK_BIN_VIEW_FRAME = "bin/shark/view"
@@ -131,6 +132,7 @@ def create_bin_root():
         object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,
         offset_coeff=OFFSET_COEFF,
         wait_between_moves=3.0,
+        search_depth=BIN_SEARCH_DEPTH,
     )
 
     cluster_bin_centre = shared_action_client.FromConstant(
@@ -481,24 +483,24 @@ def create_bin_root():
     seq_drop_into_bin.add_children(
         children=[
             retry_start_vision,
-            # seq_search,
-            cluster_bin_centre,
+            seq_search,
+            # cluster_bin_centre,  # TODO: remove this if use search
             extract_tf,
             calculate_acute_pose,
             goto_bin_centre,
             # stabilise,
-            retry_enable_detections,
-            sub_get_points_first_sequence_retry,
-            retry_enable_rotated_detections,
-            sub_get_points_second_sequence_retry,
-            sel_update_template,
-            retry_enable_correct_detections,
-            set_anchor_frame,
-            seq_goto_cluster,
-            set_dropper_actuation,
-            pub_fire_dropper_first,
-            py_trees.timers.Timer(name="Wait between drops", duration=3.5),
-            pub_fire_dropper_second,
+            # retry_enable_detections,
+            # sub_get_points_first_sequence_retry,
+            # retry_enable_rotated_detections,
+            # sub_get_points_second_sequence_retry,
+            # sel_update_template,
+            # retry_enable_correct_detections,
+            # set_anchor_frame,
+            # seq_goto_cluster,
+            # set_dropper_actuation,
+            # pub_fire_dropper_first,
+            # py_trees.timers.Timer(name="Wait between drops", duration=3.5),
+            # pub_fire_dropper_second,
             seq_stop_vision,
         ],
     )
