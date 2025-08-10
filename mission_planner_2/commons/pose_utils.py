@@ -342,3 +342,42 @@ def within_threshold_dist(
 
     distance = np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
     return distance <= distance_threshold
+
+
+def tf_to_stamped_pose(
+    frame_id: str,
+    tf: TransformStamped,
+    use_radians=True,
+) -> PoseStamped:
+    """
+    Convert a transform to a pose stamped in provided frame.
+
+    Takes the cached transform relationship and converts it to a pose
+    that can be used directly by navigation nodes (goto behaviors).
+
+    Args:
+        tf: Transform stamped object from tf2 lookup
+
+    Returns:
+        Pose stamped in provided frame coordinates representing the
+        navigation target for reaching end_frame
+    """
+    roll, pitch, yaw = euler_from_quaternion(
+        [
+            tf.transform.rotation.x,
+            tf.transform.rotation.y,
+            tf.transform.rotation.z,
+            tf.transform.rotation.w,
+        ],
+    )
+
+    return create_stamped_pose(
+        frame_id=frame_id,
+        position_x=tf.transform.translation.x,
+        position_y=tf.transform.translation.y,
+        position_z=tf.transform.translation.z,
+        roll=roll,
+        pitch=pitch,
+        yaw=yaw,
+        use_radians=use_radians,
+    )
