@@ -3,7 +3,6 @@ from typing import Literal
 
 import numpy as np
 import py_trees
-import py_trees_ros
 from geometry_msgs.msg import PoseStamped, TransformStamped
 
 from mission_planner_2.commons import shared_action_client
@@ -66,8 +65,9 @@ LAYER_ONE_RECLUSTERED_DUMMY = "slalom/dummy/one"
 LAYER_TWO_RECLUSTERED_DUMMY = "slalom/dummy/two"
 RECLUSTER_DURATION = 5
 RECLUSTERED_LAYER_KEY = fk("reclustered_layer")
-SWEEP_ANGLE_DEGREES = 45.0
-SWEEP_RECLUSTER_DURATION = 10
+SWEEP_ANGLE_DEGREES = 30.0
+SWEEP_RECLUSTER_DURATION = 5
+DEPTH_OVERRIDE_VALUE = 0.3
 #########################################################################
 
 
@@ -117,8 +117,8 @@ def validate_clusters(
 
     def check_tf_dist(
         tf: TransformStamped,
-        z_lower_bound: float = 1.5,
-        z_upper_bound: float = 2.5,
+        z_lower_bound: float = 1.0,
+        z_upper_bound: float = 1.1,
     ) -> bool:
         """
         Check if the distance between two transforms is within a specified range in the z-axis.
@@ -140,7 +140,7 @@ def create_move_to_layer_zero_root():
         2. Move to the clustered pose.
     We operate under the assumption that we always have the clustered pose for layer zero.
     """
-    root = py_trees.composites.Selector(
+    root = py_trees.composites.Sequence(
         name="Move to Layer Zero",
         memory=True,
     )
@@ -156,6 +156,8 @@ def create_move_to_layer_zero_root():
     goto_layer_zero_clustered = goto.FromBlackboard(
         name="Goto Layer Zero Clustered",
         pose_key=LAYER_ZERO_POSE_KEY,
+        depth_override_value=DEPTH_OVERRIDE_VALUE,
+        specified_heading=False,
     )
 
     root.add_children(
@@ -214,7 +216,9 @@ def create_move_between_layers_root(
         """
 
         def check_tf_dist(
-            tf: TransformStamped, x_lower_bound: float = 1.5, x_upper_bound: float = 2.5
+            tf: TransformStamped,
+            x_lower_bound: float = 1.0,
+            x_upper_bound: float = 3.0,
         ) -> bool:
             """
             Check if the distance in the x-axis is within the specified bounds.
@@ -279,6 +283,7 @@ def create_move_between_layers_root(
     goto_yaw_view_pose = goto.FromBlackboard(
         name=f"Goto Yawed Pose from Layer {current_layer} to Layer {next_layer}",
         pose_key=LAYER_TO_LAYER_POSE_KEY,
+        depth_override_value=DEPTH_OVERRIDE_VALUE,
     )
 
     recluster_action = shared_action_client.FromConstant(
@@ -287,7 +292,7 @@ def create_move_between_layers_root(
         action_goal=create_clustering_goal(
             in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
-                LAYER_ZERO_RECLUSTERED,
+                next_layer_frame + "/reclustered/yaw",
                 LAYER_ONE_RECLUSTERED_DUMMY,
                 LAYER_TWO_RECLUSTERED_DUMMY,
             ],
@@ -297,9 +302,17 @@ def create_move_between_layers_root(
 
     write_reclustered_to_bb = create_tf_checker_from_constant_root(
         start_frames=[BASE_LINK_FRAME],
-        end_frames=[LAYER_ZERO_RECLUSTERED],
+        end_frames=[next_layer_frame + "/reclustered/yaw"],
         update_keys=[RECLUSTERED_LAYER_KEY],
         fallback_val=[None],
+    )
+
+    set_next_layer_reclustered_pose_yaw = DynamicSetBlackboard(
+        name=f"Set Next Layer {next_layer} Reclustered Pose",
+        key=POSE_FUNC_KEY,
+        update_key=LAYER_TO_LAYER_POSE_KEY,
+        overwrite=True,
+        func=lambda f: f(next_layer_frame + "/reclustered/yaw"),
     )
 
     seq_yaw_and_recluster.add_children(
@@ -310,6 +323,7 @@ def create_move_between_layers_root(
             goto_yaw_view_pose,  # Move to the yawed pose
             recluster_action,  # Recluster the next layer
             write_reclustered_to_bb,  # Write the reclustered transform to the blackboard
+            set_next_layer_reclustered_pose_yaw,
         ]
     )
 
@@ -318,58 +332,96 @@ def create_move_between_layers_root(
         memory=True,
     )
 
-    par_sweep_recluster = py_trees.composites.Parallel(
-        name=f"Parallel sweep and recluster from Layer {current_layer} to Layer {next_layer}",
-        policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
-    )
-
     sweep_poses = [
         create_stamped_pose(
             frame_id=BASE_LINK_FRAME, yaw=-SWEEP_ANGLE_DEGREES, use_radians=False
         ),
         create_stamped_pose(
-            frame_id=BASE_LINK_FRAME, yaw=SWEEP_ANGLE_DEGREES, use_radians=False
+            frame_id=BASE_LINK_FRAME, yaw=SWEEP_ANGLE_DEGREES * 2, use_radians=False
         ),
     ]
 
-    goto_sweep = goto.NFromConstant(
-        name=f"Sweep left then right from Layer {current_layer} to Layer {next_layer}",
-        poses=sweep_poses,
-        wait_between_moves_sec=1.0,
+    goto_sweep_0 = goto.FromConstant(
+        name=f"Sweep left from Layer {current_layer} to Layer {next_layer}",
+        pose=sweep_poses[0],
+        depth_override_value=DEPTH_OVERRIDE_VALUE,
     )
 
-    recluster_sweep = shared_action_client.FromConstant(
+    goto_sweep_1 = goto.FromConstant(
+        name=f"Sweep right from Layer {current_layer} to Layer {next_layer}",
+        pose=sweep_poses[1],
+        depth_override_value=DEPTH_OVERRIDE_VALUE,
+    )
+
+    recluster_sweep_pre = shared_action_client.FromConstant(
+        name=f"Recluster before Sweep from Layer {current_layer} to Layer {next_layer}",
+        shared_action=SharedAction.CLUSTER_MULTI,
+        action_goal=create_clustering_goal(
+            in_children=CLUSTERING_IN_CHILDREN_NEAR,
+            out_children=[
+                next_layer_frame + "/reclustered/sweep",
+                LAYER_ONE_RECLUSTERED_DUMMY,
+                LAYER_TWO_RECLUSTERED_DUMMY,
+            ],
+            duration=SWEEP_RECLUSTER_DURATION,
+            persistent=True,
+        ),
+    )
+
+    recluster_sweep_0 = shared_action_client.FromConstant(
         name=f"Recluster during Sweep from Layer {current_layer} to Layer {next_layer}",
         shared_action=SharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
-                LAYER_ZERO_RECLUSTERED,
+                next_layer_frame + "/reclustered/sweep",
                 LAYER_ONE_RECLUSTERED_DUMMY,
                 LAYER_TWO_RECLUSTERED_DUMMY,
             ],
             duration=SWEEP_RECLUSTER_DURATION,
+            persistent=True,
         ),
     )
 
-    par_sweep_recluster.add_children(
-        [
-            goto_sweep,
-            recluster_sweep,
-        ]
+    recluster_sweep_1 = shared_action_client.FromConstant(
+        name=f"Recluster during Sweep from Layer {current_layer} to Layer {next_layer}",
+        shared_action=SharedAction.CLUSTER_MULTI,
+        action_goal=create_clustering_goal(
+            in_children=CLUSTERING_IN_CHILDREN_NEAR,
+            out_children=[
+                next_layer_frame + "/reclustered/sweep",
+                LAYER_ONE_RECLUSTERED_DUMMY,
+                LAYER_TWO_RECLUSTERED_DUMMY,
+            ],
+            duration=SWEEP_RECLUSTER_DURATION,
+            persistent=True,
+        ),
     )
 
     write_sweep_reclustered_to_bb = create_tf_checker_from_constant_root(
         start_frames=[BASE_LINK_FRAME],
-        end_frames=[LAYER_ZERO_RECLUSTERED],
+        end_frames=[next_layer_frame + "/reclustered/sweep"],
         update_keys=[RECLUSTERED_LAYER_KEY],
         fallback_val=[None],
     )
 
+    set_next_layer_reclustered_pose_sweep = DynamicSetBlackboard(
+        name=f"Set Next Layer {next_layer} Reclustered Pose",
+        key=POSE_FUNC_KEY,
+        update_key=LAYER_TO_LAYER_POSE_KEY,
+        overwrite=True,
+        func=lambda f: f(next_layer_frame + "/reclustered/sweep"),
+    )
+
     seq_sweep_and_recluster.add_children(
         [
-            par_sweep_recluster,  # Parallel sweep and recluster
+            recluster_sweep_pre,  # Recluster before sweeping
+            goto_sweep_0,  # Sweep left
+            recluster_sweep_0,  # Recluster during the left sweep
+            goto_sweep_1,  # Sweep right
+            recluster_sweep_1,  # Recluster during the right sweep
             write_sweep_reclustered_to_bb,  # Write the reclustered transform to the blackboard
+            set_next_layer_reclustered_pose_sweep,
         ]
     )
 
@@ -407,19 +459,10 @@ def create_move_between_layers_root(
         ),
     )
 
-    set_next_layer_reclustered_pose = DynamicSetBlackboard(
-        name=f"Set Next Layer {next_layer} Reclustered Pose",
-        key=POSE_FUNC_KEY,
-        update_key=LAYER_TO_LAYER_POSE_KEY,
-        overwrite=True,
-        func=lambda f: f(LAYER_ZERO_RECLUSTERED),
-    )
-
     seq_valid_recluster.add_children(
         [
             write_recluster_layer_validation,  # Write the validation of the reclustered layer to the blackboard
             check_reclustered_layer_validity,  # Check if the reclustering was valid
-            set_next_layer_reclustered_pose,  # Set the next layer's pose to the reclustered pose
         ]
     )
 
@@ -493,6 +536,8 @@ def create_move_between_layers_root(
     goto_next_layer = goto.FromBlackboard(
         name=f"Goto Next Layer {next_layer}",
         pose_key=LAYER_TO_LAYER_POSE_KEY,
+        depth_override_value=DEPTH_OVERRIDE_VALUE,
+        specified_heading=False,
     )
 
     root.add_children(
@@ -550,7 +595,6 @@ def create_movement_strategy_root():
             None,
             None,
         ],
-        timeout=30.0,
     )
 
     # Having valid clusters implies that the clustered layers are not None and are spaced apart correctly.
@@ -568,6 +612,14 @@ def create_movement_strategy_root():
         ),
     )
 
+    move_to_center = goto.FromConstant(
+        name="Move to centre",
+        pose=create_stamped_pose(
+            frame_id="slalom/centre",
+        ),
+        depth_override_value=DEPTH_OVERRIDE_VALUE,
+    )
+
     move_to_layer_zero = create_move_to_layer_zero_root()
     move_to_layer_one = create_move_between_layers_root(
         current_layer="zero",
@@ -583,6 +635,7 @@ def create_movement_strategy_root():
             set_pose_func,
             write_transforms_to_bb,
             set_is_valid_clusters,
+            move_to_center,
             move_to_layer_zero,
             move_to_layer_one,
             move_to_layer_two,

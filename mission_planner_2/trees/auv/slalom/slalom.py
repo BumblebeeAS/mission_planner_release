@@ -6,7 +6,6 @@ from lifecycle_msgs.srv import ChangeState
 from std_srvs.srv import SetBool
 
 from mission_planner_2.commons import shared_action_client
-from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -31,17 +30,9 @@ fk = full_key_generator(NAMESPACE)
 RECLUSTER = False
 
 if RECLUSTER:
-    from mission_planner_2.trees.auv.slalom.channel_movement_recluster import (
-        create_channel_movement_one_root,
-        create_channel_movement_two_root,
-        create_channel_movement_zero_root,
-    )
+    pass
 else:
-    from mission_planner_2.trees.auv.slalom.channel_movement import (
-        create_channel_movement_one_root,
-        create_channel_movement_two_root,
-        create_channel_movement_zero_root,
-    )
+    pass
 
 
 ########################## UPDATE CONSTANTS HERE #########################
@@ -50,6 +41,7 @@ DEPTH_ANYTHING_SERVER_TOPIC = "/auv4/slalom/manage_components"
 
 BASE_LINK_FRAME = "auv4/base_link_ned"
 WORLD_FRAME = "world_ned"
+CHANNEL_PAIR_ZERO_NEAR_FRAME = "slalom_layer_near_0"
 CHANNEL_PAIR_ZERO_FRAME = "slalom_layer_0"
 CHANNEL_PAIR_ONE_FRAME = "slalom_layer_1"
 CHANNEL_PAIR_TWO_FRAME = "slalom_layer_2"
@@ -64,11 +56,12 @@ SLALOM_ONE_FROM_ZERO_HARDCODED = "slalom_layer_1/hardcoded"
 SLALOM_TWO_FROM_ONE_HARDCODED_HARDCODED = "slalom_layer_2/hardcoded/hardcoded"
 
 TRANSFORM_TIMEOUT_DURATION = 5.0
-CLUSTER_VIEW_DURATION = 40
+CLUSTER_VIEW_DURATION = 5
 WAIT_BETWEEN_MOVES_SEC = 0.1
 MIN_CLUSTER_SIZE = 10
 
 MOVE_VIEW_DEPTH = 0.3
+CLUSTERING_SERVICE_NAME = "/auv4/cluster_tfs_multi_srv"
 
 """
 For sim.
@@ -78,8 +71,8 @@ THIRD_VIEW = {"position_x": 7.0, "position_y": -0.8, "position_z": 1.0, "yaw": -
 """
 
 FIRST_VIEW = {"position_x": 0.0, "position_y": 0.0, "position_z": 0.0, "yaw": 0.0}
-SECOND_VIEW = {"position_x": 0.0, "position_y": -1.2, "position_z": 0.0, "yaw": 0.0}
-THIRD_VIEW = {"position_x": 0.0, "position_y": 2.4, "position_z": 0.0, "yaw": 0.0}
+SECOND_VIEW = {"position_x": 0.0, "position_y": -0.6, "position_z": 0.0, "yaw": 0.0}
+THIRD_VIEW = {"position_x": 0.0, "position_y": 1.2, "position_z": 0.0, "yaw": 0.0}
 
 # set by  gate task if there change must change here too
 IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
@@ -155,6 +148,7 @@ def create_slalom_root():
         service_request=create_start_vision_req(),
         key_response=_START_VISION_KEY,
     )
+
     check_start_vision_succeeded = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Verify start vision pipeline succeeded",
         check=py_trees.common.ComparisonExpression(
@@ -180,12 +174,64 @@ def create_slalom_root():
         ),
     )
 
-    dynamic_set_create_pose_func = DynamicSetBlackboard(
-        name="Set set create func correct side",
-        key=IS_LEFT_KEY,
-        update_key=_CREATE_POSE_FUNC_KEY,
-        func=lambda is_left: (
-            _create_slalom_left_pose if is_left else _create_slalom_right_pose
+    cluster_action_1 = shared_action_client.FromConstant(
+        name="Initial cluster 1",
+        shared_action=SharedAction.CLUSTER_MULTI,
+        action_goal=create_clustering_goal(
+            in_children=[
+                CHANNEL_PAIR_ZERO_FRAME,
+                CHANNEL_PAIR_ONE_FRAME,
+                CHANNEL_PAIR_TWO_FRAME,
+            ],
+            out_children=[
+                CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+                CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+                CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            ],
+            min_cluster_size=MIN_CLUSTER_SIZE,
+            min_samples=MIN_CLUSTER_SIZE,
+            persistent=True,
+            duration=CLUSTER_VIEW_DURATION,
+        ),
+    )
+    cluster_action_2 = shared_action_client.FromConstant(
+        name="Initial cluster 2",
+        shared_action=SharedAction.CLUSTER_MULTI,
+        action_goal=create_clustering_goal(
+            in_children=[
+                CHANNEL_PAIR_ZERO_FRAME,
+                CHANNEL_PAIR_ONE_FRAME,
+                CHANNEL_PAIR_TWO_FRAME,
+            ],
+            out_children=[
+                CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+                CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+                CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            ],
+            min_cluster_size=MIN_CLUSTER_SIZE,
+            min_samples=MIN_CLUSTER_SIZE,
+            persistent=True,
+            duration=CLUSTER_VIEW_DURATION,
+        ),
+    )
+    cluster_action_3 = shared_action_client.FromConstant(
+        name="Initial cluster 3",
+        shared_action=SharedAction.CLUSTER_MULTI,
+        action_goal=create_clustering_goal(
+            in_children=[
+                CHANNEL_PAIR_ZERO_FRAME,
+                CHANNEL_PAIR_ONE_FRAME,
+                CHANNEL_PAIR_TWO_FRAME,
+            ],
+            out_children=[
+                CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
+                CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
+                CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
+            ],
+            min_cluster_size=MIN_CLUSTER_SIZE,
+            min_samples=MIN_CLUSTER_SIZE,
+            persistent=True,
+            duration=CLUSTER_VIEW_DURATION,
         ),
     )
 
@@ -199,7 +245,7 @@ def create_slalom_root():
             position_z=FIRST_VIEW["position_z"],
             yaw=FIRST_VIEW["yaw"],
         ),
-        depth_override_value=MOVE_VIEW_DEPTH
+        depth_override_value=MOVE_VIEW_DEPTH,
     )
 
     move_view_two = goto.FromConstant(
@@ -211,7 +257,7 @@ def create_slalom_root():
             position_z=SECOND_VIEW["position_z"],
             yaw=SECOND_VIEW["yaw"],
         ),
-        depth_override_value=MOVE_VIEW_DEPTH
+        depth_override_value=MOVE_VIEW_DEPTH,
     )
 
     move_view_three = goto.FromConstant(
@@ -223,32 +269,7 @@ def create_slalom_root():
             position_z=THIRD_VIEW["position_z"],
             yaw=THIRD_VIEW["yaw"],
         ),
-        depth_override_value=MOVE_VIEW_DEPTH
-    )
-
-    move_and_cluster_par = py_trees.composites.Parallel(
-        name="Move to different views and cluster",
-        policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
-    )
-
-    cluster_action = shared_action_client.FromConstant(
-        name="Cluster slalom transforms",
-        shared_action=SharedAction.CLUSTER_MULTI,
-        action_goal=create_clustering_goal(
-            in_children=[
-                CHANNEL_PAIR_ZERO_FRAME,
-                CHANNEL_PAIR_ONE_FRAME,
-                CHANNEL_PAIR_TWO_FRAME,
-            ],
-            out_children=[
-                CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
-                CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
-                CHANNEL_PAIR_TWO_FRAME_CLUSTERED,
-            ],
-            duration=CLUSTER_VIEW_DURATION,
-            min_cluster_size=MIN_CLUSTER_SIZE,
-            min_samples=MIN_CLUSTER_SIZE,
-        ),
+        depth_override_value=MOVE_VIEW_DEPTH,
     )
 
     seq_move_and_cluster = py_trees.composites.Sequence(
@@ -256,15 +277,13 @@ def create_slalom_root():
         memory=True,
         children=[
             move_view_one,
-            py_trees.timers.Timer(duration=10),
+            cluster_action_1,
             move_view_two,
-            py_trees.timers.Timer(duration=10),
+            cluster_action_2,
             move_view_three,
-            py_trees.timers.Timer(duration=10),
+            cluster_action_3,
         ],
     )
-
-    move_and_cluster_par.add_children([cluster_action, seq_move_and_cluster])
 
     seq_movement_strategy = create_movement_strategy_root()
 
@@ -313,10 +332,9 @@ def create_slalom_root():
             check_start_vision_succeeded,
             srv_load_depth_anything,
             check_start_depth_succeeded,
-            dynamic_set_create_pose_func,
-            move_and_cluster_par,
+            seq_move_and_cluster,
             seq_movement_strategy,
-            goto_pass_through,
+            # goto_pass_through,
             srv_end_vision,
             check_end_vision_succeeded,
             srv_unload_depth_anything,
