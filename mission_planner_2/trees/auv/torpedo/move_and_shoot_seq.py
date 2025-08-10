@@ -5,6 +5,10 @@ from std_srvs.srv import Trigger
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
+from mission_planner_2.commons.namespace_utils import (
+    full_key_generator,
+    generate_namespace,
+)
 from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
@@ -14,6 +18,12 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.trees.auv.goto import goto
 
+NAMESPACE = generate_namespace()
+fk = full_key_generator(NAMESPACE)
+
+_CLUSTERING_GOAL_KEY = fk("clustering_goal")
+_CLUSTERING_GOAL_CHECK_KEY = fk("clustering_goal_check")
+
 
 def create_move_and_shoot_generator(
     anchor_frame_key: str,
@@ -22,10 +32,10 @@ def create_move_and_shoot_generator(
     choice_key: str,
     pose_key: str,
     pose_frame_key: str,
-    fish_shoot_frame: str,
-    shark_shoot_frame: str,
-    template_frame_optical: str,
-    template_frame_optical_clustered: str,
+    fish_shoot_frame_key: str,
+    shark_shoot_frame_key: str,
+    template_frame_optical_key: str,
+    template_frame_optical_clustered_key: str,
     cluster_duration: int,
     realign_cluster_duration: int,
     actuation_topic_left: str,
@@ -40,20 +50,24 @@ def create_move_and_shoot_generator(
     def f(first=True):
         if first:
             anchor_frame = torpedo_shooter_left_frame
-            shoot_pose_sel = lambda choice: create_stamped_pose(
-                fish_shoot_frame if choice.success else shark_shoot_frame
+            shoot_pose_sel = (
+                lambda choice, fish_shoot_frame, shark_shoot_frame: create_stamped_pose(
+                    fish_shoot_frame if choice.success else shark_shoot_frame
+                )
             )
-            shoot_frame_sel = lambda choice: (
+            shoot_frame_sel = lambda choice, fish_shoot_frame, shark_shoot_frame: (
                 fish_shoot_frame if choice.success else shark_shoot_frame
             )
             actuation_topic = actuation_topic_left
             torp_string = "first"
         else:
             anchor_frame = torpedo_shooter_right_frame
-            shoot_pose_sel = lambda choice: create_stamped_pose(
-                shark_shoot_frame if choice.success else fish_shoot_frame
+            shoot_pose_sel = (
+                lambda choice, fish_shoot_frame, shark_shoot_frame: create_stamped_pose(
+                    shark_shoot_frame if choice.success else fish_shoot_frame
+                )
             )
-            shoot_frame_sel = lambda choice: (
+            shoot_frame_sel = lambda choice, fish_shoot_frame, shark_shoot_frame: (
                 shark_shoot_frame if choice.success else fish_shoot_frame
             )
             actuation_topic = actuation_topic_right
@@ -67,8 +81,8 @@ def create_move_and_shoot_generator(
         )
 
         dynamic_set_pose = DynamicSetBlackboard(
-            name="select torpedo frame",
-            key=choice_key,
+            name="select torpedo pose",
+            key=[choice_key, fish_shoot_frame_key, shark_shoot_frame_key],
             update_key=pose_key,
             overwrite=True,
             func=shoot_pose_sel,
@@ -76,21 +90,42 @@ def create_move_and_shoot_generator(
 
         dynamic_set_frame = DynamicSetBlackboard(
             name="select torpedo frame",
-            key=choice_key,
+            key=[choice_key, fish_shoot_frame_key, shark_shoot_frame_key],
             update_key=pose_frame_key,
             overwrite=True,
             func=shoot_frame_sel,
         )
 
-        cluster_node = shared_action_client.FromConstant(
-            name=f"Cluster the transforms before {torp_string} shot",
-            shared_action=SharedAction.CLUSTER,
-            action_goal=create_clustering_goal(
-                in_children=template_frame_optical,
-                out_children=template_frame_optical_clustered,
+        dynamic_set_cluster_goal = DynamicSetBlackboard(
+            name="set clustering goal",
+            key=[template_frame_optical_key, template_frame_optical_clustered_key],
+            update_key=_CLUSTERING_GOAL_KEY,
+            overwrite=True,
+            func=lambda frame, clustered: create_clustering_goal(
+                in_children=frame,
+                out_children=clustered,
                 duration=cluster_duration,
                 use_cache=False,
             ),
+        )
+
+        dynamic_set_cluster_goal_check = DynamicSetBlackboard(
+            name="set clustering goal check",
+            key=[template_frame_optical_key, template_frame_optical_clustered_key],
+            update_key=_CLUSTERING_GOAL_CHECK_KEY,
+            overwrite=True,
+            func=lambda frame, clustered: create_clustering_goal(
+                in_children=frame,
+                out_children=clustered,
+                duration=realign_cluster_duration,
+                use_cache=False,
+            ),
+        )
+
+        cluster_node = shared_action_client.FromBlackboard(
+            name=f"Cluster the transforms before {torp_string} shot",
+            shared_action=SharedAction.CLUSTER,
+            key=_CLUSTERING_GOAL_KEY,
         )
 
         retry_cluster_node = py_trees.decorators.Retry(
@@ -99,15 +134,10 @@ def create_move_and_shoot_generator(
             num_failures=num_retries_clustering,
         )
 
-        cluster_node_check = shared_action_client.FromConstant(
+        cluster_node_check = shared_action_client.FromBlackboard(
             name=f"Cluster the transforms before {torp_string} shot",
             shared_action=SharedAction.CLUSTER,
-            action_goal=create_clustering_goal(
-                in_children=template_frame_optical,
-                out_children=template_frame_optical_clustered,
-                duration=realign_cluster_duration,
-                use_cache=False,
-            ),
+            key=_CLUSTERING_GOAL_CHECK_KEY,
         )
 
         retry_cluster_node_check = py_trees.decorators.Retry(
@@ -168,6 +198,8 @@ def create_move_and_shoot_generator(
                 set_anchor_frame,
                 dynamic_set_pose,
                 dynamic_set_frame,
+                dynamic_set_cluster_goal,
+                dynamic_set_cluster_goal_check,
                 goto_cluster,
                 fire,
                 wait_after_fire,
