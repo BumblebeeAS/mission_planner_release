@@ -2,6 +2,8 @@ import operator
 
 import py_trees
 import py_trees_ros
+from bb_behavior_msgs.action import ControlledSpin
+from bb_controls_msgs.srv import Controller
 from lifecycle_msgs.srv import ChangeState
 from py_trees.decorators import Retry
 from rclpy.qos import qos_profile_sensor_data
@@ -28,6 +30,7 @@ fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
 VISION_SERVER_TOPIC = "/auv4/gate/manage_nodes"
+CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 
 CLUSTERING_DURATION = 4
 STABILIZE_DURATION = 3.0
@@ -193,17 +196,70 @@ def create_gate_root():
         depth_override_value=GATE_DEPTH,
     )
 
-    yaw_poses = [
-        create_stamped_pose(frame_id="auv4/base_link_ned", yaw=120.0)
-        for _ in range(2 * 3)
-    ]
+    # yaw_poses = [
+    #     create_stamped_pose(frame_id="auv4/base_link_ned", yaw=120.0)
+    #     for _ in range(2 * 3)
+    # ]
 
-    # TODO: change to spin from samuel
-    goto_yaw = goto.NFromConstant(
-        name="Goto yaw style",
-        poses=yaw_poses,
-        wait_between_moves_sec=0.1,
+    # # TODO: change to spin from samuel
+    # goto_yaw = goto.NFromConstant(
+    #     name="Goto yaw style",
+    #     poses=yaw_poses,
+    #     wait_between_moves_sec=0.1,
+    # )
+
+    # Start of spinning
+    seq_yaw_spin = py_trees.composites.Sequence(
+        name="yaw_spin",
+        memory=True
     )
+
+    srv_disable_controls = checked_service.FromConstant(
+        name="Disable controls (for spin)",
+        service_name=CONTROLS_SRV_TOPIC,
+        service_type=Controller,
+        service_request=Controller.Request(
+            enable=False,
+            pause=False,
+            disable_altitude=False,
+        ),
+    )
+
+    spin = shared_action_client.FromConstant(
+        name="Call controlled spin",
+        shared_action=SharedAction.CONTROLLED_SPIN,
+        action_goal=ControlledSpin.Goal(
+            yaw_amount=720,
+            yaw_tolerance=3.0,
+            yaw_rate=20.0,
+            timeout_seconds=30.0,
+        )
+    )
+
+    force_succeed_spin = py_trees.decorators.FailureIsSuccess(
+        name="Force success spin",
+        child=spin,
+    )
+
+    srv_enable_controls = checked_service.FromConstant(
+        name="Enable controls (for spin)",
+        service_name=CONTROLS_SRV_TOPIC,
+        service_type=Controller,
+        service_request=Controller.Request(
+            enable=True,
+            pause=False,
+            disable_altitude=False,
+        ),
+    )
+
+    seq_yaw_spin.add_children(
+        children=[
+            srv_disable_controls,
+            force_succeed_spin,
+            srv_enable_controls
+        ]
+    )
+    # End of spinning
 
     srv_end_vision = checked_service.FromConstant(
         name="End vision",
@@ -235,7 +291,7 @@ def create_gate_root():
             sub_gate_orientation,
             sel_gate_side,
             goto_through_gate,
-            # goto_yaw,
+            seq_yaw_spin,
             force_success_stop_vision,
         ]
     )
