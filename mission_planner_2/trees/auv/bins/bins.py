@@ -5,10 +5,6 @@ import py_trees_ros
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons import cache_tf, checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
@@ -24,14 +20,22 @@ from mission_planner_2.commons.namespace_utils import (
 from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
+    tf_to_stamped_pose,
     within_threshold_xyz,
 )
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
+from mission_planner_2.commons.tf_checker import (
+    create_tf_checker_from_bb_root,
+    create_tf_checker_from_constant_root,
+)
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.bins.template_selector import (
     create_template_selector_root,
 )
 from mission_planner_2.trees.auv.goto import goto
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -64,6 +68,7 @@ RETRIES = 5
 NUM_RETRIES = 3
 BIN_SEARCH_DEPTH = 0.7
 
+BIN_CENTRE_VIEW_FRAME = "bin/centre/view"
 FISH_BIN_VIEW_FRAME = "bin/fish/view"
 SHARK_BIN_VIEW_FRAME = "bin/shark/view"
 FISH_BIN_VIEW_ROTATED_FRAME = "bin/fish/rotated/view"
@@ -145,18 +150,24 @@ def create_bin_root():
         ),
     )
 
-    extract_tf = cache_tf.ToBlackboard(
-        name="Extract movement to bin centre",
-        variable_name=_BIN_CENTRE_TF_KEY,
-        start="auv4/base_link_ned",
-        end="bin/centre/view",
+    extract_tf = create_tf_checker_from_constant_root(
+        start_frames=[
+            BASE_LINK_FRAME,
+        ],
+        end_frames=[
+            BIN_CENTRE_VIEW_FRAME,
+        ],
+        update_keys=_BIN_CENTRE_TF_KEY,
+        fallback_val=[
+            None,
+        ],
     )
 
     calculate_acute_pose = DynamicSetBlackboard(
         name="Calculate acute pose to bin centre",
         key=_BIN_CENTRE_TF_KEY,
         update_key=_BIN_CENTRE_ACUTE_POSE_KEY,
-        func=find_acute_angle,
+        func=lambda tf: find_acute_angle(tf_to_stamped_pose(BASE_LINK_FRAME, tf)),
     )
 
     # Step 2: Navigate to bin centre
