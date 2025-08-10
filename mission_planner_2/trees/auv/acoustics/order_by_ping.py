@@ -17,11 +17,11 @@ _PING_RESPONSE_KEY = fk("ping")
 
 
 def create_order_by_ping_root(
-        first_subtree_func,
-        second_subtree_func,
-        ping_topic: str = "/sensors/ping",
-        timeout: float = 20.0,
-        confidence_threshold: float = 0.8,
+    first_subtree_func,
+    second_subtree_func,
+    ping_topic: str = "/sensors/ping",
+    timeout: float = 20.0,
+    confidence_threshold: float = 20.0,
 ) -> py_trees.behaviour.Behaviour:
     
     sel_subtree = py_trees.composites.Selector(
