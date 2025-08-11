@@ -5,7 +5,7 @@ import py_trees_ros
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from mission_planner_2.commons import cache_tf, checked_service, shared_action_client
+from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
 from mission_planner_2.commons.detection_utils import (
@@ -25,7 +25,6 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
 from mission_planner_2.commons.tf_checker import (
-    create_tf_checker_from_bb_root,
     create_tf_checker_from_constant_root,
 )
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
@@ -128,10 +127,10 @@ def create_bin_root():
     )
 
     seq_search = create_search_bot_layered_square_root(
-        fwd=1.0,
+        fwd=0.5,
         back=0.3,
-        left=1.0,
-        right=1.0,
+        left=0.5,
+        right=0.5,
         num_squares=NUM_SQUARES,
         object_frame=TEMPLATE_FRAME_YOLO,
         object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,
@@ -157,7 +156,7 @@ def create_bin_root():
         end_frames=[
             BIN_CENTRE_VIEW_FRAME,
         ],
-        update_keys=_BIN_CENTRE_TF_KEY,
+        update_keys=[_BIN_CENTRE_TF_KEY],
         fallback_val=[
             None,
         ],
@@ -434,6 +433,13 @@ def create_bin_root():
         service_request=Trigger.Request(),
     )
 
+    pub_fire_dropper_third = py_trees_ros.service_clients.FromConstant(
+        name="Fire dropper third",
+        service_name=ACTUATION_TOPIC,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
+    )
+
     seq_stop_vision = py_trees.composites.Sequence(
         name="Stop vision",
         memory=True,
@@ -500,18 +506,20 @@ def create_bin_root():
             calculate_acute_pose,
             goto_bin_centre,
             # stabilise,
-            # retry_enable_detections,
-            # sub_get_points_first_sequence_retry,
-            # retry_enable_rotated_detections,
-            # sub_get_points_second_sequence_retry,
-            # sel_update_template,
-            # retry_enable_correct_detections,
-            # set_anchor_frame,
-            # seq_goto_cluster,
-            # set_dropper_actuation,
-            # pub_fire_dropper_first,
-            # py_trees.timers.Timer(name="Wait between drops", duration=3.5),
-            # pub_fire_dropper_second,
+            retry_enable_detections,
+            sub_get_points_first_sequence_retry,
+            retry_enable_rotated_detections,
+            sub_get_points_second_sequence_retry,
+            sel_update_template,
+            retry_enable_correct_detections,
+            set_anchor_frame,
+            seq_goto_cluster,
+            set_dropper_actuation,
+            pub_fire_dropper_first,
+            py_trees.timers.Timer(name="Wait between drops", duration=3.5),
+            pub_fire_dropper_second,
+            py_trees.timers.Timer(name="Wait between drops", duration=0.5),
+            pub_fire_dropper_third,
             seq_stop_vision,
         ],
     )
