@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import functools
 import traceback
 
 import py_trees
@@ -8,6 +9,7 @@ import rclpy
 
 from mission_planner_2.commons.bumble_tree import BumbleTree
 from mission_planner_2.commons.hooks import stop_on_success_or_failure
+from mission_planner_2.commons.led_management import LedVisitor, led_handler
 from mission_planner_2.commons.node_registry import TreeNode
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.trees.auv.acoustics.order_by_ping import create_order_by_ping_root
@@ -42,6 +44,9 @@ def main():
     tree = BumbleTree(root=root)
     node = TreeNode()
 
+    led_visitor = LedVisitor(full=True)
+    tree.add_visitor(led_visitor)
+
     try:
         tree.setup(node=node, timeout=60.0)
     except:
@@ -50,6 +55,7 @@ def main():
         rclpy.shutdown()
 
     tree.add_post_tick_handler(stop_on_success_or_failure)
+    tree.add_post_tick_handler(functools.partial(led_handler, led_visitor, node.led_publisher))
 
     tree.tick_tock(period_ms=100)
     try:
