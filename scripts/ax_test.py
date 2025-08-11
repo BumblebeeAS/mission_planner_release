@@ -12,6 +12,7 @@ from mission_planner_2.commons.hooks import stop_on_success_or_failure
 from mission_planner_2.commons.led_management import LedVisitor, led_handler
 from mission_planner_2.commons.node_registry import TreeNode
 from mission_planner_2.commons.pose_utils import create_stamped_pose
+from mission_planner_2.commons.visitors import LoggingSnapshotVisitor
 from mission_planner_2.trees.auv.acoustics.order_by_ping import create_order_by_ping_root
 from mission_planner_2.trees.auv.goto import goto
 
@@ -27,7 +28,8 @@ def left_func() -> py_trees.behaviour.Behaviour:
 
 def right_func() -> py_trees.behaviour.Behaviour:
     return goto.FromConstant(
-        name=create_stamped_pose(
+        name="goto_right",
+        pose=create_stamped_pose(
             "auv4/base_link_ned",
             yaw=90.0
         )
@@ -36,16 +38,23 @@ def right_func() -> py_trees.behaviour.Behaviour:
 def main():
     rclpy.init(args=None)
     root = create_order_by_ping_root(
-        right_func,
         left_func,
-        confidence_threshold=5.0
+        right_func,
+        confidence_threshold=1.0
     )
     py_trees.logging.level = py_trees.logging.Level.DEBUG
     tree = BumbleTree(root=root)
     node = TreeNode()
 
     led_visitor = LedVisitor(full=True)
+    log_visitor = LoggingSnapshotVisitor(
+        node=node,
+        display_only_visited_behaviours=True,
+        display_blackboard=False,
+        display_activity_stream=True,
+    )
     tree.add_visitor(led_visitor)
+    tree.add_visitor(log_visitor)
 
     try:
         tree.setup(node=node, timeout=60.0)

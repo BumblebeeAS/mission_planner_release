@@ -40,7 +40,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 # Install Python executables
 install(PROGRAMS
-  scripts/ax_text.py
+  scripts/ax_test.py
   scripts/main.py
   scripts/test.py
   scripts/mission_tfs.py
