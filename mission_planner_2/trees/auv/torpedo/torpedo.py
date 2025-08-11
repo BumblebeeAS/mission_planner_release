@@ -85,7 +85,6 @@ _POSE_KEY = fk("pose")
 _POSE_FRAME_KEY = fk("pose_frame")
 _ANCHOR_FRAME_KEY = fk("anchor_frame")
 _CORRECT_TEMPLATE_KEY = fk("correct_template")
-_CORRECT_TEMPLATE_FRAME_OPTICAL_KEY = fk("correct_template_frame_optical")
 _CORRECT_REQ_KEY = fk("correct_req")
 _CORRECT_FISH_KEY = fk("correct_fish")
 _CORRECT_SHARK_KEY = fk("correct_shark")
@@ -134,7 +133,7 @@ def create_torpedo_root():
         pose_frame_key=_POSE_FRAME_KEY,
         fish_shoot_frame_key=_CORRECT_FISH_KEY,
         shark_shoot_frame_key=_CORRECT_SHARK_KEY,
-        template_frame_optical_key=_CORRECT_TEMPLATE_FRAME_OPTICAL_KEY,
+        template_frame_optical_key=_CORRECT_TEMPLATE_KEY,
         template_frame_optical_clustered_key=_CORRECT_CLUSTERED_KEY,
         cluster_duration=CLUSTER_DURATION,
         realign_cluster_duration=REALIGN_CLUSTER_DURATION,
@@ -198,6 +197,8 @@ def create_torpedo_root():
     seq_check_point_correspondences = create_point_correspondences_check_root(
         toggle_template_topic=TOGGLE_TEMPLATE_TOPIC,
         camera_frame=CAMERA_FRAME,
+        template_frame_1=TORPEDO_TEMPLATE_1,
+        template_frame_2=TORPEDO_TEMPLATE_2,
         template_frame_optical_1=TEMPLATE_FRAME_OPTICAL_1,
         template_frame_optical_2=TEMPLATE_FRAME_OPTICAL_2,
         num_retries=NUM_RETRIES,
@@ -236,7 +237,7 @@ def create_torpedo_root():
             create_img_matching_request(
                 enable=True,
                 camera_frame_id=CAMERA_FRAME,
-                template_name=TEMPLATE_FRAME_OPTICAL_1,
+                template_name=TORPEDO_TEMPLATE_1,
             ),
             FISH_SHOOT_FRAME_1,
             SHARK_SHOOT_FRAME_1,
@@ -264,7 +265,7 @@ def create_torpedo_root():
             create_img_matching_request(
                 enable=True,
                 camera_frame_id=CAMERA_FRAME,
-                template_name=TEMPLATE_FRAME_OPTICAL_2,
+                template_name=TORPEDO_TEMPLATE_2,
             ),
             FISH_SHOOT_FRAME_2,
             SHARK_SHOOT_FRAME_2,
@@ -366,6 +367,7 @@ def create_torpedo_root():
             goto_torp_centre,
             # stabilise_before_matching,
             seq_check_point_correspondences,
+            sel_correct_stuff,
             retry_enable_detections,
             move_and_shoot_first,
             goto_back_centre,

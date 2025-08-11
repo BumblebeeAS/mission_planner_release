@@ -26,10 +26,12 @@ _POINTS_2_KEY = fk("points_2")
 def _create_point_correspondences_check_root(
     toggle_template_topic: str,
     camera_frame,
+    template_frame,
     template_frame_optical,
     num_retries,
     points_correspondences_topic,
     template_num,
+    points_key,
 ):
     srv_enable_detections_frame = checked_service.FromConstant(
         name="Enable detections",
@@ -38,7 +40,7 @@ def _create_point_correspondences_check_root(
         service_request=create_img_matching_request(
             enable=True,
             camera_frame_id=camera_frame,
-            template_name=template_frame_optical,
+            template_name=template_frame,
         ),
         key_response=fk("torpedo_enable_detections"),
         check_func=lambda x: x.new_state,  # check if the service call was successful
@@ -56,8 +58,8 @@ def _create_point_correspondences_check_root(
         topic_type=PointCorrespondencesStamped,
         qos_profile=qos_profile_sensor_data,
         blackboard_variables={
-            _POINTS_1_KEY: "object_points",
-            fk("object_frame_id_1"): "object_frame_id",
+            points_key: "object_points",
+            fk("object_frame_id"): "object_frame_id",
         },
     )
 
@@ -67,7 +69,7 @@ def _create_point_correspondences_check_root(
         py_trees.behaviours.CheckBlackboardVariableValue(
             name="Check point correspondences",
             check=py_trees.common.ComparisonExpression(
-                variable=fk("object_frame_id_1"),
+                variable=fk("object_frame_id"),
                 value=template_frame_optical,
                 operator=operator.eq,
             ),
@@ -99,6 +101,8 @@ def _create_point_correspondences_check_root(
 def create_point_correspondences_check_root(
     toggle_template_topic: str,
     camera_frame,
+    template_frame_1,
+    template_frame_2,
     template_frame_optical_1,
     template_frame_optical_2,
     num_retries,
@@ -113,19 +117,23 @@ def create_point_correspondences_check_root(
     seq_check_template_1 = _create_point_correspondences_check_root(
         toggle_template_topic=toggle_template_topic,
         camera_frame=camera_frame,
+        template_frame=template_frame_1,
         template_frame_optical=template_frame_optical_1,
         num_retries=num_retries,
         points_correspondences_topic=points_correspondences_topic,
         template_num=1,
+        points_key=_POINTS_1_KEY,
     )
 
     seq_check_template_2 = _create_point_correspondences_check_root(
         toggle_template_topic=toggle_template_topic,
         camera_frame=camera_frame,
+        template_frame=template_frame_2,
         template_frame_optical=template_frame_optical_2,
         num_retries=num_retries,
         points_correspondences_topic=points_correspondences_topic,
         template_num=2,
+        points_key=_POINTS_2_KEY,
     )
 
     dynamic_set_correct_template = DynamicSetBlackboard(
@@ -134,7 +142,7 @@ def create_point_correspondences_check_root(
         update_key=correct_template_key,
         overwrite=True,
         func=lambda first, second: template_frame_optical_1
-        if first > second
+        if len(first.data) > len(second.data)
         else template_frame_optical_2,
     )
 
