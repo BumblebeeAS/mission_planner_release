@@ -4,19 +4,13 @@ import py_trees
 import py_trees_ros
 import yaml
 from ament_index_python.packages import get_package_share_directory
-from bb_controls_msgs.srv import Controller
-from geometry_msgs.msg import PoseWithCovarianceStamped
-from robot_localization.srv import SetPose
 from std_srvs.srv import Trigger
 
-from mission_planner_2.commons import checked_service
 from mission_planner_2.trees.auv.bins.bins import create_bin_root
-from mission_planner_2.trees.auv.button.wait_for_button import (
-    create_wait_for_button_root,
-)
 from mission_planner_2.trees.auv.gate.gate import create_gate_root
 from mission_planner_2.trees.auv.gate.move_to_task import create_move_to_gate_task_root
 from mission_planner_2.trees.auv.gate.return_home import create_return_root
+from mission_planner_2.trees.auv.mother.button_behaviors import create_button_start_root
 from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
 from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
 from mission_planner_2.trees.auv.slalom.slalom import create_slalom_root
@@ -32,6 +26,8 @@ ZERO_YAW_POSE_KEY = "/global/zero_yaw_pose_key"
 CHOICE_KEY = "/global/choice_is_fish"
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 RESET_POSE_SRV_TOPIC = "/auv4/nav/reset_pose"
+
+BUTTON_RETRIES = 1000000
 
 
 def load_mission_coordinates():
@@ -62,42 +58,11 @@ def create_mother(coords: dict):
         memory=True,
     )
 
-    wait_for_left_button = create_wait_for_button_root(
-        button_topic=LEFT_BUTTON_TOPIC,
-        num_retries=1000000,
-    )
-
-    req = SetPose.Request()
-    req.pose = PoseWithCovarianceStamped()
-    req.pose.pose.pose.orientation.w = 1.0
-
-    srv_reset_pose = py_trees_ros.service_clients.FromConstant(
-        name="Reset pose",
-        service_type=SetPose,
-        service_name=RESET_POSE_SRV_TOPIC,
-        service_request=req,
-    )
-
-    srv_enable_controls = checked_service.FromConstant(
-        name="Enable controls",
-        service_name=CONTROLS_SRV_TOPIC,
-        service_type=Controller,
-        service_request=Controller.Request(
-            enable=True,
-            pause=False,
-            disable_altitude=False,
-        ),
-    )
-
-    retry_enable_controls = py_trees.decorators.Retry(
-        name="Retry enable controls",
-        child=srv_enable_controls,
-        num_failures=1000,
-    )
-
-    wait_for_right_button = create_wait_for_button_root(
-        button_topic=RIGHT_BUTTON_TOPIC,
-        num_retries=1000000,
+    button_start = create_button_start_root(
+        reset_pose_srv_topic=RESET_POSE_SRV_TOPIC,
+        controls_srv_topic=CONTROLS_SRV_TOPIC,
+        left_button_topic=LEFT_BUTTON_TOPIC,
+        right_button_topic=RIGHT_BUTTON_TOPIC,
     )
 
     set_base_link_frame = py_trees.behaviours.SetBlackboardVariable(
@@ -187,10 +152,7 @@ def create_mother(coords: dict):
 
     root.add_children(
         [
-            # wait_for_left_button,
-            # srv_reset_pose,
-            # retry_enable_controls,
-            # wait_for_right_button,
+            # button_start,
             srv_get_choice,
             # set_is_left,
             set_base_link_frame,

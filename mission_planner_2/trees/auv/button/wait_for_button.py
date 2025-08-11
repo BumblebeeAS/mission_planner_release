@@ -16,8 +16,9 @@ fk = full_key_generator(NAMESPACE)
 _BUTTON_RESPONSE_KEY = fk("button_response")
 
 
-def create_wait_for_button_root(
-    button_topic: str = "/auv4/button/left", num_retries: int = 1000000
+def _create_wait_for_button_root(
+    button_topic: str = "/auv4/button/left",
+    num_retries: int = 1000000,
 ):
     seq_read_button = py_trees.composites.Sequence(
         "Read and check button sequence",
@@ -37,7 +38,7 @@ def create_wait_for_button_root(
         check=py_trees.common.ComparisonExpression(
             variable=_BUTTON_RESPONSE_KEY,
             value=True,
-            operator=lambda x, y: operator.eq(x.data, y),
+            operator=lambda x, y: operator.eq(x.data, y),  # type: ignore
         ),
     )
 
@@ -49,4 +50,28 @@ def create_wait_for_button_root(
         num_failures=num_retries,
     )
 
+    return root
+
+
+def create_button_behavior_root(
+    button_topic: str,
+    num_retries: int,
+    execute_behavior: py_trees.behaviour.Behaviour,
+):
+    root = py_trees.composites.Sequence(
+        name="Seq for button start",
+        memory=True,
+    )
+
+    wait_for_button_press = _create_wait_for_button_root(
+        button_topic=button_topic,
+        num_retries=num_retries,
+    )
+
+    root.add_children(
+        [
+            wait_for_button_press,
+            execute_behavior,
+        ]
+    )
     return root
