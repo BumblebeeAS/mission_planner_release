@@ -52,7 +52,7 @@ def create_order_by_ping_root(
     )
 
     check_ping_direction = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check ping direction",
+        name="Check ping direction is right",
         check=py_trees.common.ComparisonExpression(
             variable=_PING_RESPONSE_KEY,
             value=180,
