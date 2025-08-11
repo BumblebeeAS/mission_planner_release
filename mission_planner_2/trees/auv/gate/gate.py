@@ -5,10 +5,6 @@ import py_trees_ros
 from bb_behavior_msgs.action import ControlledSpin
 from bb_controls_msgs.srv import Controller
 from lifecycle_msgs.srv import ChangeState
-from py_trees.decorators import Retry
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import String
-
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -24,6 +20,9 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.trees.auv.goto import goto
+from py_trees.decorators import Retry
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import String
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -209,10 +208,7 @@ def create_gate_root():
     # )
 
     # Start of spinning
-    seq_yaw_spin = py_trees.composites.Sequence(
-        name="yaw_spin",
-        memory=True
-    )
+    seq_yaw_spin = py_trees.composites.Sequence(name="yaw_spin", memory=True)
 
     srv_disable_controls = checked_service.FromConstant(
         name="Disable controls (for spin)",
@@ -229,11 +225,11 @@ def create_gate_root():
         name="Call controlled spin",
         shared_action=SharedAction.CONTROLLED_SPIN,
         action_goal=ControlledSpin.Goal(
-            yaw_amount=720,
+            yaw_amount=720.0,
             yaw_tolerance=3.0,
             yaw_rate=20.0,
             timeout_seconds=30.0,
-        )
+        ),
     )
 
     force_succeed_spin = py_trees.decorators.FailureIsSuccess(
@@ -253,11 +249,7 @@ def create_gate_root():
     )
 
     seq_yaw_spin.add_children(
-        children=[
-            srv_disable_controls,
-            force_succeed_spin,
-            srv_enable_controls
-        ]
+        children=[srv_disable_controls, force_succeed_spin, srv_enable_controls]
     )
     # End of spinning
 
