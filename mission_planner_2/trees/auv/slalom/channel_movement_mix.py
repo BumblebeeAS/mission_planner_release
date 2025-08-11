@@ -4,7 +4,6 @@ from typing import Literal
 import numpy as np
 import py_trees
 from geometry_msgs.msg import PoseStamped, TransformStamped
-
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.namespace_utils import (
@@ -118,7 +117,7 @@ def validate_clusters(
     def check_tf_dist(
         tf: TransformStamped,
         z_lower_bound: float = 1.0,
-        z_upper_bound: float = 1.1,
+        z_upper_bound: float = 5.0,
     ) -> bool:
         """
         Check if the distance between two transforms is within a specified range in the z-axis.
