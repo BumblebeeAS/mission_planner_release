@@ -50,6 +50,14 @@ gate:
     z: -2.0
     roll: -90.0
     pitch: -90.0
+  - name: centre_after_gate
+    suffix: after_gate
+    parents:
+     - "gate/centre"
+    y: 0.7
+    z: 2.0
+    roll: -90.0
+    pitch: -90.0
   - name: left_right_view
     parents:
       - "gate/left"
@@ -68,26 +76,26 @@ bin:
       - "bin/shark/rotated"
     z: -0.75
     yaw: -90.0
-slalom:
-  - name: slalom_left_channel
-    suffix: left
-    parents:
-      - "slalom_layer_0/clustered"
-      - "slalom_layer_1/clustered"
-      - "slalom_layer_2/clustered"
-      - "slalom/reclustered"
-    x: 0.75
-    y: 0.5
-    roll: -90.0
-    pitch: -90.0
-  - name: slalom_right_channel
-    suffix: right
-    parents:
-      - "slalom_layer_0/clustered"
-      - "slalom_layer_1/clustered"
-      - "slalom_layer_2/clustered"
-      - "slalom/reclustered"
-    x: 2.25
-    y: 0.5
-    roll: -90.0
-    pitch: -90.0
+# slalom:
+  # - name: slalom_left_channel
+  #   suffix: left
+  #   parents:
+  #     - "slalom_layer_0/clustered"
+  #     - "slalom_layer_1/clustered"
+  #     - "slalom_layer_2/clustered"
+  #     - "slalom/reclustered"
+  #   x: 0.75
+  #   y: 0.5
+  #   roll: -90.0
+  #   pitch: -90.0
+  # - name: slalom_right_channel
+  #   suffix: right
+  #   parents:
+  #     - "slalom_layer_0/clustered"
+  #     - "slalom_layer_1/clustered"
+  #     - "slalom_layer_2/clustered"
+  #     - "slalom/reclustered"
+  #   x: 2.25
+  #   y: 0.5
+  #   roll: -90.0
+  #   pitch: -90.0
