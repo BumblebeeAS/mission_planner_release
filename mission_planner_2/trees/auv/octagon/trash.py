@@ -3,9 +3,10 @@ import py_trees_ros
 from bb_auv_msgs.action import Grabber
 from bb_behavior_msgs.action import AlignAndCollect, ControlledAscent
 from bb_controls_msgs.srv import Controller
-from bb_perception_msgs.action import ClusterTfAction
 from bb_perception_msgs.srv import GetObjectCount, TrashToggleFrame
+from geometry_msgs.msg import PoseStamped, TransformStamped
 from py_trees_ros.subscribers import operator
+from tf_transformations import euler_from_quaternion
 
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -18,6 +19,7 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
+from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.helpers import create_spin_goal
 
@@ -31,17 +33,19 @@ GRABBER_ACTION_TOPIC = "/auv4/actuation/grabber"
 BUCKET_DETECTIONS_TOPIC = "/auv4/trash/trash/yolo/detections/in_bucket"
 BASE_LINK_FRAME = "auv4/base_link_ned"
 LIMITS_SERVICE_NAME = "/auv4/controls/limits"
+BOT_CAM_FRAME = "auv4/bot_cam_optical"
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
 # DONT go move it in the section to be updated
 _TABLE_TRASH_DETECTIONS_COUNT_KEY = fk("table_trash_count_key")
-_SPIN_GOTO_POSES_KEY = fk("spin_goto_poses_key")
 
 
 def create_align_actuate_surface_root(
     trash_name: str,
     object_frame: str,
     command: int,
+    initial_collection_result_key: str,
+    trash_count_service: str,
     depth_rate: float = 0.08,
     depth_tolerance: float = 0.05,
     cluster_duration: int = 10,
@@ -64,10 +68,15 @@ def create_align_actuate_surface_root(
         name=f"Align, actuate, surface ({trash_name})",
         memory=True,
     )
-    cluster_trash = py_trees_ros.actions.ActionClient(
+
+    par_cluster_and_count = py_trees.composites.Parallel(
+        name="Cluster basket (and check for changed count if dropping)",
+        policy=py_trees.common.ParallelPolicy.SuccessOnAll(),
+    )
+
+    cluster_trash = shared_action_client.FromConstant(
         name=f"Cluster trash ({trash_name})",
-        action_type=ClusterTfAction,
-        action_name="/auv4/cluster_tf",
+        shared_action=SharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children=[object_frame_depth_from_table],
             out_children=[object_frame_clustered],
@@ -75,6 +84,26 @@ def create_align_actuate_surface_root(
             use_cache=False,
         ),
     )
+
+    # if dropping
+    if command == AlignAndCollect.Goal.OPEN:
+        check_collections_changed = create_check_collections_changed_root(
+            initial_collection_result_key=initial_collection_result_key,
+            trash_count_service=trash_count_service,
+            collect_duration=cluster_duration,
+        )
+
+        par_children = [
+            cluster_trash,
+            check_collections_changed,
+        ]
+    else:
+        par_children = [
+            cluster_trash,
+        ]
+
+    par_cluster_and_count.add_children(par_children)  # type: ignore
+
     srv_toggle_trash_frame_clustered = py_trees_ros.service_clients.FromConstant(
         name=f"Toggle trash frame clustered ({trash_name})",
         service_type=TrashToggleFrame,
@@ -83,6 +112,7 @@ def create_align_actuate_surface_root(
             trash_frame_clustered=object_frame_clustered, enable=True
         ),
     )
+
     srv_disable_controls = checked_service.FromConstant(
         name=f"Disable controls ({trash_name})",
         service_name=CONTROLS_SRV_TOPIC,
@@ -93,10 +123,10 @@ def create_align_actuate_surface_root(
             disable_altitude=False,
         ),
     )
-    call_trash_pickup = py_trees_ros.actions.ActionClient(
+
+    call_trash_pickup = shared_action_client.FromConstant(
         name=f"Call trash align and collect ({trash_name})",
-        action_type=AlignAndCollect,
-        action_name="/auv4/align_and_collect",
+        shared_action=SharedAction.ALIGN_AND_COLLECT,
         action_goal=AlignAndCollect.Goal(
             object_frame=object_frame_depth_from_odom,
             object_frame_clustered=object_frame_clustered,
@@ -135,6 +165,7 @@ def create_align_actuate_surface_root(
             disable_altitude=False,
         ),
     )
+
     seq_surface.add_children(
         children=[
             action_controlled_ascent,
@@ -144,7 +175,7 @@ def create_align_actuate_surface_root(
 
     root.add_children(
         children=[
-            cluster_trash,
+            par_cluster_and_count,
             srv_toggle_trash_frame_clustered,
             srv_disable_controls,
             call_trash_pickup,
@@ -288,19 +319,28 @@ def create_open_and_ascend_root(
 
 
 def create_goto_table_centre_root(
-    table_centre_frame_clustered: str,
     table_centre_frame: str,
+    table_centre_frame_clustered: str,
     cluster_duration: int,
     table_cluster_failure_count_key: str,
     is_grabber_open: bool,
     trash: str | None,
 ):
     if trash == "bottle":
-        pose = create_stamped_pose(frame_id=table_centre_frame_clustered, yaw=90.0)
+        goto_pose = create_stamped_pose(
+            frame_id=table_centre_frame_clustered,
+            yaw=90.0,
+        )
     elif trash == "ladle":
-        pose = create_stamped_pose(frame_id=table_centre_frame_clustered, yaw=-90.0)
+        goto_pose = create_stamped_pose(
+            frame_id=table_centre_frame_clustered, yaw=-90.0
+        )
+    elif trash is None:
+        goto_pose = create_stamped_pose(
+            frame_id=table_centre_frame_clustered
+        )  # should never be used
     else:
-        pose = create_stamped_pose(frame_id=table_centre_frame_clustered)
+        raise ValueError("wee")
 
     root = py_trees.composites.Sequence(
         name="Goto table centre",
@@ -367,20 +407,77 @@ def create_goto_table_centre_root(
 
     sel_cluster_centre_with_failure_count.add_children(selector_children)  # type: ignore
 
-    goto_table_centre = goto.FromConstant(
+    goto_table_centre_with_bucket = goto.FromConstant(
         name="Goto table centre",
-        pose=pose,
+        pose=goto_pose,
         ignore_depth=True,
+        anchor_frame_name=BOT_CAM_FRAME,
     )
 
-    root.add_children(
-        [
+    _base_link_to_table_centre_key = fk("base_link_to_table_centre_tf")
+    _zero_yaw_pose_key = fk("zero_yaw_pose")
+
+    lookup_base_link_to_table_centre = create_tf_checker_from_constant_root(
+        start_frames=[BASE_LINK_FRAME],
+        end_frames=[table_centre_frame_clustered],
+        timeout=5.0,
+        update_keys=[_base_link_to_table_centre_key],
+        fallback_val=[None],
+    )
+
+    create_zeroed_yaw_pose = DynamicSetBlackboard(
+        name="Create zeroed yaw pose",
+        key=_base_link_to_table_centre_key,
+        update_key=_zero_yaw_pose_key,
+        overwrite=True,
+        func=get_zeroed_yaw_pose,
+    )
+
+    goto_table_centre = goto.FromBlackboard(
+        name="Goto table centre",
+        pose_key=_zero_yaw_pose_key,
+        ignore_depth=True,
+        anchor_frame_name=BOT_CAM_FRAME,
+    )
+
+    if trash is None:
+        root_children = [
             sel_cluster_centre_with_failure_count,
+            lookup_base_link_to_table_centre,
+            create_zeroed_yaw_pose,
             goto_table_centre,
+        ]
+    else:
+        root_children = [
+            sel_cluster_centre_with_failure_count,
+            goto_table_centre_with_bucket,
+        ]
+
+    root.add_children(root_children)
+
+    return root
+
+
+def get_zeroed_yaw_pose(tf: TransformStamped) -> PoseStamped:
+    r, p, y = euler_from_quaternion(
+        [
+            tf.transform.rotation.x,
+            tf.transform.rotation.y,
+            tf.transform.rotation.z,
+            tf.transform.rotation.w,
         ]
     )
 
-    return root
+    return create_stamped_pose(
+        frame_id=BASE_LINK_FRAME,
+        position_x=tf.transform.translation.x,
+        position_y=tf.transform.translation.y,
+        position_z=tf.transform.translation.z,
+        roll=r,
+        pitch=p,
+        yaw=0.0,
+        use_radians=True,
+    )
 
 
 def create_count_table_root(
@@ -451,9 +548,10 @@ def create_check_collections_changed_root(
         name="Check table count drop",
         key=[initial_collection_result_key, new_collect_key],
         update_key=is_changed_key,
-        func=lambda initial, after: after.num_bottles_on_table
-        + after.num_ladles_on_table
-        < initial.num_bottles_on_table + initial.num_ladles_on_table,
+        func=lambda initial, after: (
+            after.num_bottles_on_table + after.num_ladles_on_table
+            < initial.num_bottles_on_table + initial.num_ladles_on_table
+        ),
     )
 
     check_is_changed = py_trees.behaviours.CheckBlackboardVariableValue(
@@ -565,11 +663,6 @@ def create_spin_root(
         ),
     )
 
-    force_succeed_spin = py_trees.decorators.FailureIsSuccess(
-        name="Force success spin",
-        child=spin,
-    )
-
     srv_enable_controls = checked_service.FromConstant(
         name="Enable controls (for spin)",
         service_name=CONTROLS_SRV_TOPIC,
@@ -586,7 +679,7 @@ def create_spin_root(
             collect_trash_counts,
             set_spin_action_goal,
             srv_disable_controls,
-            force_succeed_spin,
+            spin,
             srv_enable_controls,
         ]
     )
