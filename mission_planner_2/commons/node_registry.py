@@ -35,6 +35,7 @@ class SharedAction(Enum):
     CONTROLLED_ASCENT = ActionRegistry("/auv4/controlled_ascent", ControlledAscent)
     CONTROLLED_SPIN = ActionRegistry("/auv4/controlled_spin", ControlledSpin)
     GRABBER = ActionRegistry("/auv4/actuation/grabber", Grabber)
+    ALIGN_AND_COLLECT = ActionRegistry("/auv4/align_and_collect", AlignAndCollect)
 
 
 class SharedService(Enum):
