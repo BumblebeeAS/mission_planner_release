@@ -105,7 +105,7 @@ urdf:
     x: -0.06819
     y: -0.11
     # z: 0.01983
-    z: 0.04663
+    z: 0.01663
     parent_frame_id: "auv4/bot_cam_optical"
     child_frame_id: "auv4/torpedo_shooter_right"
   - name: dropper
@@ -148,8 +148,9 @@ map:
     child_frame_id: "map_ned/gate/end"
   - name: slalom_start
     x: 3.0
-    y: -1.0
+    y: 0.0
     z: 0.3
+    yaw: 20.0
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/slalom/start"
   - name: slalom_end

@@ -84,7 +84,7 @@ def compute_start_to_end_vector(start: dict, end: dict) -> dict:
     output_vector_as_dict["z"] = end["z"] - start["z"]
     output_vector_as_dict["roll"] = 0.0
     output_vector_as_dict["pitch"] = 0.0
-    output_vector_as_dict["yaw"] = 0.0
+    output_vector_as_dict["yaw"] = end["yaw"] - start["yaw"]
 
     return output_vector_as_dict
 

@@ -67,7 +67,7 @@ def _tf_fallback_check(
 def create_tf_checker_from_constant_root(
     start_frames: list[str] = ["_placeholder1", "_placeholder2"],
     end_frames: list[str] = ["_placeholder1u", "_placeholder2u"],
-    timeout: float = 5.0,
+    timeout: float = 20.0,
     update_keys: list[str] = ["_placeholder1u", "_placeholder2u"],
     fallback_val: list[any] = [None, None],
     is_fail_if_none: bool = True,
@@ -112,7 +112,7 @@ def create_tf_checker_from_constant_root(
 def create_tf_checker_from_bb_root(
     start_frame_keys: list[str] = ["_placeholder1", "_placeholder2"],
     end_frame_keys: list[str] = ["_placeholder1u", "_placeholder2u"],
-    timeout: float = 5.0,
+    timeout: float = 20.0,
     update_keys: list[str] = ["_placeholder1u", "_placeholder2u"],
     fallback_val: list[any] = [None, None],
     is_fail_if_none: bool = True,

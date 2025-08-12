@@ -7,6 +7,7 @@ from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import TransformStamped
 from std_srvs.srv import Trigger
 
+from mission_planner_2.commons.blackboard import MultiSetBlackboard
 from mission_planner_2.trees.auv.bins.bins import create_bin_root
 from mission_planner_2.trees.auv.gate.gate import create_gate_root
 from mission_planner_2.trees.auv.gate.move_to_task import create_move_to_gate_task_root
@@ -14,7 +15,11 @@ from mission_planner_2.trees.auv.gate.return_home import create_return_root
 from mission_planner_2.trees.auv.mother.button_behaviors import create_button_start_root
 from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
 from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
-from mission_planner_2.trees.auv.slalom.slalom import create_slalom_root
+
+# from mission_planner_2.trees.auv.slalom.slalom import create_slalom_root
+from mission_planner_2.trees.auv.slalom.slalom_yaw import (
+    create_slalom_yaw_root as create_slalom_root,
+)
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
 LEFT_BUTTON_TOPIC = "/auv4/button/left"
@@ -82,13 +87,6 @@ def create_mother(coords: dict):
         overwrite=True,
     )
 
-    set_yaw_before_gate = py_trees.behaviours.SetBlackboardVariable(
-        name="Set yaw before gate",
-        variable_name=YAW_BEFORE_GATE_KEY,
-        variable_value=TransformStamped(),
-        overwrite=True,
-    )
-
     srv_get_choice = py_trees_ros.service_clients.FromConstant(
         name="Get Choice",
         service_name="/auv4/choice/get_is_fish",
@@ -152,11 +150,10 @@ def create_mother(coords: dict):
     # TODO: see if need a move to gate here to go closer to do the return task
     return_root = create_return_root()
 
-    # TODO: PURELY FOR TESTING
-    set_is_left = py_trees.behaviours.SetBlackboardVariable(
-        name="Set is left for test",
-        variable_name=IS_LEFT_KEY,
-        variable_value=True,
+    set_testing_keys = MultiSetBlackboard(
+        name="Set is_left, yaw_before_gate",
+        keys=[IS_LEFT_KEY, YAW_BEFORE_GATE_KEY],
+        values=[True, TransformStamped()],
         overwrite=True,
     )
 
@@ -164,16 +161,15 @@ def create_mother(coords: dict):
         [
             # button_start,
             srv_get_choice,
-            # set_is_left,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
-            set_yaw_before_gate,
+            set_testing_keys,
             # move_to_gate,
             # gate_root,
             # move_to_slalom,
-            # slalom_root,
+            slalom_root,
             # move_to_bin,
-            bin_root,
+            # bin_root,
             # move_to_torpedo,
             # torpedo_root,
             # move_to_space,
