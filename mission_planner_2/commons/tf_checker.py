@@ -1,12 +1,13 @@
 import py_trees
+import py_trees_ros
 from rclpy.qos import qos_profile_system_default
 
-import py_trees_ros
 from mission_planner_2.commons import cache_tf
 
 
 def _tf_fallback_check(
     frame_id: str,
+    is_fail_if_none: bool,
     end_frame: str = "world_ned",
     timeout: float = 5.0,
     update_key: str = "_placeholder1u",
@@ -41,12 +42,17 @@ def _tf_fallback_check(
         duration=timeout,
     )
 
-    set_missing_tf = py_trees.behaviours.SetBlackboardVariable(
-        name="set_missing_tf",
-        variable_name=update_key,
-        variable_value=fallback_val,
-        overwrite=True,
-    )
+    if is_fail_if_none:
+        fallback_behavior = py_trees.behaviours.Failure(
+            name=f"tf checker fail_if_none: {is_fail_if_none}"
+        )
+    else:
+        fallback_behavior = py_trees.behaviours.SetBlackboardVariable(
+            name=f"set_missing_tf fail_if_none: {is_fail_if_none}",
+            variable_name=update_key,
+            variable_value=fallback_val,
+            overwrite=True,
+        )
 
     root.add_children(
         [
@@ -64,6 +70,7 @@ def create_tf_checker_from_constant_root(
     timeout: float = 5.0,
     update_keys: list[str] = ["_placeholder1u", "_placeholder2u"],
     fallback_val: list[any] = [None, None],
+    is_fail_if_none: bool = True,
 ) -> py_trees.composites.Sequence:
     """Creates a sequence of TF checks with constant frames.
 
@@ -90,6 +97,7 @@ def create_tf_checker_from_constant_root(
             update_key=update_key,
             fallback_val=fallback_val,
             is_from_bb=False,
+            is_fail_if_none=is_fail_if_none,
         )
         for start, end, update_key, fallback_val in zip(
             start_frames, end_frames, update_keys, fallback_val
@@ -107,6 +115,7 @@ def create_tf_checker_from_bb_root(
     timeout: float = 5.0,
     update_keys: list[str] = ["_placeholder1u", "_placeholder2u"],
     fallback_val: list[any] = [None, None],
+    is_fail_if_none: bool = True,
 ) -> py_trees.composites.Sequence:
     """Creates a sequence of TF checks from blackboard.
 
@@ -133,6 +142,7 @@ def create_tf_checker_from_bb_root(
             update_key=update_key,
             fallback_val=fallback_val,
             is_from_bb=True,
+            is_fail_if_none=is_fail_if_none,
         )
         for start, end, update_key, fallback_val in zip(
             start_frame_keys, end_frame_keys, update_keys, fallback_val
