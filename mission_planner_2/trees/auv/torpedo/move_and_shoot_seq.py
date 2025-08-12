@@ -186,6 +186,13 @@ def create_move_and_shoot_generator(
             service_request=Trigger.Request(),
         )
 
+        fire_2 = py_trees_ros.service_clients.FromConstant(
+            name=f"Fire {torp_string} torpedo retry",
+            service_type=Trigger,
+            service_name=actuation_topic,
+            service_request=Trigger.Request(),
+        )
+
         wait_after_fire = py_trees.timers.Timer(
             name="Wait after fire",
             duration=wait_after_fire_duration,
@@ -202,6 +209,7 @@ def create_move_and_shoot_generator(
                 dynamic_set_cluster_goal_check,
                 goto_cluster,
                 fire,
+                fire_2,
                 wait_after_fire,
             ],
         )

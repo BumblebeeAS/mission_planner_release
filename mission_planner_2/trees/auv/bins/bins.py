@@ -5,6 +5,10 @@ import py_trees_ros
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
@@ -32,9 +36,6 @@ from mission_planner_2.trees.auv.bins.template_selector import (
     create_template_selector_root,
 )
 from mission_planner_2.trees.auv.goto import goto
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -127,7 +128,7 @@ def create_bin_root():
     )
 
     seq_search = create_search_bot_layered_square_root(
-        fwd=0.5,
+        fwd=1.0,
         back=0.3,
         left=0.5,
         right=0.5,

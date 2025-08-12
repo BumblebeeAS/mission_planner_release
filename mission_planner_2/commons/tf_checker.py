@@ -57,7 +57,7 @@ def _tf_fallback_check(
     root.add_children(
         [
             decorator_timeout,
-            set_missing_tf,
+            fallback_behavior,
         ]
     )
 

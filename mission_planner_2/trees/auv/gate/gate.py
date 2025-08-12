@@ -5,6 +5,10 @@ import py_trees_ros
 from bb_behavior_msgs.action import ControlledSpin
 from bb_controls_msgs.srv import Controller
 from lifecycle_msgs.srv import ChangeState
+from py_trees.decorators import Retry
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import String
+
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -19,10 +23,8 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
+from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
-from py_trees.decorators import Retry
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import String
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -57,6 +59,7 @@ _GATE_ORIENTATION_KEY = fk("orientation")
 _IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 _START_VISION_KEY = fk("gate_start_vision")
 _STOP_VISION_KEY = fk("gate_stop_vision")
+_YAW_BEFORE_GATE = "/global/yaw_before_gate"
 
 
 def create_gate_root():
@@ -113,6 +116,14 @@ def create_gate_root():
         "Goto picture position",
         create_stamped_pose(GATE_CENTRE_FRAME),
         depth_override_value=GATE_DEPTH,
+    )
+
+    get_yaw_before_gate = create_tf_checker_from_constant_root(
+        start_frames=["world_ned"],
+        end_frames=["auv4/base_link_ned"],
+        update_keys=[_YAW_BEFORE_GATE],
+        timeout=120.0,
+        fallback_val=[None],
     )
 
     # Step 8: Get gate orientation
@@ -280,6 +291,7 @@ def create_gate_root():
             retry_start_vision,
             retry_cluster_gate,
             goto_see_pictures,
+            get_yaw_before_gate,
             sub_gate_orientation,
             sel_gate_side,
             goto_through_gate,

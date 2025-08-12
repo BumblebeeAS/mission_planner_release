@@ -53,7 +53,7 @@ slalom:
   - name: centre
     x: 1.5
     y: 0.3
-    z: -3.0
+    z: -1.5
     roll: -90.0
     pitch: -90.0
     # x: -1.5
@@ -70,12 +70,12 @@ slalom:
   #   parent_frame_id: "slalom/centre"
   #   child_frame_id: "slalom/centre/right"
   - name: slalom_layer_2_from_1_hardcoded
-    x: -0.3
+    x: -0.1
     z: 2.0
     parent_frame_id: "slalom_layer_1/hardcoded"
     child_frame_id: "slalom_layer_2/hardcoded"
   - name: slalom_layer_1_from_0_hardcoded
-    x: 0.3
+    x: 0.1
     z: 2.0
     parent_frame_id: "slalom_layer_0/clustered"
     child_frame_id: "slalom_layer_1/hardcoded"
@@ -141,44 +141,44 @@ map:
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/rel_gate_flip/start"
   - name: gate_end
-    x: 5.0
+    x: 4.0
     y: 0.0
     z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/gate/end"
   - name: slalom_start
-    x: 5.0
-    y: 0.0
+    x: 3.0
+    y: -1.0
     z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/slalom/start"
   - name: slalom_end
-    x: 12.0
-    y: 0.0
+    x: 9.0
+    y: -1.0
     z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/slalom/end"
   - name: bin
     x: 15.0
-    y: 0.0
+    y: -1.0
     z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/bin"
   - name: torpedo_start
-    x: 15.0
-    y: 0.0
+    x: 13.0
+    y: 2.0
     z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/torpedo/start"
   - name: torpedo_post
-    x: 15.0
-    y: -3.0
+    x: 13.0
+    y: 0.0
     z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/torpedo/post"
   - name: octagon
-    x: 7.0
-    y: -0.5
+    x: 17.1
+    y: 0.6
     z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/octagon"

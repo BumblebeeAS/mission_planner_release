@@ -75,6 +75,7 @@ STABILIZE_DURATION = 5
 WAIT_BETWEEN_ROTATIONS = 3
 LOOK_AT_TARGET_PAUSE_DURATION = 4
 NUM_SQUARES = 1
+SEARCH_DEPTH = 0.3
 OFFSET_COEFF = 1.0
 DROP_Z_DISTANCE = 0.30
 
@@ -85,7 +86,7 @@ DROP_DEPTH_RATE = 0.05
 CONTROLLED_ASCENT_DEPTH_RATE = 0.05
 
 SURFACE_DEPTH_THRESHOLD = 0.00
-LOOK_AT_TABLE_DEPTH_THRESHOLD = 0.7
+LOOK_AT_TABLE_DEPTH_THRESHOLD = 0.00
 CONTROLLED_ASCENT_DEPTH_TOLERANCE = 0.05
 
 CONTROLLED_SPIN_TOPIC = "/auv4/controlled_spin"
@@ -163,11 +164,11 @@ def create_collection_root(
         initial_collection_result_key=_COLLECTION_RESULTS_KEY,
         trash_count_service=TRASH_COUNT_SERVICE,
     )
+
     seq_trash.add_children(
         children=[
             seq_trash_pick_up,
             goto_table_centre_drop,
-            # seq_check_changed,
             seq_trash_drop,
         ]
     )
@@ -409,6 +410,7 @@ def create_octagon_root():
         object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
         offset_coeff=OFFSET_COEFF,
         wait_between_moves=1.0,
+        search_depth=SEARCH_DEPTH,
     )
 
     ################## BOTTLE PART #################
@@ -612,6 +614,7 @@ def create_octagon_root():
             check_start_vision_succeeded,
             init_table_clustering_count,
             init_collection_results,
+            seq_search_for_table,
             sel_timeout,
             force_success_seq_search_and_look,
             force_success_seq_spin,

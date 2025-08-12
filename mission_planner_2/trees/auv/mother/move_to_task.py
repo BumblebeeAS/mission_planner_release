@@ -9,6 +9,8 @@ from mission_planner_2.commons.pose_utils import (
 from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
 
+_YAW_BEFORE_GATE_KEY = "/global/yaw_before_gate"
+
 
 def create_move_to_task(
     task: str,
@@ -16,7 +18,8 @@ def create_move_to_task(
     end: dict,
     odom_key: str,
     zero_yaw_pose_key: str,
-    goto_depth: float = 0.3
+    goto_depth: float = 0.3,
+    yaw_before_gate_key: str = _YAW_BEFORE_GATE_KEY,
 ):
     root = py_trees.composites.Sequence(
         name=f"Move to {task}",
@@ -32,7 +35,7 @@ def create_move_to_task(
 
     dynamic_create_zero_yaw_pose = DynamicSetBlackboard(
         name="Set zero yaw pose",
-        key=odom_key,
+        key=[odom_key, yaw_before_gate_key],
         update_key=zero_yaw_pose_key,
         overwrite=True,
         func=get_zero_yaw_pose,
@@ -41,7 +44,7 @@ def create_move_to_task(
     goto_zero_yaw = goto.FromBlackboard(
         name="Goto zero yaw",
         pose_key=zero_yaw_pose_key,
-        depth_override_value=goto_depth
+        depth_override_value=goto_depth,
     )
 
     coords = compute_start_to_end_vector(start, end)
@@ -59,7 +62,7 @@ def create_move_to_task(
     goto_task = goto.FromConstant(
         name=f"Goto {task} start",
         pose=task_pose,
-        depth_override_value=goto_depth
+        depth_override_value=goto_depth,
     )
 
     root.add_children(
@@ -86,18 +89,29 @@ def compute_start_to_end_vector(start: dict, end: dict) -> dict:
     return output_vector_as_dict
 
 
-def get_zero_yaw_pose(tf: TransformStamped):
+def get_zero_yaw_pose(
+    tf: TransformStamped | None,
+    yaw_before_gate_tf: TransformStamped | None,
+):
+    if tf is None or yaw_before_gate_tf is None:
+        return create_stamped_pose(
+            frame_id="auv4/base_link_ned",
+        )
+
     _, _, y = euler_from_quaternion(
         [
-            tf.transform.rotation.x,
-            tf.transform.rotation.y,
-            tf.transform.rotation.z,
-            tf.transform.rotation.w,
+            yaw_before_gate_tf.transform.rotation.x,
+            yaw_before_gate_tf.transform.rotation.y,
+            yaw_before_gate_tf.transform.rotation.z,
+            yaw_before_gate_tf.transform.rotation.w,
         ]
     )
 
     return create_stamped_pose(
-        frame_id="auv4/base_link_ned",
-        yaw=-y,
+        frame_id="world_ned",
+        yaw=y,
+        position_x=tf.transform.translation.x,
+        position_y=tf.transform.translation.y,
+        position_z=tf.transform.translation.z,
         use_radians=True,
     )
