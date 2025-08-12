@@ -48,8 +48,8 @@ def create_look_at_target_root(
             _SHARK_TF_KEY,
         ],
         fallback_val=[
-            fish_frame_clustered,
-            shark_frame_clustered,
+            None,
+            None,
         ],
     )
 

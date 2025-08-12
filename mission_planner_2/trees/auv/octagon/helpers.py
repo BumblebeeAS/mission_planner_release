@@ -9,9 +9,12 @@ from mission_planner_2.commons.pose_utils import create_stamped_pose
 
 def get_table_to_symbol_pose(
     choice: Trigger.Response,
-    fish_tf: TransformStamped,
-    shark_tf: TransformStamped,
+    fish_tf: TransformStamped | None,
+    shark_tf: TransformStamped | None,
 ) -> PoseStamped:
+    if fish_tf is None or shark_tf is None:
+        return create_stamped_pose(frame_id="auv4/base_link_ned")
+
     target_tf = fish_tf if choice.success else shark_tf
 
     yaw = np.arctan2(

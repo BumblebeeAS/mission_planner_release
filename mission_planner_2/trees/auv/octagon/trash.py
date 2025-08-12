@@ -325,6 +325,7 @@ def create_goto_table_centre_root(
     table_cluster_failure_count_key: str,
     is_grabber_open: bool,
     trash: str | None,
+    depth_override: float | None = None,
 ):
     if trash == "bottle":
         goto_pose = create_stamped_pose(
@@ -433,12 +434,20 @@ def create_goto_table_centre_root(
         func=get_zeroed_yaw_pose,
     )
 
-    goto_table_centre = goto.FromBlackboard(
-        name="Goto table centre",
-        pose_key=_zero_yaw_pose_key,
-        ignore_depth=True,
-        anchor_frame_name=BOT_CAM_FRAME,
-    )
+    if depth_override is not None:
+        goto_table_centre = goto.FromBlackboard(
+            name="Goto table centre",
+            pose_key=_zero_yaw_pose_key,
+            anchor_frame_name=BOT_CAM_FRAME,
+            depth_override_value=depth_override,
+        )
+    else:
+        goto_table_centre = goto.FromBlackboard(
+            name="Goto table centre",
+            pose_key=_zero_yaw_pose_key,
+            ignore_depth=True,
+            anchor_frame_name=BOT_CAM_FRAME,
+        )
 
     if trash is None:
         root_children = [

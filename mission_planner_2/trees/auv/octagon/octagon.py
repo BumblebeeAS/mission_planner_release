@@ -2,10 +2,12 @@ import operator
 
 import py_trees
 import py_trees_ros
-from bb_behavior_msgs.action import AlignAndCollect
+from bb_behavior_msgs.action import AlignAndCollect, ControlledSpin
+from bb_controls_msgs.srv import Controller
 from bb_perception_msgs.srv import ClusterTfSrv, GetObjectCount
 from lifecycle_msgs.srv import ChangeState
 
+from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -14,12 +16,11 @@ from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
+from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_request,
-    create_stamped_pose,
 )
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
-from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
 from mission_planner_2.trees.auv.octagon.trash import (
     create_align_actuate_surface_root,
@@ -83,7 +84,7 @@ PICKUP_CUTOFF_Z_DISTANCE = 0.2
 DROP_DEPTH_RATE = 0.05
 CONTROLLED_ASCENT_DEPTH_RATE = 0.05
 
-SURFACE_DEPTH_THRESHOLD = 0.03
+SURFACE_DEPTH_THRESHOLD = 0.00
 LOOK_AT_TABLE_DEPTH_THRESHOLD = 0.7
 CONTROLLED_ASCENT_DEPTH_TOLERANCE = 0.05
 
@@ -196,6 +197,7 @@ def create_search_root():
         table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
         cluster_duration=CLUSTER_DURATION,
         is_grabber_open=False,
+        depth_override=SURFACE_DEPTH_THRESHOLD,
     )
 
     cluster_node_start = py_trees_ros.service_clients.FromConstant(
@@ -210,19 +212,52 @@ def create_search_root():
         ),
     )
 
-    goto_n_search_poses = goto.NFromConstant(
-        name="Goto search poses",
-        poses=[
-            create_stamped_pose(
-                frame_id=BASE_LINK_FRAME,
-                yaw=360.0 / NUM_ROTATIONS,
-            )
-            for _ in range(NUM_ROTATIONS)
-        ],
-        anchor_frame_name=BASE_LINK_FRAME,
-        specified_heading=True,
-        wait_between_moves_sec=WAIT_BETWEEN_ROTATIONS,
+    srv_disable_controls = checked_service.FromConstant(
+        name="Disable controls (for spin)",
+        service_name=CONTROLS_SRV_TOPIC,
+        service_type=Controller,
+        service_request=Controller.Request(
+            enable=False,
+            pause=False,
+            disable_altitude=False,
+        ),
     )
+
+    controlled_spin_for_search = shared_action_client.FromConstant(
+        name="Goto search poses",
+        shared_action=SharedAction.CONTROLLED_SPIN,
+        action_goal=ControlledSpin.Goal(
+            yaw_amount=360.0,
+            yaw_tolerance=3.0,
+            yaw_rate=5.0,
+            timeout_seconds=30.0,
+        ),
+    )
+
+    srv_enable_controls = checked_service.FromConstant(
+        name="Enable controls (for spin)",
+        service_name=CONTROLS_SRV_TOPIC,
+        service_type=Controller,
+        service_request=Controller.Request(
+            enable=True,
+            pause=False,
+            disable_altitude=False,
+        ),
+    )
+
+    # goto_n_search_poses = goto.NFromConstant(
+    #     name="Goto search poses",
+    #     poses=[
+    #         create_stamped_pose(
+    #             frame_id=BASE_LINK_FRAME,
+    #             yaw=360.0 / NUM_ROTATIONS,
+    #         )
+    #         for _ in range(NUM_ROTATIONS)
+    #     ],
+    #     anchor_frame_name=BASE_LINK_FRAME,
+    #     specified_heading=True,
+    #     wait_between_moves_sec=WAIT_BETWEEN_ROTATIONS,
+
     cluster_node_stop = py_trees_ros.service_clients.FromConstant(
         name="Cluster search stop",
         service_type=ClusterTfSrv,
@@ -238,7 +273,9 @@ def create_search_root():
         [
             goto_table_centre_for_symbols,
             cluster_node_start,
-            goto_n_search_poses,
+            srv_disable_controls,
+            controlled_spin_for_search,
+            srv_enable_controls,
             cluster_node_stop,
         ]
     )
