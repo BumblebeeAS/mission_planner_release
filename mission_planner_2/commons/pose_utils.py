@@ -8,6 +8,7 @@ import numpy as np
 from bb_controls_msgs.srv import Limits
 from bb_perception_msgs.action import ClusterTfAction
 from bb_perception_msgs.srv import ClusterTfSrv
+from bb_robosub_msgs.srv import ClusterSlalomTfsStart, ClusterSlalomTfsStop
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from py_trees import console
@@ -380,4 +381,29 @@ def tf_to_stamped_pose(
         pitch=pitch,
         yaw=yaw,
         use_radians=use_radians,
+    )
+
+
+def create_slalom_clustering_start_srv_request(
+    input_child_frame_ids: list[str],
+    reset_cache: bool,
+):
+    return ClusterSlalomTfsStart.Request(
+        input_child_frame_ids=input_child_frame_ids,
+        reset_cache=reset_cache,
+    )
+
+
+def create_slalom_clustering_stop_srv_request(
+    output_child_frame_ids: list[str],
+    output_parent_frame_id: str,
+    min_cluster_size: int,
+):
+    output_parent_frame_ids = [output_parent_frame_id] * len(output_child_frame_ids)
+    num_layers = len(output_child_frame_ids)
+    return ClusterSlalomTfsStop.Request(
+        output_child_frame_ids=output_child_frame_ids,
+        output_parent_frame_ids=output_parent_frame_ids,
+        min_cluster_size=min_cluster_size,
+        num_layers=num_layers,
     )
