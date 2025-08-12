@@ -262,6 +262,15 @@ def create_open_and_ascend_root(
     controlled_ascent_depth_rate: float,
     open_grabber_first: bool = True,
 ):
+    """
+    This is a fallback!!!
+    """
+
+    seq_open_and_ascend_and_enable = py_trees.composites.Sequence(
+        name="Open grabber and ascend and enable",
+        memory=True,
+    )
+
     seq_open_and_ascend = py_trees.composites.Sequence(
         name="Open grabber and ascend",
         memory=True,
@@ -277,11 +286,6 @@ def create_open_and_ascend_root(
         ),
     )
 
-    force_succeed_open_grabber = py_trees.decorators.FailureIsSuccess(
-        name="Force succeed open grabber",
-        child=open_grabber,
-    )
-
     action_controlled_ascent = shared_action_client.FromConstant(
         name="Ascent to surface",
         shared_action=SharedAction.CONTROLLED_ASCENT,
@@ -293,6 +297,24 @@ def create_open_and_ascend_root(
         ),
     )
 
+    if open_grabber_first:
+        children = [
+            open_grabber,
+            action_controlled_ascent,
+        ]
+    else:
+        children = [
+            action_controlled_ascent,
+            open_grabber,
+        ]
+
+    seq_open_and_ascend.add_children(children=children)
+
+    force_succeed_seq_open_and_ascend = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed sequence open and ascend",
+        child=seq_open_and_ascend,
+    )
+
     srv_enable_controls = py_trees_ros.service_clients.FromConstant(
         name="Enable controls",
         service_type=Controller,
@@ -300,22 +322,19 @@ def create_open_and_ascend_root(
         service_request=Controller.Request(enable=True),
     )
 
-    if open_grabber_first:
-        children = [
-            force_succeed_open_grabber,
-            action_controlled_ascent,
+    seq_open_and_ascend_and_enable.add_children(
+        [
+            force_succeed_seq_open_and_ascend,
             srv_enable_controls,
         ]
-    else:
-        children = [
-            action_controlled_ascent,
-            force_succeed_open_grabber,
-            srv_enable_controls,
-        ]
+    )
 
-    seq_open_and_ascend.add_children(children=children)
+    force_succeed_seq_open_and_ascend_and_enable = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed sequence open and ascend and enable",
+        child=seq_open_and_ascend_and_enable,
+    )
 
-    return seq_open_and_ascend
+    return force_succeed_seq_open_and_ascend_and_enable
 
 
 def create_goto_table_centre_root(
@@ -638,7 +657,7 @@ def create_spin_root(
     collect_trash_counts = create_trash_count_collection_root(
         collection_result_key=collection_result_key,
         trash_count_service=trash_count_service,
-        trash="bottle",
+        trash=None,
         table_centre_frame=table_centre_frame,
         table_centre_frame_clustered=table_centre_frame_clustered,
         table_cluster_failure_count_key=table_cluster_failure_count_key,
