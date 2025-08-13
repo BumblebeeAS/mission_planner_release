@@ -19,12 +19,13 @@ from mission_planner_2.commons.namespace_utils import (
 from mission_planner_2.commons.node_registry import SharedAction
 from mission_planner_2.commons.pose_utils import (
     create_clustering_request,
+    create_stamped_pose,
 )
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
+from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
 from mission_planner_2.trees.auv.octagon.trash import (
     create_align_actuate_surface_root,
-    create_check_collections_changed_root,
     create_checked_collection_root,
     create_goto_table_centre_root,
     create_open_and_ascend_root,
@@ -145,12 +146,6 @@ def create_collection_root(
         is_grabber_open=False,
     )
 
-    seq_check_changed = create_check_collections_changed_root(
-        initial_collection_result_key=_COLLECTION_RESULTS_KEY,
-        trash_count_service=trash_count_service,
-        collect_duration=COLLECT_DURATION,
-    )
-
     seq_trash_drop = create_align_actuate_surface_root(
         trash_name=trash_name,
         object_frame=bucket_frame,
@@ -245,19 +240,6 @@ def create_search_root():
             disable_altitude=False,
         ),
     )
-
-    # goto_n_search_poses = goto.NFromConstant(
-    #     name="Goto search poses",
-    #     poses=[
-    #         create_stamped_pose(
-    #             frame_id=BASE_LINK_FRAME,
-    #             yaw=360.0 / NUM_ROTATIONS,
-    #         )
-    #         for _ in range(NUM_ROTATIONS)
-    #     ],
-    #     anchor_frame_name=BASE_LINK_FRAME,
-    #     specified_heading=True,
-    #     wait_between_moves_sec=WAIT_BETWEEN_ROTATIONS,
 
     cluster_node_stop = py_trees_ros.service_clients.FromConstant(
         name="Cluster search stop",
@@ -411,6 +393,13 @@ def create_octagon_root():
         offset_coeff=OFFSET_COEFF,
         wait_between_moves=1.0,
         search_depth=SEARCH_DEPTH,
+    )
+
+    goto_table_centre_after_search = goto.FromConstant(
+        name="Goto after table search",
+        pose=create_stamped_pose(TABLE_CENTER_FRAME_CLUSTERED),
+        anchor_frame_name="auv4/bot_cam_optical",
+        depth_override_value=SEARCH_DEPTH,
     )
 
     ################## BOTTLE PART #################
@@ -615,6 +604,7 @@ def create_octagon_root():
             init_table_clustering_count,
             init_collection_results,
             seq_search_for_table,
+            goto_table_centre_after_search,
             sel_timeout,
             force_success_seq_search_and_look,
             force_success_seq_spin,
