@@ -206,17 +206,11 @@ def create_gate_root():
         depth_override_value=GATE_DEPTH,
     )
 
-    # yaw_poses = [
-    #     create_stamped_pose(frame_id="auv4/base_link_ned", yaw=120.0)
-    #     for _ in range(2 * 3)
-    # ]
-
-    # # TODO: change to spin from samuel
-    # goto_yaw = goto.NFromConstant(
-    #     name="Goto yaw style",
-    #     poses=yaw_poses,
-    #     wait_between_moves_sec=0.1,
-    # )
+    goto_after_gate = goto.FromConstant(
+        name="Goto centre after gate",
+        pose=create_stamped_pose("gate/centre/after_gate"),
+        depth_override_value=GATE_DEPTH,
+    )
 
     # Start of spinning
     seq_yaw_spin = py_trees.composites.Sequence(name="yaw_spin", memory=True)
@@ -295,6 +289,7 @@ def create_gate_root():
             sub_gate_orientation,
             sel_gate_side,
             goto_through_gate,
+            goto_after_gate,
             seq_yaw_spin,
             force_success_stop_vision,
         ]
