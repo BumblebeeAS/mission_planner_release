@@ -79,6 +79,12 @@ slalom:
     z: 2.0
     parent_frame_id: "slalom_layer_0/clustered"
     child_frame_id: "slalom_layer_1/hardcoded"
+  - name: slalom_post_centre_clustered
+    parent_frame_id: "slalom_layer_2/clustered"
+    child_frame_id: "slalom/post_centre/clustered"
+  - name: slalom_post_centre_hardcoded
+    parent_frame_id: "slalom_layer_2/hardcoded"
+    child_frame_id: "slalom/post_centre/hardcoded"
 octagon:
   - name: symbols_hardcoded_shark
     x: 0.1525
@@ -147,39 +153,66 @@ map:
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/gate/end"
   - name: slalom_start
-    x: 3.0
-    y: 0.0
-    z: 0.3
-    yaw: 20.0
+    x: 2.5
+    y: 2.0
+    # x: 3.0
+    # y: 0.0
+    # z: 0.3
+    yaw: 40.0
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/slalom/start"
+  - name: slalom_stupid_0
+    x: 1.0
+    y: 0.0
+    parent_frame_id: "map_ned/slalom/start"
+    child_frame_id: "map_ned/slalom/stupid_0"
+  - name: slalom_stupid_1
+    x: 2.0
+    y: 0.0
+    parent_frame_id: "map_ned/slalom/stupid_0"
+    child_frame_id: "map_ned/slalom/stupid_1"
+  - name: slalom_stupid_2
+    x: 2.0
+    y: 0.0
+    parent_frame_id: "map_ned/slalom/stupid_1"
+    child_frame_id: "map_ned/slalom/stupid_2"
   - name: slalom_end
     x: 9.0
-    y: -1.0
-    z: 0.3
+    y: 1.0
+    # x: 9.0
+    # y: -1.0
+    # z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/slalom/end"
   - name: bin
-    x: 15.0
-    y: -1.0
-    z: 0.3
+    x: 10.0
+    y: 2.0
+    # x: 15.0
+    # y: -1.0
+    # z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/bin"
   - name: torpedo_start
-    x: 13.0
-    y: 2.0
-    z: 0.3
+    x: 14.0
+    y: -6.0
+    # x: 13.0
+    # y: 2.0
+    # z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/torpedo/start"
   - name: torpedo_post
-    x: 13.0
-    y: 0.0
-    z: 0.3
+    x: 14.0
+    y: -3.0
+    # x: 13.0
+    # y: 0.0
+    # z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/torpedo/post"
   - name: octagon
-    x: 17.1
-    y: 0.6
-    z: 0.3
+    x: 18.0
+    y: -3.0
+    # x: 17.1
+    # y: 0.6
+    # z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/octagon"
