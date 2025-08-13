@@ -2,15 +2,16 @@ from typing import Callable
 
 import py_trees
 import py_trees_ros
+from bb_auv_msgs.action import Grabber
+from bb_sensor_msgs.msg import Ping
 from rclpy.qos import qos_profile_system_default
 
-from bb_sensor_msgs.msg import Ping
-
+from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-
+from mission_planner_2.commons.node_registry import SharedAction
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -22,19 +23,16 @@ def create_order_by_ping_root(
     first_subtree_func: Callable[[], py_trees.behaviour.Behaviour],
     second_subtree_func: Callable[[], py_trees.behaviour.Behaviour],
     ping_topic: str = "/sensors/ping",
-    timeout: float = 20.0,
+    timeout: float = 10.0,
     confidence_threshold: float = 1.0,
-    partition_angle_offset: int = 0
+    partition_angle_offset: int = 0,
 ) -> py_trees.behaviour.Behaviour:
-
     sel_subtree = py_trees.composites.Selector(
-        name="Select subtree by ping",
-        memory=True
+        name="Select subtree by ping", memory=True
     )
 
     seq_sub_check = py_trees.composites.Sequence(
-        name="Sequence subscribe to ping and check confidence",
-        memory=True
+        name="Sequence subscribe to ping and check confidence", memory=True
     )
 
     sub_ping = py_trees_ros.subscribers.ToBlackboard(
@@ -42,7 +40,7 @@ def create_order_by_ping_root(
         topic_name=ping_topic,
         topic_type=Ping,
         qos_profile=qos_profile_system_default,
-        blackboard_variables={_PING_RESPONSE_KEY: None}
+        blackboard_variables={_PING_RESPONSE_KEY: None},
     )
 
     check_ping_confidence = py_trees.behaviours.CheckBlackboardVariableValue(
@@ -50,8 +48,8 @@ def create_order_by_ping_root(
         check=py_trees.common.ComparisonExpression(
             variable=_PING_RESPONSE_KEY,
             value=confidence_threshold,
-            operator=lambda x, y: x.confidence >= y
-        )
+            operator=lambda x, y: x.confidence >= y,
+        ),
     )
 
     check_ping_direction = py_trees.behaviours.CheckBlackboardVariableValue(
@@ -59,71 +57,104 @@ def create_order_by_ping_root(
         check=py_trees.common.ComparisonExpression(
             variable=_PING_RESPONSE_KEY,
             value=180,
-            operator=lambda x, y: (x.doa_deg - partition_angle_offset) % 360 < y
-        )
+            operator=lambda x, y: (x.doa_deg - partition_angle_offset) % 360 < y,
+        ),
     )
 
-    seq_sub_check.add_children(
-        children=[
-            sub_ping,
-            check_ping_confidence
-        ]
-    )
+    seq_sub_check.add_children(children=[sub_ping, check_ping_confidence])
 
     retry_wait_ping = py_trees.decorators.Retry(
-        name="Retry wait for good ping",
-        child=seq_sub_check,
-        num_failures=100_000
+        name="Retry wait for good ping", child=seq_sub_check, num_failures=100_000
     )
 
     timeout_wait_ping = py_trees.decorators.Timeout(
-        name="Timeout wait for good ping",
-        child=retry_wait_ping,
-        duration=timeout
+        name="Timeout wait for good ping", child=retry_wait_ping, duration=timeout
     )
 
     seq_confidence_check_threshold_check_first_order = py_trees.composites.Sequence(
-        name="Sequence check and first order",
-        memory=True
+        name="Sequence check and first order", memory=True
     )
 
     seq_first_order = py_trees.composites.Sequence(
-        name="Sequence first order",
-        memory=True
+        name="Sequence first order", memory=True
     )
 
     seq_second_order = py_trees.composites.Sequence(
-        name="Sequence second order",
-        memory=True
+        name="Sequence second order", memory=True
+    )
+
+    first_open_grabber = shared_action_client.FromConstant(
+        name="Open grabber for pings",
+        shared_action=SharedAction.GRABBER,
+        action_goal=Grabber.Goal(
+            command=65535,
+            tolerance=0,
+            timeout_ms=5000,
+        ),
+    )
+
+    force_succeed_open_grabber_one = py_trees.decorators.FailureIsSuccess(
+        name="force succeed open grabber",
+        child=first_open_grabber,
+    )
+
+    second_open_grabber = shared_action_client.FromConstant(
+        name="Open grabber for pings",
+        shared_action=SharedAction.GRABBER,
+        action_goal=Grabber.Goal(
+            command=65535,
+            tolerance=0,
+            timeout_ms=5000,
+        ),
+    )
+
+    force_succeed_open_grabber_two = py_trees.decorators.FailureIsSuccess(
+        name="force succeed open grabber",
+        child=second_open_grabber,
     )
 
     seq_first_order.add_children(
         children=[
+            force_succeed_open_grabber_one,
             first_subtree_func(),
-            second_subtree_func()
+            second_subtree_func(),
         ]
     )
 
     seq_second_order.add_children(
         children=[
+            force_succeed_open_grabber_two,
             second_subtree_func(),
-            first_subtree_func()
+            first_subtree_func(),
         ]
+    )
+
+    close_grabber = shared_action_client.FromConstant(
+        name="Close grabber for pings",
+        shared_action=SharedAction.GRABBER,
+        action_goal=Grabber.Goal(
+            command=5,
+            tolerance=0,
+            timeout_ms=5000,
+        ),
+    )
+
+    force_succeed_close_grabber = py_trees.decorators.FailureIsSuccess(
+        name="force succed close grabber",
+        child=close_grabber,
     )
 
     seq_confidence_check_threshold_check_first_order.add_children(
         children=[
+            force_succeed_close_grabber,
             timeout_wait_ping,
             check_ping_direction,
-            seq_first_order
+            seq_first_order,
         ]
     )
 
     sel_subtree.add_children(
-        children=[
-            seq_confidence_check_threshold_check_first_order,
-            seq_second_order
-        ]
+        children=[seq_confidence_check_threshold_check_first_order, seq_second_order]
     )
 
     return sel_subtree

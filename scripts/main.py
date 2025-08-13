@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import functools
 import traceback
 
 import py_trees
@@ -9,10 +8,15 @@ import rclpy
 
 from mission_planner_2.commons.bumble_tree import BumbleTree
 from mission_planner_2.commons.hooks import stop_on_success_or_failure
-from mission_planner_2.commons.led_management import LedVisitor, led_handler
+from mission_planner_2.commons.led_management import LedVisitor
 from mission_planner_2.commons.node_registry import TreeNode
 from mission_planner_2.commons.visitors import LoggingSnapshotVisitor
-from mission_planner_2.trees.auv.mother.mother import (
+
+# from mission_planner_2.trees.auv.mother.mother import (
+#     create_mother,
+#     load_mission_coordinates,
+# )
+from mission_planner_2.trees.auv.mother.mother_c import (
     create_mother,
     load_mission_coordinates,
 )
@@ -34,7 +38,7 @@ def main():
         display_blackboard=False,
         display_activity_stream=True,
     )
-    tree.add_visitor(led_visitor)
+    # tree.add_visitor(led_visitor)
     tree.add_visitor(log_visitor)
     ############################
 
@@ -47,9 +51,9 @@ def main():
 
     ###### Add post-tick handlers ######
     tree.add_post_tick_handler(stop_on_success_or_failure)
-    tree.add_post_tick_handler(
-        functools.partial(led_handler, led_visitor, node.led_publisher)
-    )
+    # tree.add_post_tick_handler(
+    #     functools.partial(led_handler, led_visitor, node.led_publisher)
+    # )
     ###################################
 
     tree.tick_tock(period_ms=100)

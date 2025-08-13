@@ -59,14 +59,13 @@ TEMPLATE_FRAME_YOLO_CLUSTERED = "bin/yolo/clustered"
 ACTUATION_TOPIC = "/auv4/actuation/dropper"
 ACTUATION_UINT = UInt8(data=6)
 
-NUM_SQUARES = 1
-OFFSET_COEFF = 1.0
 CLUSTERING_DURATION = 4
 REALIGN_CLUSTER_DURATION = 2
 STABILIZE_CONTROLS_DURATION = 5.0
 RETRIES = 5
 NUM_RETRIES = 3
-BIN_SEARCH_DEPTH = 0.3
+
+BIN_DEPTH_OVERRIDE_VALUE = 1.5
 
 BIN_CENTRE_VIEW_FRAME = "bin/centre/view"
 FISH_BIN_VIEW_FRAME = "bin/fish/view"
@@ -80,6 +79,14 @@ SEARCH_PATTERN = [
     {"x": 0.0, "y": 0.5, "z": 0.0},
     {"x": -0.5, "y": 0.0, "z": 0.0},
 ]
+
+SEARCH_FWD = 1.0
+SEARCH_BACK = 0.3
+SEARCH_LEFT = 0.5
+SEARCH_RIGHT = 0.5
+NUM_SQUARES = 1
+OFFSET_COEFF = 1.0
+SEARCH_DEPTH = 0.3
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -128,16 +135,16 @@ def create_bin_root():
     )
 
     seq_search = create_search_bot_layered_square_root(
-        fwd=1.0,
-        back=0.3,
-        left=0.5,
-        right=0.5,
+        fwd=SEARCH_FWD,
+        back=SEARCH_BACK,
+        left=SEARCH_LEFT,
+        right=SEARCH_RIGHT,
         num_squares=NUM_SQUARES,
         object_frame=TEMPLATE_FRAME_YOLO,
         object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,
         offset_coeff=OFFSET_COEFF,
         wait_between_moves=3.0,
-        search_depth=BIN_SEARCH_DEPTH,
+        search_depth=SEARCH_DEPTH,
     )
 
     cluster_bin_centre = shared_action_client.FromConstant(
@@ -174,6 +181,7 @@ def create_bin_root():
     goto_bin_centre = goto.FromBlackboard(
         name="Goto bin centre",
         pose_key=_BIN_CENTRE_ACUTE_POSE_KEY,
+        depth_override_value=BIN_DEPTH_OVERRIDE_VALUE,
     )
 
     stabilise = py_trees.timers.Timer("Stabilise", duration=STABILIZE_CONTROLS_DURATION)

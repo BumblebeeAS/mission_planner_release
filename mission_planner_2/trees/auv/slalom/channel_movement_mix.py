@@ -67,11 +67,15 @@ RECLUSTERED_LAYER_KEY = fk("reclustered_layer")
 SWEEP_ANGLE_DEGREES = 30.0
 SWEEP_RECLUSTER_DURATION = 5
 DEPTH_OVERRIDE_VALUE = 0.9
+LOWER_X_BOUND = 1.5
+UPPER_X_BOUND = 2.5
 #########################################################################
 
 
-def create_yawed_pose(tf: TransformStamped) -> PoseStamped:
+def create_yawed_pose(tf: TransformStamped, is_reverse: bool) -> PoseStamped:
     yaw = np.arctan2(tf.transform.translation.x, tf.transform.translation.z)
+    if is_reverse:
+        yaw = -yaw  # Reverse the yaw if needed
     print(f"Yaw angle for pose: {yaw} radians")
     return create_stamped_pose(frame_id=BASE_LINK_FRAME, yaw=yaw, use_radians=True)
 
@@ -109,6 +113,8 @@ def _create_slalom_right_pose(frame_id: str):
 def validate_clusters(
     layer_zero_to_one: TransformStamped,
     layer_one_to_two: TransformStamped,
+    z_lower_bound: float = 1.5,
+    z_upper_bound: float = 2.5,
 ) -> bool:
     """
     Validate that the clusters are not None and are spaced apart correctly.
@@ -116,8 +122,8 @@ def validate_clusters(
 
     def check_tf_dist(
         tf: TransformStamped,
-        z_lower_bound: float = 1.0,
-        z_upper_bound: float = 5.0,
+        z_lower_bound: float = 1.5,
+        z_upper_bound: float = 2.5,
     ) -> bool:
         """
         Check if the distance between two transforms is within a specified range in the z-axis.
@@ -127,7 +133,11 @@ def validate_clusters(
     if layer_zero_to_one is None or layer_one_to_two is None:
         return False
 
-    return check_tf_dist(layer_zero_to_one) and check_tf_dist(layer_one_to_two)
+    return check_tf_dist(
+        tf=layer_zero_to_one, z_lower_bound=z_lower_bound, z_upper_bound=z_upper_bound
+    ) and check_tf_dist(
+        tf=layer_one_to_two, z_lower_bound=z_lower_bound, z_upper_bound=z_upper_bound
+    )
 
 
 def create_move_to_layer_zero_root():
@@ -208,6 +218,8 @@ def create_move_between_layers_root(
 
     def validate_reclustered_layer(
         tf: TransformStamped,
+        x_lower_bound: float = 1.5,
+        x_upper_bound: float = 2.5,
     ):
         """
         The transform used here is from the current layer to the reclustered/next layer.
@@ -216,8 +228,8 @@ def create_move_between_layers_root(
 
         def check_tf_dist(
             tf: TransformStamped,
-            x_lower_bound: float = 1.0,
-            x_upper_bound: float = 3.0,
+            x_lower_bound: float = 1.5,
+            x_upper_bound: float = 2.5,
         ) -> bool:
             """
             Check if the distance in the x-axis is within the specified bounds.
@@ -227,7 +239,11 @@ def create_move_between_layers_root(
 
         if tf is None:
             return False
-        return check_tf_dist(tf)
+        return check_tf_dist(
+            tf,
+            x_lower_bound=x_lower_bound,
+            x_upper_bound=x_upper_bound,
+        )
 
     current_layer_frame = (
         LAYER_ZERO_CLUSTERED if current_layer == "zero" else LAYER_ONE_CLUSTERED
@@ -277,7 +293,7 @@ def create_move_between_layers_root(
         key=LAYER_TO_LAYER_TF_KEY,
         update_key=LAYER_TO_LAYER_POSE_KEY,
         overwrite=True,
-        func=lambda tf: create_yawed_pose(tf=tf),
+        func=lambda tf: create_yawed_pose(tf=tf, is_reverse=False),
     )
 
     goto_yaw_view_pose = goto.FromBlackboard(
@@ -298,6 +314,20 @@ def create_move_between_layers_root(
             ],
             duration=RECLUSTER_DURATION,
         ),
+    )
+
+    create_yaw_view_back_pose = DynamicSetBlackboard(
+        name=f"Create Yawed Pose for Layer {current_layer} to Layer {next_layer}",
+        key=LAYER_TO_LAYER_TF_KEY,
+        update_key=LAYER_TO_LAYER_POSE_KEY,
+        overwrite=True,
+        func=lambda tf: create_yawed_pose(tf=tf, is_reverse=True),
+    )
+
+    goto_yaw_view_back_pose = goto.FromBlackboard(
+        name=f"Goto Yawed Pose from Layer {current_layer} to Layer {next_layer}",
+        pose_key=LAYER_TO_LAYER_POSE_KEY,
+        depth_override_value=DEPTH_OVERRIDE_VALUE,
     )
 
     write_reclustered_to_bb = create_tf_checker_from_constant_root(
@@ -322,6 +352,8 @@ def create_move_between_layers_root(
             get_current_to_next_tf,  # Get the transform from current layer to next layer
             create_yaw_view_pose,  # Create a yawed pose based on the transform
             goto_yaw_view_pose,  # Move to the yawed pose
+            create_yaw_view_back_pose,  # Create a yawed pose for the back position
+            goto_yaw_view_back_pose,  # Move back to the original position
             recluster_action,  # Recluster the next layer
             write_reclustered_to_bb,  # Write the reclustered transform to the blackboard
             set_next_layer_reclustered_pose_yaw,
@@ -340,6 +372,9 @@ def create_move_between_layers_root(
         create_stamped_pose(
             frame_id=BASE_LINK_FRAME, yaw=SWEEP_ANGLE_DEGREES * 2, use_radians=False
         ),
+        create_stamped_pose(
+            frame_id=BASE_LINK_FRAME, yaw=-SWEEP_ANGLE_DEGREES, use_radians=False
+        ),
     ]
 
     goto_sweep_0 = goto.FromConstant(
@@ -351,6 +386,12 @@ def create_move_between_layers_root(
     goto_sweep_1 = goto.FromConstant(
         name=f"Sweep right from Layer {current_layer} to Layer {next_layer}",
         pose=sweep_poses[1],
+        depth_override_value=DEPTH_OVERRIDE_VALUE,
+    )
+
+    goto_sweep_back = goto.FromConstant(
+        name=f"Sweep back to Layer {current_layer} from Layer {next_layer}",
+        pose=sweep_poses[2],
         depth_override_value=DEPTH_OVERRIDE_VALUE,
     )
 
@@ -417,11 +458,12 @@ def create_move_between_layers_root(
 
     seq_sweep_and_recluster.add_children(
         [
-            recluster_sweep_pre,  # Recluster before sweeping
             goto_sweep_0,  # Sweep left
             recluster_sweep_0,  # Recluster during the left sweep
             goto_sweep_1,  # Sweep right
             recluster_sweep_1,  # Recluster during the right sweep
+            goto_sweep_back,  # Sweep back to the original position
+            recluster_sweep_pre,  # Recluster before sweeping
             write_sweep_reclustered_to_bb,  # Write the reclustered transform to the blackboard
             set_next_layer_reclustered_pose_sweep,
         ]
@@ -449,7 +491,9 @@ def create_move_between_layers_root(
         key=RECLUSTERED_LAYER_KEY,
         update_key=IS_VALID_RECLUSTERED_KEY,
         overwrite=True,
-        func=lambda tf: validate_reclustered_layer(tf),
+        func=lambda tf: validate_reclustered_layer(
+            tf=tf, x_lower_bound=LOWER_X_BOUND, x_upper_bound=UPPER_X_BOUND
+        ),
     )
 
     check_reclustered_layer_validity = py_trees.behaviours.CheckBlackboardVariableValue(
@@ -612,6 +656,8 @@ def create_movement_strategy_root():
         func=lambda layer_zero_to_one, layer_one_to_two: validate_clusters(
             layer_zero_to_one,
             layer_one_to_two,
+            z_lower_bound=LOWER_X_BOUND,
+            z_upper_bound=UPPER_X_BOUND,
         ),
     )
 

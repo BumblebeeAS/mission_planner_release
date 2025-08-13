@@ -75,9 +75,7 @@ NUM_ROTATIONS = 3
 STABILIZE_DURATION = 5
 WAIT_BETWEEN_ROTATIONS = 3
 LOOK_AT_TARGET_PAUSE_DURATION = 4
-NUM_SQUARES = 1
-SEARCH_DEPTH = 0.3
-OFFSET_COEFF = 1.0
+
 DROP_Z_DISTANCE = 0.30
 
 PICKUP_DEPTH_RATE = 0.05
@@ -97,6 +95,14 @@ MAX_TABLE_CLUSTER_FAILURE = 3
 
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 GRABBER_ACTION_TOPIC = "/auv4/actuation/grabber"
+
+SEARCH_FWD = 1.0
+SEARCH_BACK = 1.0
+SEARCH_LEFT = 1.0
+SEARCH_RIGHT = 1.0
+NUM_SQUARES = 1
+OFFSET_COEFF = 1.0
+SEARCH_DEPTH = 0.3
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -383,10 +389,10 @@ def create_octagon_root():
     )
 
     seq_search_for_table = create_search_bot_layered_square_root(
-        fwd=1.0,
-        back=0.3,
-        left=0.5,
-        right=0.5,
+        fwd=SEARCH_FWD,
+        back=SEARCH_BACK,
+        left=SEARCH_LEFT,
+        right=SEARCH_RIGHT,
         num_squares=NUM_SQUARES,
         object_frame=TABLE_CENTER_FRAME,
         object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,

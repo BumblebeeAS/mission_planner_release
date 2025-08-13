@@ -18,10 +18,13 @@ from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
 from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
 
 # from mission_planner_2.trees.auv.slalom.slalom import create_slalom_root
-from mission_planner_2.trees.auv.slalom.slalom_yaw import (
-    create_slalom_yaw_root as create_slalom_root,
+from mission_planner_2.trees.auv.slalom.slalom_mix_yaw import (
+    create_slalom_mix_yaw_root as create_slalom_root,
 )
 
+# from mission_planner_2.trees.auv.slalom.slalom_stupid import (
+#     create_slalom_stupid_root as create_slalom_root,
+# )
 # from mission_planner_2.trees.auv.slalom.slalom_stupid import create_slalom_stupid_root
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
@@ -38,6 +41,7 @@ RESET_POSE_SRV_TOPIC = "/auv4/nav/reset_pose"
 YAW_BEFORE_GATE_KEY = "/global/yaw_before_gate"
 
 BUTTON_RETRIES = 1000000
+ACOUSTIC_TIMEOUT = 10.0
 
 
 def load_mission_coordinates():
@@ -163,7 +167,7 @@ def create_mother(coords: dict):
         end=coords["slalom_end"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
-        goto_depth=0.4,
+        goto_depth=0.15,
     )
 
     move_to_bin = create_move_to_task(
@@ -191,10 +195,9 @@ def create_mother(coords: dict):
             end=coords[end_coords],
             odom_key=CURRENT_ODOM_KEY,
             zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
-            specified_heading=False,
         )
 
-    acoustics_root = create_acoustics_root(move_func)
+    acoustics_root = create_acoustics_root(move_func, timeout=ACOUSTIC_TIMEOUT)
 
     move_to_torpedo = create_move_to_task(
         task="torpedo",
@@ -202,26 +205,24 @@ def create_mother(coords: dict):
         end=coords["torpedo_start"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
-        specified_heading=False,
     )
 
     torpedo_root = create_torpedo_root()
 
     move_to_space = create_move_to_task(
         task="post_torpedo",
-        start=coords["torpedo_start"],
-        end=coords["torpedo_post"],
+        start=coords["torpedo"],
+        end=coords["acoustic_start"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
 
     move_to_octagon = create_move_to_task(
         task="octagon",
-        start=coords["torpedo_post"],
+        start=coords["acoustic_start"],
         end=coords["octagon"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
-        specified_heading=False,
     )
 
     octagon_root = create_octagon_root()
@@ -238,19 +239,19 @@ def create_mother(coords: dict):
 
     root.add_children(
         [
-            # button_start,
+            button_start,
             seq_reset_clustering,
             srv_get_choice,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
             set_testing_keys,  # if dont do gate
-            # move_to_gate,
-            # gate_root,
-            # move_to_slalom,
-            # move_to_slalom_end,
+            move_to_gate,
+            gate_root,
+            move_to_slalom,
+            move_to_slalom_end,
             # slalom_root,
-            # move_to_bin,
-            # bin_root,
+            move_to_bin,
+            bin_root,
             move_to_acoustic_start,
             acoustics_root,
             # move_to_torpedo,
@@ -258,7 +259,6 @@ def create_mother(coords: dict):
             # move_to_space,
             # move_to_octagon,
             # octagon_root,
-            # return_root,
         ]
     )
 
