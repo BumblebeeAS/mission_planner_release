@@ -20,6 +20,8 @@ from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
 from mission_planner_2.trees.auv.slalom.slalom_yaw import (
     create_slalom_yaw_root as create_slalom_root,
 )
+
+# from mission_planner_2.trees.auv.slalom.slalom_stupid import create_slalom_stupid_root
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
 LEFT_BUTTON_TOPIC = "/auv4/button/left"
@@ -113,6 +115,15 @@ def create_mother(coords: dict):
     )
     slalom_root = create_slalom_root()
 
+    move_to_slalom_end = create_move_to_task(
+        task="move_to_slalom_end",
+        start=coords["slalom_start"],
+        end=coords["slalom_end"],
+        odom_key=CURRENT_ODOM_KEY,
+        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        goto_depth=0.4,
+    )
+
     move_to_bin = create_move_to_task(
         task="bin",
         start=coords["slalom_end"],
@@ -140,7 +151,7 @@ def create_mother(coords: dict):
     )
     move_to_octagon = create_move_to_task(
         task="octagon",
-        start=coords["gate_end"],
+        start=coords["torpedo_post"],
         end=coords["octagon"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
@@ -163,13 +174,14 @@ def create_mother(coords: dict):
             srv_get_choice,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
-            set_testing_keys,
+            set_testing_keys,  # if dont do gate
             # move_to_gate,
             # gate_root,
             # move_to_slalom,
-            slalom_root,
+            # move_to_slalom_end,
+            # slalom_root,
             # move_to_bin,
-            # bin_root,
+            bin_root,
             # move_to_torpedo,
             # torpedo_root,
             # move_to_space,

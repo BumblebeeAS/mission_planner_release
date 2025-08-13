@@ -106,6 +106,14 @@ def create_mother(coords: dict):
     )
     slalom_root = create_slalom_root()
 
+    move_to_slalom_end = create_move_to_task(
+        task="move_to_slalom_end",
+        start=coords["slalom_start"],
+        end=coords["slalom_end"],
+        odom_key=CURRENT_ODOM_KEY,
+        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+    )
+
     move_to_bin = create_move_to_task(
         task="bin",
         start=coords["slalom_end"],
@@ -149,6 +157,7 @@ def create_mother(coords: dict):
             move_to_gate,
             gate_root,
             move_to_slalom,
+            # move_to_slalom_end,
             slalom_root,
             move_to_bin,
             bin_root,
