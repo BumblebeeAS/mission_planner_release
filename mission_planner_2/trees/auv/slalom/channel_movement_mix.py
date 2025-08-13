@@ -66,7 +66,7 @@ RECLUSTER_DURATION = 5
 RECLUSTERED_LAYER_KEY = fk("reclustered_layer")
 SWEEP_ANGLE_DEGREES = 30.0
 SWEEP_RECLUSTER_DURATION = 5
-DEPTH_OVERRIDE_VALUE = 0.3
+DEPTH_OVERRIDE_VALUE = 0.9
 #########################################################################
 
 
@@ -269,6 +269,7 @@ def create_move_between_layers_root(
         end_frames=[next_layer_frame],
         update_keys=[LAYER_TO_LAYER_TF_KEY],
         fallback_val=[None],
+        is_fail_if_none=False,
     )
 
     create_yaw_view_pose = DynamicSetBlackboard(
@@ -304,6 +305,7 @@ def create_move_between_layers_root(
         end_frames=[next_layer_frame + "/reclustered/yaw"],
         update_keys=[RECLUSTERED_LAYER_KEY],
         fallback_val=[None],
+        is_fail_if_none=False,
     )
 
     set_next_layer_reclustered_pose_yaw = DynamicSetBlackboard(
@@ -402,6 +404,7 @@ def create_move_between_layers_root(
         end_frames=[next_layer_frame + "/reclustered/sweep"],
         update_keys=[RECLUSTERED_LAYER_KEY],
         fallback_val=[None],
+        is_fail_if_none=False,
     )
 
     set_next_layer_reclustered_pose_sweep = DynamicSetBlackboard(
@@ -594,6 +597,7 @@ def create_movement_strategy_root():
             None,
             None,
         ],
+        is_fail_if_none=False,
     )
 
     # Having valid clusters implies that the clustered layers are not None and are spaced apart correctly.

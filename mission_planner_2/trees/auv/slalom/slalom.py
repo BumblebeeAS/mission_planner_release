@@ -3,8 +3,6 @@ import operator
 import py_trees
 import py_trees_ros
 from lifecycle_msgs.srv import ChangeState
-from std_srvs.srv import SetBool
-
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
@@ -23,6 +21,7 @@ from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.slalom.channel_movement_mix import (
     create_movement_strategy_root,
 )
+from std_srvs.srv import SetBool
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -60,8 +59,16 @@ CLUSTER_VIEW_DURATION = 5
 WAIT_BETWEEN_MOVES_SEC = 0.1
 MIN_CLUSTER_SIZE = 10
 
-MOVE_VIEW_DEPTH = 0.3
+MOVE_VIEW_DEPTH = 0.9
 CLUSTERING_SERVICE_NAME = "/auv4/cluster_tfs_multi_srv"
+LAYER_ZERO_NEAR = "slalom_layer_near_0"
+LAYER_ONE_NEAR = "slalom_layer_near_1"
+LAYER_TWO_NEAR = "slalom_layer_near_2"
+CLUSTERING_IN_CHILDREN_NEAR = [
+    LAYER_ZERO_NEAR,
+    LAYER_ONE_NEAR,
+    LAYER_TWO_NEAR,
+]
 
 """
 For sim.
@@ -178,11 +185,7 @@ def create_slalom_root():
         name="Initial cluster 1",
         shared_action=SharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
-            in_children=[
-                CHANNEL_PAIR_ZERO_FRAME,
-                CHANNEL_PAIR_ONE_FRAME,
-                CHANNEL_PAIR_TWO_FRAME,
-            ],
+            in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
                 CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
                 CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
@@ -198,11 +201,7 @@ def create_slalom_root():
         name="Initial cluster 2",
         shared_action=SharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
-            in_children=[
-                CHANNEL_PAIR_ZERO_FRAME,
-                CHANNEL_PAIR_ONE_FRAME,
-                CHANNEL_PAIR_TWO_FRAME,
-            ],
+            in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
                 CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
                 CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
@@ -218,11 +217,7 @@ def create_slalom_root():
         name="Initial cluster 3",
         shared_action=SharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
-            in_children=[
-                CHANNEL_PAIR_ZERO_FRAME,
-                CHANNEL_PAIR_ONE_FRAME,
-                CHANNEL_PAIR_TWO_FRAME,
-            ],
+            in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
                 CHANNEL_PAIR_ZERO_FRAME_CLUSTERED,
                 CHANNEL_PAIR_ONE_FRAME_CLUSTERED,
@@ -334,7 +329,7 @@ def create_slalom_root():
             check_start_depth_succeeded,
             seq_move_and_cluster,
             seq_movement_strategy,
-            # goto_pass_through,
+            goto_pass_through,
             srv_end_vision,
             check_end_vision_succeeded,
             srv_unload_depth_anything,
