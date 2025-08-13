@@ -2,6 +2,7 @@ import py_trees
 
 from mission_planner_2.trees.auv.acoustics.order_by_ping import create_order_by_ping_root
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
+from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
 
 
 def create_acoustics_root(move_func) -> py_trees.behaviour.Behaviour:
@@ -16,7 +17,7 @@ def create_acoustics_root(move_func) -> py_trees.behaviour.Behaviour:
         seq_acoustic_octagon.add_children(
             children=[
                 move_func("acoustic_start", "octagon"),
-                create_torpedo_root(),
+                create_octagon_root(),
                 move_func("octagon", "acoustic_start")
             ]
         )
