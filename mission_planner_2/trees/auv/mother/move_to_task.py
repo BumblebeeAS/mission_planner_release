@@ -20,6 +20,7 @@ def create_move_to_task(
     zero_yaw_pose_key: str,
     goto_depth: float = 0.3,
     yaw_before_gate_key: str = _YAW_BEFORE_GATE_KEY,
+    specified_heading: bool = True,
 ):
     root = py_trees.composites.Sequence(
         name=f"Move to {task}",
@@ -63,6 +64,7 @@ def create_move_to_task(
         name=f"Goto {task} start",
         pose=task_pose,
         depth_override_value=goto_depth,
+        specified_heading=specified_heading,
     )
 
     root.add_children(
