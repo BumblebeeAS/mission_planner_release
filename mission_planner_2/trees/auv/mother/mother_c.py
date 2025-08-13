@@ -8,6 +8,7 @@ from geometry_msgs.msg import TransformStamped
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.blackboard import MultiSetBlackboard
+from mission_planner_2.trees.auv.acoustics.acoustics import create_acoustics_root
 from mission_planner_2.trees.auv.bins.bins import create_bin_root
 from mission_planner_2.trees.auv.gate.gate import create_gate_root
 from mission_planner_2.trees.auv.gate.move_to_task import create_move_to_gate_task_root
@@ -75,6 +76,45 @@ def create_mother(coords: dict):
         button_retries=BUTTON_RETRIES,
     )
 
+    seq_reset_clustering = py_trees.composites.Sequence(
+        name="Reset clustering caches",
+        memory=True,
+    )
+
+    srv_reset_cluster_tf_action = py_trees_ros.service_clients.FromConstant(
+        name="Reset cluster tf action",
+        service_type=Trigger,
+        service_name="/auv4/cluster_tf/reset_caches",
+        service_request=Trigger.Request(),
+    )
+    srv_reset_cluster_tf_multi_action = py_trees_ros.service_clients.FromConstant(
+        name="Reset cluster tf multi action",
+        service_type=Trigger,
+        service_name="/auv4/cluster_tf_multi/reset_caches",
+        service_request=Trigger.Request(),
+    )
+    srv_reset_cluster_tf_srv = py_trees_ros.service_clients.FromConstant(
+        name="Reset cluster tf server",
+        service_type=Trigger,
+        service_name="/auv4/cluster_tfs_srv/reset_caches",
+        service_request=Trigger.Request(),
+    )
+    srv_reset_cluster_tf_multi_srv = py_trees_ros.service_clients.FromConstant(
+        name="Reset cluster tf multi server",
+        service_type=Trigger,
+        service_name="/auv4/cluster_tfs_multi_srv/reset_caches",
+        service_request=Trigger.Request(),
+    )
+
+    seq_reset_clustering.add_children(
+        [
+            srv_reset_cluster_tf_action,
+            srv_reset_cluster_tf_multi_action,
+            srv_reset_cluster_tf_srv,
+            srv_reset_cluster_tf_multi_srv,
+        ]
+    )
+
     set_base_link_frame = py_trees.behaviours.SetBlackboardVariable(
         name="Set Base Link Frame",
         variable_name=BASE_LINK_KEY,
@@ -98,6 +138,7 @@ def create_mother(coords: dict):
     )
 
     gate_root = create_gate_root()
+
     move_to_gate = create_move_to_gate_task_root(
         world_coords=coords["gate_start"],
         relative_coords=coords["rel_gate_start"],
@@ -113,6 +154,7 @@ def create_mother(coords: dict):
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
+
     slalom_root = create_slalom_root()
 
     move_to_slalom_end = create_move_to_task(
@@ -131,7 +173,28 @@ def create_mother(coords: dict):
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
+
     bin_root = create_bin_root()
+
+    move_to_acoustic_start = create_move_to_task(
+        task="acoustic_start",
+        start=coords["bin"],
+        end=coords["acoustic_start"],
+        odom_key=CURRENT_ODOM_KEY,
+        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+    )
+
+    def move_func(start_coords, end_coords):
+        return create_move_to_task(
+            task=f"Acoustic move from {start_coords} to {end_coords}",
+            start=coords[start_coords],
+            end=coords[end_coords],
+            odom_key=CURRENT_ODOM_KEY,
+            zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+            specified_heading=False,
+        )
+
+    acoustics_root = create_acoustics_root(move_func)
 
     move_to_torpedo = create_move_to_task(
         task="torpedo",
@@ -139,7 +202,9 @@ def create_mother(coords: dict):
         end=coords["torpedo_start"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        specified_heading=False,
     )
+
     torpedo_root = create_torpedo_root()
 
     move_to_space = create_move_to_task(
@@ -149,13 +214,16 @@ def create_mother(coords: dict):
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
+
     move_to_octagon = create_move_to_task(
         task="octagon",
         start=coords["torpedo_post"],
         end=coords["octagon"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        specified_heading=False,
     )
+
     octagon_root = create_octagon_root()
 
     # TODO: see if need a move to gate here to go closer to do the return task
@@ -171,6 +239,7 @@ def create_mother(coords: dict):
     root.add_children(
         [
             # button_start,
+            seq_reset_clustering,
             srv_get_choice,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
@@ -181,7 +250,9 @@ def create_mother(coords: dict):
             # move_to_slalom_end,
             # slalom_root,
             # move_to_bin,
-            bin_root,
+            # bin_root,
+            move_to_acoustic_start,
+            acoustics_root,
             # move_to_torpedo,
             # torpedo_root,
             # move_to_space,
