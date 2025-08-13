@@ -149,52 +149,15 @@ def create_mother(coords: dict):
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY
     )
 
-    move_to_octagon_from_acoustic_start = create_move_to_task(
-        task="octagon_acoustic_start",
-        start=coords["acoustic_start"],
-        end=coords["octagon"],
+    move_func = lambda start_coords, end_coords: create_move_to_task(
+        task=f"acoustic_move_{start_coords}_{end_coords}",
+        start=coords[start_coords],
+        end=coords[end_coords],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY
     )
 
-    move_to_torpedo_from_acoustic_start = create_move_to_task(
-        task="torpedo_acoustic_start",
-        start=coords["acoustic_start"],
-        end=coords["torpedo_start"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY
-    )
-
-    move_to_acoustic_start_from_octagon = create_move_to_task(
-        task="octagon_acoustic_end",
-        start=coords["octagon"],
-        end=coords["acoustic_start"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY
-    )
-
-    move_to_acoustic_start_from_torpedo = create_move_to_task(
-        task="torpedo_acoustic_end",
-        start=coords["torpedo_start"],
-        end=coords["acoustic_start"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY
-    )
-
-    acoustics_root = create_acoustics_root(
-        "acoustic_octagon",
-        "acoustic_torpedo",
-        [
-            move_to_octagon_from_acoustic_start,
-            octagon_root,
-            move_to_acoustic_start_from_octagon
-        ],
-        [
-            move_to_torpedo_from_acoustic_start,
-            torpedo_root,
-            move_to_acoustic_start_from_torpedo
-        ]
-    )
+    acoustics_root = create_acoustics_root(move_func)
 
     root.add_children(
         [

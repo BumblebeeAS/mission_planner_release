@@ -1,34 +1,46 @@
 import py_trees
 
 from mission_planner_2.trees.auv.acoustics.order_by_ping import create_order_by_ping_root
+from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
 
-def create_acoustics_root(
-    first_task_name: str,
-    second_task_name: str,
-    first_task: list[py_trees.behaviour.Behaviour],
-    second_task: list[py_trees.behaviour.Behaviour]
-) -> py_trees.behaviour.Behaviour:
+def create_acoustics_root(move_func) -> py_trees.behaviour.Behaviour:
 
-    seq_first_task = py_trees.composites.Sequence(
-        name=f"Sequence {first_task_name}",
-        memory=True
-    )
-    
-    seq_second_task = py_trees.composites.Sequence(
-        name=f"Sequence {second_task_name}",
-        memory=True
-    )
+    def acoustic_octagon() -> py_trees.behaviour.Behaviour:
+        
+        seq_acoustic_octagon = py_trees.composites.Sequence(
+            name="Sequence acoustic octagon",
+            memory=True
+        )
 
-    seq_first_task.add_children(
-        children=first_task
-    )
+        seq_acoustic_octagon.add_children(
+            children=[
+                move_func("acoustic_start", "octagon"),
+                create_torpedo_root(),
+                move_func("octagon", "acoustic_start")
+            ]
+        )
 
-    seq_second_task.add_children(
-        children=second_task
-    )
+        return seq_acoustic_octagon
+
+    def acoustic_torpedo() -> py_trees.behaviour.Behaviour:
+
+        seq_acoustic_torpedo = py_trees.composites.Sequence(
+            name="Sequence acoustic torpedo",
+            memory=True
+        )
+
+        seq_acoustic_torpedo.add_children(
+            children=[
+                move_func("acoustic_start", "torpedo_start"),
+                create_torpedo_root(),
+                move_func("torpedo_start", "acoustic_start")
+            ]
+        )
+
+        return seq_acoustic_torpedo
 
     return create_order_by_ping_root(
-        lambda: seq_first_task,
-        lambda: seq_second_task
+        acoustic_octagon,
+        acoustic_torpedo
     )
