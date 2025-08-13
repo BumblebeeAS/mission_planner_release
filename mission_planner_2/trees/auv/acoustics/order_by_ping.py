@@ -24,6 +24,7 @@ def create_order_by_ping_root(
     ping_topic: str = "/sensors/ping",
     timeout: float = 20.0,
     confidence_threshold: float = 1.0,
+    partition_angle_offset: int = 0
 ) -> py_trees.behaviour.Behaviour:
 
     sel_subtree = py_trees.composites.Selector(
@@ -54,11 +55,11 @@ def create_order_by_ping_root(
     )
 
     check_ping_direction = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Check ping direction is right",
+        name="Check ping direction",
         check=py_trees.common.ComparisonExpression(
             variable=_PING_RESPONSE_KEY,
             value=180,
-            operator=lambda x, y: x.doa_deg < y
+            operator=lambda x, y: (x.doa_deg - partition_angle_offset) % 360 < y
         )
     )
 

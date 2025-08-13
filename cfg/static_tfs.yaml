@@ -183,3 +183,9 @@ map:
     z: 0.3
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/octagon"
+  - name: acoustic_start
+    x: 15.0
+    y: 0.0
+    z: 0.0
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/acoustic_start"
