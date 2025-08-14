@@ -74,7 +74,7 @@ bin:
       - "bin/shark"
       - "bin/fish/rotated"
       - "bin/shark/rotated"
-    z: -0.6
+    z: -0.65
     yaw: -90.0
 # slalom:
   # - name: slalom_left_channel

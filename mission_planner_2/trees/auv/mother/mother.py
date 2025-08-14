@@ -31,7 +31,7 @@ BUTTON_RETRIES = 1000000
 
 def load_mission_coordinates():
     package_share_directory = get_package_share_directory("mission_planner_2")
-    yaml_file_path = os.path.join(package_share_directory, "cfg", "static_tfs.yaml")
+    yaml_file_path = os.path.join(package_share_directory, "cfg", "eyeball.yaml")
 
     with open(yaml_file_path, "r") as file:
         data = yaml.safe_load(file)

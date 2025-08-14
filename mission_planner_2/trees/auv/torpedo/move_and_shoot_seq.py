@@ -46,6 +46,7 @@ def create_move_and_shoot_generator(
     stabilization_duration=2.5,
     num_retries_clustering=3,
     wait_after_fire_duration: float = 3.0,
+    shoot_repeats: int = 2,
 ):
     def f(first=True):
         if first:
@@ -186,11 +187,10 @@ def create_move_and_shoot_generator(
             service_request=Trigger.Request(),
         )
 
-        fire_2 = py_trees_ros.service_clients.FromConstant(
-            name=f"Fire {torp_string} torpedo retry",
-            service_type=Trigger,
-            service_name=actuation_topic,
-            service_request=Trigger.Request(),
+        repeat_firing = py_trees.decorators.Repeat(
+            name=f"Fire {torp_string} repeats: {shoot_repeats}",
+            child=fire,
+            num_success=shoot_repeats,
         )
 
         wait_after_fire = py_trees.timers.Timer(
@@ -208,8 +208,7 @@ def create_move_and_shoot_generator(
                 dynamic_set_cluster_goal,
                 dynamic_set_cluster_goal_check,
                 goto_cluster,
-                fire,
-                fire_2,
+                repeat_firing,
                 wait_after_fire,
             ],
         )

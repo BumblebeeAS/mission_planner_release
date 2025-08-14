@@ -46,7 +46,7 @@ ACOUSTIC_TIMEOUT = 10.0
 
 def load_mission_coordinates():
     package_share_directory = get_package_share_directory("mission_planner_2")
-    yaml_file_path = os.path.join(package_share_directory, "cfg", "static_tfs.yaml")
+    yaml_file_path = os.path.join(package_share_directory, "cfg", "eyeball.yaml")
 
     with open(yaml_file_path, "r") as file:
         data = yaml.safe_load(file)
@@ -154,7 +154,7 @@ def create_mother(coords: dict):
     move_to_slalom = create_move_to_task(
         task="slalom",
         start=coords["gate_end"],
-        end=coords["slalom_start"],
+        end=coords["slalom_s"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
@@ -163,8 +163,8 @@ def create_mother(coords: dict):
 
     move_to_slalom_end = create_move_to_task(
         task="move_to_slalom_end",
-        start=coords["slalom_start"],
-        end=coords["slalom_end"],
+        start=coords["slalom_s"],
+        end=coords["slalom_e"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
         goto_depth=0.15,
@@ -172,7 +172,7 @@ def create_mother(coords: dict):
 
     move_to_bin = create_move_to_task(
         task="bin",
-        start=coords["slalom_end"],
+        start=coords["slalom_e"],
         end=coords["bin"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
@@ -182,7 +182,7 @@ def create_mother(coords: dict):
 
     move_to_acoustic_start = create_move_to_task(
         task="acoustic_start",
-        start=coords["bin"],
+        start=coords["bin"],  # used to be bin
         end=coords["acoustic_start"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
@@ -239,19 +239,19 @@ def create_mother(coords: dict):
 
     root.add_children(
         [
-            button_start,
+            # button_start,
             seq_reset_clustering,
             srv_get_choice,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
             set_testing_keys,  # if dont do gate
-            move_to_gate,
-            gate_root,
-            move_to_slalom,
-            move_to_slalom_end,
+            # move_to_gate,
+            # gate_root,
+            # move_to_slalom,
+            # move_to_slalom_end,
             # slalom_root,
-            move_to_bin,
-            bin_root,
+            # move_to_bin,
+            # bin_root,
             move_to_acoustic_start,
             acoustics_root,
             # move_to_torpedo,

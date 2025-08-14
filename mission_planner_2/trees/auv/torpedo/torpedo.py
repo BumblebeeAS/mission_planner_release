@@ -77,6 +77,8 @@ SHARK_SHOOT_FRAME_1 = "torpedo_1/shark/view"
 SHARK_SHOOT_FRAME_2 = "torpedo_2/shark/view"
 
 POINT_CORRESPONDENCES_TOPIC = "/auv4/torpedo/image_matching/point_correspondences"
+SHOOT_REPEATS = 2
+MAX_ALIGN_FAILURE = 5
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -141,10 +143,11 @@ def create_torpedo_root():
         actuation_topic_right=ACTUATION_TOPIC_RIGHT,
         distance_threshold=DISTANCE_THRESHOLD,
         yaw_threshold=YAW_THRESHOLD,
-        retries=8,
+        retries=MAX_ALIGN_FAILURE,
         stabilization_duration=2.5,
         num_retries_clustering=NUM_RETRIES,
         wait_after_fire_duration=WAIT_AFTER_FIRE_DURATION,
+        shoot_repeats=SHOOT_REPEATS,
     )
 
     seq_launch_torpedo = py_trees.composites.Sequence(

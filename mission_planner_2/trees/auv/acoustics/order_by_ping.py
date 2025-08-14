@@ -24,7 +24,7 @@ def create_order_by_ping_root(
     second_subtree_func: Callable[[], py_trees.behaviour.Behaviour],
     ping_topic: str = "/sensors/ping",
     timeout: float = 10.0,
-    confidence_threshold: float = 1.0,
+    confidence_threshold: float = -1.0,
     partition_angle_offset: int = 0,
 ) -> py_trees.behaviour.Behaviour:
     sel_subtree = py_trees.composites.Selector(

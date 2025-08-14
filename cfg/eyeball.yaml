@@ -1,0 +1,129 @@
+map:
+  - name: gate_start
+    x: 0.0
+    y: -1.4
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/gate/start"
+  - name: rel_gate_start
+    x: 0.0
+    y: -1.4
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/rel_gate/start"
+  - name: rel_gate_start_flip
+    x: 0.0
+    y: -1.4
+    yaw: 180
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/rel_gate_flip/start"
+  - name: gate_end
+    x: 4.8
+    y: -1.4
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/gate/end"
+  - name: slalom_start
+    # A
+    x: 2.5
+    y: 0.4
+    # B2
+    # x: 3.5
+    # y: 1.4
+    # yaw: 40.0
+    # D
+    # x: 3.6
+    # y: -2.8
+  - name: slalom_s
+    # A
+    x: 4.8
+    y: -0.7
+    # B2
+    # x: 3.5
+    # y: 1.4
+    # yaw: 40.0
+    # D
+    # x: 3.6
+    # y: -1.6
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/slalom/start"
+  - name: slalom_end
+    # A
+    x: 12.5
+    y: 0.2
+    # B2
+    # x: 9.8
+    # y: 5.6
+    # D
+    # x: 11.8
+    # y: -2.6
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/slalom/end"
+  - name: slalom_e
+    # A
+    x: 12.5
+    y: -0.9
+    # B2
+    # x: 9.8
+    # y: 5.6
+    # D
+    # x: 11.8
+    # y: -2.1
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/slalom/end"
+  - name: bin
+    # A
+    x: 16.6
+    y: 0.2
+    # B2
+    # x: 12.3
+    # y: 6.5
+    # D
+    # x: 14.0
+    # y: -2.6
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/bin"
+  - name: torpedo_start
+    # A
+    x: 11.0
+    y: -6.6
+    # D
+    # x: 12.0
+    # y: 1.2
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/torpedo/start"
+  - name: torpedo
+    # A
+    x: 15.0
+    y: -6.6
+    # D
+    # x: 14.0
+    # y: 1.2
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/torpedo"
+  - name: torpedo_post
+    # A
+    x: 14.0
+    y: -3.4
+    # D
+    # x: 12.6
+    # y: -1.0
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/torpedo/post"
+  - name: octagon
+    # A
+    x: 18.2
+    y: -3.4
+    # D
+    # x: 18.2
+    # y: 0.0
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/octagon"
+  - name: acoustic_start
+    # A
+    x: 17.0
+    y: -5.0
+    yaw: -45.0
+    # D
+    # x: 15.4
+    # y: 0.7
+    # yaw: 45.0
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/acoustic_start"
