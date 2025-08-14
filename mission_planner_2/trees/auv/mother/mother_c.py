@@ -31,6 +31,7 @@ YAW_BEFORE_GATE_KEY = "/global/yaw_before_gate"
 
 BUTTON_RETRIES = 1000000
 ACOUSTIC_TIMEOUT = 10.0
+SLALOM_DEPTH = 0.15
 
 
 def load_mission_coordinates():
@@ -154,7 +155,7 @@ def create_mother(coords: dict):
         end=coords["slalom_end"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
-        goto_depth=0.15,
+        goto_depth=SLALOM_DEPTH,
     )
 
     move_to_bin = create_move_to_task(
