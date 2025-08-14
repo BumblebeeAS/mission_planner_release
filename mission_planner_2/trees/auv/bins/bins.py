@@ -5,10 +5,6 @@ import py_trees_ros
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
@@ -28,14 +24,15 @@ from mission_planner_2.commons.pose_utils import (
     within_threshold_xyz,
 )
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
-from mission_planner_2.commons.tf_checker import (
-    create_tf_checker_from_constant_root,
-)
+from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.bins.helpers import find_acute_angle
 from mission_planner_2.trees.auv.bins.template_selector import (
     create_template_selector_root,
 )
 from mission_planner_2.trees.auv.goto import goto
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -87,6 +84,8 @@ SEARCH_RIGHT = 0.5
 NUM_SQUARES = 1
 OFFSET_COEFF = 1.0
 SEARCH_DEPTH = 0.3
+BETWEEN_DROPS_WAIT = 3.5
+EXTRA_DROP_WAIT = 0.5
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -525,9 +524,15 @@ def create_bin_root():
             seq_goto_cluster,
             set_dropper_actuation,
             pub_fire_dropper_first,
-            py_trees.timers.Timer(name="Wait between drops", duration=3.5),
+            py_trees.timers.Timer(
+                name="Wait between drops",
+                duration=BETWEEN_DROPS_WAIT,
+            ),
             pub_fire_dropper_second,
-            py_trees.timers.Timer(name="Wait between drops", duration=0.5),
+            py_trees.timers.Timer(
+                name="Wait between drops",
+                duration=EXTRA_DROP_WAIT,
+            ),
             pub_fire_dropper_third,
             seq_stop_vision,
         ],
@@ -541,4 +546,58 @@ def create_bin_root():
         ]
     )
 
-    return seq_bin_root
+    sel_bin_failure_fallback = py_trees.composites.Selector(
+        name="Fallback for bin failure",
+        memory=True,
+    )
+
+    seq_always_drop = py_trees.composites.Sequence(
+        name="Always bin drop sequence as fallback",
+        memory=True,
+    )
+
+    pub_fire_dropper_fallback_first = py_trees_ros.service_clients.FromConstant(
+        name="Fire dropper first fallback",
+        service_name=ACTUATION_TOPIC,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
+    )
+
+    pub_fire_dropper_fallback_second = py_trees_ros.service_clients.FromConstant(
+        name="Fire dropper second fallback",
+        service_name=ACTUATION_TOPIC,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
+    )
+
+    pub_fire_dropper_fallback_third = py_trees_ros.service_clients.FromConstant(
+        name="Fire dropper third fallback",
+        service_name=ACTUATION_TOPIC,
+        service_type=Trigger,
+        service_request=Trigger.Request(),
+    )
+
+    seq_always_drop.add_children(
+        [
+            pub_fire_dropper_fallback_first,
+            py_trees.timers.Timer(
+                name="Wait between drops",
+                duration=BETWEEN_DROPS_WAIT,
+            ),
+            pub_fire_dropper_fallback_second,
+            py_trees.timers.Timer(
+                name="Wait between drops",
+                duration=EXTRA_DROP_WAIT,
+            ),
+            pub_fire_dropper_fallback_third,
+        ]
+    )
+
+    sel_bin_failure_fallback.add_children(
+        [
+            seq_bin_root,
+            seq_always_drop,
+        ]
+    )
+
+    return sel_bin_failure_fallback
