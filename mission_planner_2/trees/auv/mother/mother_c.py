@@ -132,6 +132,10 @@ def create_mother(coords: dict):
     )
 
     gate_root = create_gate_root()
+    force_succeed_gate = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed gate",
+        child=gate_root,
+    )
 
     move_to_gate = create_move_to_gate_task_root(
         world_coords=coords["gate_start"],
@@ -167,6 +171,10 @@ def create_mother(coords: dict):
     )
 
     bin_root = create_bin_root()
+    force_succeed_bin = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed bin",
+        child=bin_root,
+    )
 
     move_to_acoustic_start = create_move_to_task(
         task="acoustic_start",
@@ -186,6 +194,10 @@ def create_mother(coords: dict):
         )
 
     acoustics_root = create_acoustics_root(move_func, timeout=ACOUSTIC_TIMEOUT)
+    force_succeed_acoustics = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed acoustics",
+        child=acoustics_root,
+    )
 
     move_to_torpedo = create_move_to_task(
         task="torpedo",
@@ -196,6 +208,10 @@ def create_mother(coords: dict):
     )
 
     torpedo_root = create_torpedo_root()
+    force_succeed_torpedo = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed torpedo",
+        child=torpedo_root,
+    )
 
     move_to_space = create_move_to_task(
         task="post_torpedo",
@@ -214,6 +230,10 @@ def create_mother(coords: dict):
     )
 
     octagon_root = create_octagon_root()
+    force_succeed_octagon = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed octagon",
+        child=octagon_root,
+    )
 
     # TODO: see if need a move to gate here to go closer to do the return task
     return_root = create_return_root()
@@ -234,19 +254,18 @@ def create_mother(coords: dict):
             set_world_frame,  # TODO: use multi set bb?
             set_testing_keys,  # if dont do gate
             # move_to_gate,
-            # gate_root,
+            # force_succeed_gate,
             # move_to_slalom,
             # move_to_slalom_end,
-            # slalom_root,
             # move_to_bin,
-            # bin_root,
-            move_to_acoustic_start,
-            acoustics_root,
+            # force_succeed_bin,
+            # move_to_acoustic_start,
+            # force_succeed_acoustics,
             # move_to_torpedo,
-            # torpedo_root,
+            # force_succeed_torpedo,
             # move_to_space,
             # move_to_octagon,
-            # octagon_root,
+            force_succeed_octagon,
         ]
     )
 
