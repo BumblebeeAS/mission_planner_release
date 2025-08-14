@@ -4,15 +4,13 @@ import py_trees
 import py_trees_ros
 import yaml
 from ament_index_python.packages import get_package_share_directory
-from std_srvs.srv import Trigger
-
 from mission_planner_2.trees.auv.acoustics.acoustics import create_acoustics_root
 from mission_planner_2.trees.auv.bins.bins import create_bin_root
 from mission_planner_2.trees.auv.gate.gate import create_gate_root
 from mission_planner_2.trees.auv.gate.move_to_task import create_move_to_gate_task_root
 from mission_planner_2.trees.auv.mother.button_behaviors import create_button_start_root
 from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
-from mission_planner_2.trees.auv.slalom.slalom import create_slalom_root
+from std_srvs.srv import Trigger
 
 LEFT_BUTTON_TOPIC = "/auv4/button/left"
 RIGHT_BUTTON_TOPIC = "/auv4/button/right"
@@ -27,6 +25,7 @@ RESET_POSE_SRV_TOPIC = "/auv4/nav/reset_pose"
 YAW_BEFORE_GATE_KEY = "/global/yaw_before_gate"
 
 BUTTON_RETRIES = 1000000
+ACOUSTIC_TIMEOUT = 10.0
 
 
 def load_mission_coordinates():
@@ -139,24 +138,22 @@ def create_mother(coords: dict):
     move_to_slalom = create_move_to_task(
         task="slalom",
         start=coords["gate_end"],
-        end=coords["slalom_start"],
+        end=coords["slalom_s"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
 
-    slalom_root = create_slalom_root()
-
     move_to_slalom_end = create_move_to_task(
         task="move_to_slalom_end",
-        start=coords["slalom_start"],
-        end=coords["slalom_end"],
+        start=coords["slalom_s"],
+        end=coords["slalom_e"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
 
     move_to_bin = create_move_to_task(
         task="bin",
-        start=coords["slalom_end"],
+        start=coords["slalom_e"],
         end=coords["bin"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
@@ -183,7 +180,7 @@ def create_mother(coords: dict):
             specified_heading=False,
         )
 
-    acoustics_root = create_acoustics_root(move_func)
+    acoustics_root = create_acoustics_root(move_func, timeout=ACOUSTIC_TIMEOUT)
 
     root.add_children(
         [
@@ -195,8 +192,7 @@ def create_mother(coords: dict):
             move_to_gate,
             gate_root,
             move_to_slalom,
-            # move_to_slalom_end,
-            slalom_root,
+            move_to_slalom_end,
             move_to_bin,
             bin_root,
             move_to_acoustic_start,

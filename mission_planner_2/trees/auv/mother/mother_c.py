@@ -5,8 +5,6 @@ import py_trees_ros
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import TransformStamped
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons.blackboard import MultiSetBlackboard
 from mission_planner_2.trees.auv.acoustics.acoustics import create_acoustics_root
 from mission_planner_2.trees.auv.bins.bins import create_bin_root
@@ -16,17 +14,8 @@ from mission_planner_2.trees.auv.gate.return_home import create_return_root
 from mission_planner_2.trees.auv.mother.button_behaviors import create_button_start_root
 from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
 from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
-
-# from mission_planner_2.trees.auv.slalom.slalom import create_slalom_root
-from mission_planner_2.trees.auv.slalom.slalom_mix_yaw import (
-    create_slalom_mix_yaw_root as create_slalom_root,
-)
-
-# from mission_planner_2.trees.auv.slalom.slalom_stupid import (
-#     create_slalom_stupid_root as create_slalom_root,
-# )
-# from mission_planner_2.trees.auv.slalom.slalom_stupid import create_slalom_stupid_root
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
+from std_srvs.srv import Trigger
 
 LEFT_BUTTON_TOPIC = "/auv4/button/left"
 RIGHT_BUTTON_TOPIC = "/auv4/button/right"
