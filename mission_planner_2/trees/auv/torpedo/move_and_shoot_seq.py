@@ -1,7 +1,5 @@
 import py_trees
 import py_trees_ros
-from std_srvs.srv import Trigger
-
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
@@ -17,12 +15,52 @@ from mission_planner_2.commons.pose_utils import (
     within_threshold_xyz,
 )
 from mission_planner_2.trees.auv.goto import goto
+from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 _CLUSTERING_GOAL_KEY = fk("clustering_goal")
 _CLUSTERING_GOAL_CHECK_KEY = fk("clustering_goal_check")
+
+
+def create_firing_root(
+    actuation_topic: str,
+    torp_string: str,
+    shoot_repeats: int,
+    wait_after_fire_duration: int,
+):
+    root = py_trees.composites.Sequence(
+        name="Repeated firing sequence",
+        memory=True,
+    )
+
+    fire = py_trees_ros.service_clients.FromConstant(
+        name=f"Fire {torp_string} torpedo",
+        service_type=Trigger,
+        service_name=actuation_topic,
+        service_request=Trigger.Request(),
+    )
+
+    repeat_firing = py_trees.decorators.Repeat(
+        name=f"Fire {torp_string} repeats: {shoot_repeats}",
+        child=fire,
+        num_success=shoot_repeats,
+    )
+
+    wait_after_fire = py_trees.timers.Timer(
+        name="Wait after fire",
+        duration=wait_after_fire_duration,
+    )
+
+    root.add_children(
+        [
+            repeat_firing,
+            wait_after_fire,
+        ]
+    )
+
+    return root
 
 
 def create_move_and_shoot_generator(
@@ -180,22 +218,11 @@ def create_move_and_shoot_generator(
             # ),
         )
 
-        fire = py_trees_ros.service_clients.FromConstant(
-            name=f"Fire {torp_string} torpedo",
-            service_type=Trigger,
-            service_name=actuation_topic,
-            service_request=Trigger.Request(),
-        )
-
-        repeat_firing = py_trees.decorators.Repeat(
-            name=f"Fire {torp_string} repeats: {shoot_repeats}",
-            child=fire,
-            num_success=shoot_repeats,
-        )
-
-        wait_after_fire = py_trees.timers.Timer(
-            name="Wait after fire",
-            duration=wait_after_fire_duration,
+        seq_repeated_fire = create_firing_root(
+            actuation_topic=actuation_topic,
+            torp_string=torp_string,
+            shoot_repeats=shoot_repeats,
+            wait_after_fire_duration=wait_after_fire_duration,
         )
 
         root = py_trees.composites.Sequence(
@@ -208,8 +235,7 @@ def create_move_and_shoot_generator(
                 dynamic_set_cluster_goal,
                 dynamic_set_cluster_goal_check,
                 goto_cluster,
-                repeat_firing,
-                wait_after_fire,
+                seq_repeated_fire,
             ],
         )
 

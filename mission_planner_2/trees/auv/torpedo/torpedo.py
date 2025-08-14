@@ -3,11 +3,8 @@ import operator
 import py_trees
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
-
 from mission_planner_2.commons import checked_service
-from mission_planner_2.commons.blackboard import (
-    MultiSetBlackboard,
-)
+from mission_planner_2.commons.blackboard import MultiSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_img_matching_request,
@@ -21,6 +18,7 @@ from mission_planner_2.commons.pose_utils import create_stamped_pose
 from mission_planner_2.commons.search import create_search_front_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.torpedo.move_and_shoot_seq import (
+    create_firing_root,
     create_move_and_shoot_generator,
 )
 from mission_planner_2.trees.auv.torpedo.point_correspondences_check import (
@@ -379,4 +377,38 @@ def create_torpedo_root():
         ],
     )
 
-    return seq_launch_torpedo
+    sel_always_fire_fallback = py_trees.composites.Selector(
+        name="Always fire torpedo fallback",
+        memory=True,
+    )
+
+    seq_repeated_firing_fallback = py_trees.composites.Sequence(
+        name="Always fire torpedoes fallback sequence",
+        memory=True,
+    )
+
+    seq_repeated_firing_fallback.add_children(
+        [
+            create_firing_root(
+                actuation_topic=ACTUATION_TOPIC_LEFT,
+                torp_string="first",
+                shoot_repeats=SHOOT_REPEATS,
+                wait_after_fire_duration=WAIT_AFTER_FIRE_DURATION,
+            ),
+            create_firing_root(
+                actuation_topic=ACTUATION_TOPIC_RIGHT,
+                torp_string="second",
+                shoot_repeats=SHOOT_REPEATS,
+                wait_after_fire_duration=WAIT_AFTER_FIRE_DURATION,
+            ),
+        ]
+    )
+
+    sel_always_fire_fallback.add_children(
+        [
+            seq_launch_torpedo,
+            seq_repeated_firing_fallback,
+        ]
+    )
+
+    return sel_always_fire_fallback
