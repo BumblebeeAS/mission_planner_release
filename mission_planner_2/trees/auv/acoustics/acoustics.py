@@ -37,6 +37,10 @@ def _create_octagon_torpedo_root(
     )
 
     octagon = octagon_root()
+    force_succeed_octagon = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed octagon",
+        child=octagon,
+    )
 
     move_to_torpedo_post = move_func(
         start_coords=_OCTAGON_START,
@@ -53,14 +57,18 @@ def _create_octagon_torpedo_root(
     )
 
     torpedo = torpedo_root()
+    force_succeed_torpedo = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed torpedo",
+        child=torpedo,
+    )
 
     root.add_children(
         [
             move_to_octagon,
-            octagon,
+            force_succeed_octagon,
             move_to_torpedo_post,
             move_to_torpedo_start,
-            # torpedo,
+            force_succeed_torpedo,
         ]
     )
 
@@ -95,6 +103,10 @@ def _create_torpedo_octagon_root(
     )
 
     torpedo = torpedo_root()
+    force_succeed_torpedo = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed torpedo",
+        child=torpedo,
+    )
 
     move_to_torpedo_post_octagon = move_func(
         start_coords=_TORPEDO,
@@ -111,15 +123,19 @@ def _create_torpedo_octagon_root(
     )
 
     octagon = octagon_root()
+    force_succeed_octagon = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed octagon",
+        child=octagon,
+    )
 
     root.add_children(
         [
             move_to_torpedo_post,
             move_to_torpedo_start,
-            torpedo,
+            force_succeed_torpedo,
             move_to_torpedo_post_octagon,
             move_to_post_octagon,
-            octagon,
+            force_succeed_octagon,
         ]
     )
 

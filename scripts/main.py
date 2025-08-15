@@ -11,15 +11,19 @@ from mission_planner_2.commons.hooks import stop_on_success_or_failure
 from mission_planner_2.commons.led_management import LedVisitor
 from mission_planner_2.commons.node_registry import TreeNode
 from mission_planner_2.commons.visitors import LoggingSnapshotVisitor
+from mission_planner_2.trees.auv.mother.mother_c import (
+    create_mother,
+    load_mission_coordinates,
+)
 
 # from mission_planner_2.trees.auv.mother.mother import (
 #     create_mother,
 #     load_mission_coordinates,
 # )
-from mission_planner_2.trees.auv.mother.mother_c import (
-    create_mother,
-    load_mission_coordinates,
-)
+# from mission_planner_2.trees.auv.mother.mother_no_acoustics import (
+#     create_mother,
+#     load_mission_coordinates,
+# )
 
 
 def main():
@@ -43,7 +47,7 @@ def main():
     ############################
 
     try:
-        tree.setup(node=node, timeout=60.0)
+        tree.setup(node=node, timeout=600.0)
     except:
         console.logerror(console.red + "failed to setup the tree" + console.reset)
         tree.shutdown()

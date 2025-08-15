@@ -4,13 +4,16 @@ import py_trees
 import py_trees_ros
 import yaml
 from ament_index_python.packages import get_package_share_directory
-from mission_planner_2.trees.auv.acoustics.acoustics import create_acoustics_root
-from mission_planner_2.trees.auv.bins.bins import create_bin_root
-from mission_planner_2.trees.auv.gate.gate import create_gate_root
-from mission_planner_2.trees.auv.gate.move_to_task import create_move_to_gate_task_root
-from mission_planner_2.trees.auv.mother.button_behaviors import create_button_start_root
-from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
+from geometry_msgs.msg import TransformStamped
 from std_srvs.srv import Trigger
+
+from mission_planner_2.commons.blackboard import MultiSetBlackboard
+from mission_planner_2.trees.auv.gate.gate import create_gate_root
+from mission_planner_2.trees.auv.mother.button_behaviors import (
+    create_button_start_coinflip_root,
+)
+from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
+from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
 
 LEFT_BUTTON_TOPIC = "/auv4/button/left"
 RIGHT_BUTTON_TOPIC = "/auv4/button/right"
@@ -27,6 +30,8 @@ YAW_BEFORE_GATE_KEY = "/global/yaw_before_gate"
 BUTTON_RETRIES = 1000000
 ACOUSTIC_TIMEOUT = 10.0
 SLALOM_DEPTH = 0.15
+
+IS_OCTAGON_ON_RIGHT = False
 
 
 def load_mission_coordinates():
@@ -57,7 +62,7 @@ def create_mother(coords: dict):
         memory=True,
     )
 
-    button_start = create_button_start_root(
+    button_coin_flip_start = create_button_start_coinflip_root(
         reset_pose_srv_topic=RESET_POSE_SRV_TOPIC,
         controls_srv_topic=CONTROLS_SRV_TOPIC,
         left_button_topic=LEFT_BUTTON_TOPIC,
@@ -126,14 +131,18 @@ def create_mother(coords: dict):
         key_response=CHOICE_KEY,
     )
 
-    gate_root = create_gate_root()
+    move_to_gate = create_move_to_task(
+        task="gate",
+        start=coords["start"],
+        end=coords["gate_start"],
+        odom_key=CURRENT_ODOM_KEY,
+        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+    )
 
-    move_to_gate = create_move_to_gate_task_root(
-        world_coords=coords["gate_start"],
-        relative_coords=coords["rel_gate_start"],
-        flipped_relative_coords=coords["rel_gate_start_flip"],
-        is_relative=True,
-        is_flip=False,
+    gate_root = create_gate_root()
+    force_succeed_gate = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed gate",
+        child=gate_root,
     )
 
     move_to_slalom = create_move_to_task(
@@ -153,52 +162,37 @@ def create_mother(coords: dict):
         goto_depth=SLALOM_DEPTH,
     )
 
-    move_to_bin = create_move_to_task(
-        task="bin",
+    move_to_octagon = create_move_to_task(
+        task="octagon",
         start=coords["slalom_end"],
-        end=coords["bin"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
-        specified_heading=False,
-    )
-
-    bin_root = create_bin_root()
-
-    move_to_acoustic_start = create_move_to_task(
-        task="acoustic_start",
-        start=coords["bin"],
-        end=coords["acoustic_start"],
+        end=coords["octagon"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
 
-    def move_func(start_coords, end_coords):
-        return create_move_to_task(
-            task=f"Acoustic move from {start_coords} to {end_coords}",
-            start=coords[start_coords],
-            end=coords[end_coords],
-            odom_key=CURRENT_ODOM_KEY,
-            zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
-            specified_heading=False,
-        )
+    octagon_root = create_octagon_root()
 
-    acoustics_root = create_acoustics_root(move_func, timeout=ACOUSTIC_TIMEOUT)
+    set_testing_keys = MultiSetBlackboard(
+        name="Set is_left, yaw_before_gate",
+        keys=[IS_LEFT_KEY, YAW_BEFORE_GATE_KEY],
+        values=[True, TransformStamped()],
+        overwrite=True,
+    )
 
     root.add_children(
         [
-            button_start,
+            button_coin_flip_start,
             seq_reset_clustering,
             srv_get_choice,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
+            set_testing_keys,  # if dont do gate
             move_to_gate,
-            gate_root,
+            force_succeed_gate,
             move_to_slalom,
             move_to_slalom_end,
-            move_to_bin,
-            bin_root,
-            move_to_acoustic_start,
-            acoustics_root,
+            move_to_octagon,
+            octagon_root,
         ]
     )
 

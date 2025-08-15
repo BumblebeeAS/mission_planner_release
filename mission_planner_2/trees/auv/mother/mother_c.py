@@ -148,14 +148,6 @@ def create_mother(coords: dict):
         child=gate_root,
     )
 
-    # move_to_gate = create_move_to_gate_task_root(
-    #     world_coords=coords["gate_start"],
-    #     relative_coords=coords["rel_gate_start"],
-    #     flipped_relative_coords=coords["rel_gate_start_flip"],
-    #     is_relative=True,
-    #     is_flip=False,
-    # )
-
     move_to_slalom = create_move_to_task(
         task="slalom",
         start=coords["gate_end"],

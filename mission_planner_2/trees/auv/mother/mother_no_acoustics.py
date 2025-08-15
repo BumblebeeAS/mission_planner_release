@@ -10,8 +10,9 @@ from std_srvs.srv import Trigger
 from mission_planner_2.commons.blackboard import MultiSetBlackboard
 from mission_planner_2.trees.auv.bins.bins import create_bin_root
 from mission_planner_2.trees.auv.gate.gate import create_gate_root
-from mission_planner_2.trees.auv.gate.return_home import create_return_root
-from mission_planner_2.trees.auv.mother.button_behaviors import create_button_start_root
+from mission_planner_2.trees.auv.mother.button_behaviors import (
+    create_button_start_coinflip_root,
+)
 from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
 from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
@@ -60,7 +61,7 @@ def create_mother(coords: dict):
         memory=True,
     )
 
-    button_start = create_button_start_root(
+    button_coin_flip_start = create_button_start_coinflip_root(
         reset_pose_srv_topic=RESET_POSE_SRV_TOPIC,
         controls_srv_topic=CONTROLS_SRV_TOPIC,
         left_button_topic=LEFT_BUTTON_TOPIC,
@@ -166,24 +167,6 @@ def create_mother(coords: dict):
 
     bin_root = create_bin_root()
 
-    move_to_torpedo = create_move_to_task(
-        task="torpedo",
-        start=coords["torpedo_post"],
-        end=coords["torpedo_start"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
-    )
-
-    torpedo_root = create_torpedo_root()
-
-    move_to_space = create_move_to_task(
-        task="post_torpedo",
-        start=coords["octagon"],
-        end=coords["torpedo_post"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
-    )
-
     move_to_octagon = create_move_to_task(
         task="octagon",
         start=coords["bin"],
@@ -194,8 +177,23 @@ def create_mother(coords: dict):
 
     octagon_root = create_octagon_root()
 
-    # TODO: see if need a move to gate here to go closer to do the return task
-    return_root = create_return_root()
+    move_to_space = create_move_to_task(
+        task="post_torpedo",
+        start=coords["octagon"],
+        end=coords["torpedo_post"],
+        odom_key=CURRENT_ODOM_KEY,
+        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+    )
+
+    move_to_torpedo = create_move_to_task(
+        task="torpedo",
+        start=coords["torpedo_post"],
+        end=coords["torpedo_start"],
+        odom_key=CURRENT_ODOM_KEY,
+        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+    )
+
+    torpedo_root = create_torpedo_root()
 
     set_testing_keys = MultiSetBlackboard(
         name="Set is_left, yaw_before_gate",
@@ -206,23 +204,24 @@ def create_mother(coords: dict):
 
     root.add_children(
         [
-            # button_start,
+            button_coin_flip_start,
             seq_reset_clustering,
             srv_get_choice,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
             set_testing_keys,  # if dont do gate
-            # move_to_gate,
-            # gate_root,
-            # move_to_slalom,
-            # move_to_slalom_end,
-            # move_to_bin,
-            # bin_root,
-            # move_to_octagon,
+            #################
+            move_to_gate,
+            gate_root,
+            move_to_slalom,
+            move_to_slalom_end,
+            move_to_bin,
+            bin_root,
+            move_to_octagon,
             octagon_root,
-            # move_to_space,
-            # move_to_torpedo,
-            # torpedo_root,
+            move_to_space,
+            move_to_torpedo,
+            torpedo_root,
         ]
     )
 

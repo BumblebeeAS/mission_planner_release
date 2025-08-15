@@ -2,22 +2,22 @@
 map:
   - name: start
     x: 0.0
-    y: -0.4
+    y: -1.4
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/origin"
   - name: gate_start
     x: 0.0
-    y: -0.4
+    y: -1.4
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/gate/start"
   - name: gate
     x: 2.8
-    y: -0.4
+    y: -1.4
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/gate"
   - name: gate_end
     x: 4.8
-    y: -0.4
+    y: -1.4
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/gate/end"
   - name: slalom
@@ -55,7 +55,7 @@ map:
     child_frame_id: "map_ned/torpedo/post"
   - name: octagon
     x: 18.15
-    y: -2.6
+    y: -2.11
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/octagon"
   - name: acoustic_start

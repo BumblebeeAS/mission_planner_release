@@ -13,6 +13,8 @@ from mission_planner_2.commons.node_registry import SharedAction
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
+NUM_PINGS_REQUIRED = 3
+PINGER_TIMER = 10.0
 _PING_RESPONSE_KEY = fk("ping")
 
 
@@ -95,11 +97,9 @@ def create_order_by_ping_root(
         memory=True,
     )
 
-    open_grabber = _create_grabber_root(is_open=True)
-
     req = GetPingCount.Request()
     req.enable = True
-    req.num_pings_required = 3
+    req.num_pings_required = NUM_PINGS_REQUIRED
     req.partition_angle = float(partition_angle_offset)
 
     srv_enable_acoustic = py_trees_ros.service_clients.FromConstant(
@@ -111,12 +111,12 @@ def create_order_by_ping_root(
 
     timer = py_trees.timers.Timer(
         name="timer",
-        duration=6.0,
+        duration=PINGER_TIMER,
     )
 
     req_disable = GetPingCount.Request()
     req_disable.enable = False
-    req_disable.num_pings_required = 3
+    req_disable.num_pings_required = NUM_PINGS_REQUIRED
     req_disable.partition_angle = float(partition_angle_offset)
 
     srv_disable_acoustic = py_trees_ros.service_clients.FromConstant(
@@ -127,12 +127,22 @@ def create_order_by_ping_root(
         key_response=_PING_RESPONSE_KEY,
     )
 
+    default_response = GetPingCount.Response()
+    default_response.is_left = False
+
+    set_ping_response_key_default = py_trees.behaviours.SetBlackboardVariable(
+        name="Set ping response key default",
+        variable_name=_PING_RESPONSE_KEY,
+        variable_value=default_response,
+        overwrite=True,
+    )
+
     seq_sub_check.add_children(
         children=[
+            set_ping_response_key_default,
             srv_enable_acoustic,
             timer,
             srv_disable_acoustic,
-            # _create_ping_check_root(confidence_threshold, partition_angle_offset),
             py_trees.behaviours.CheckBlackboardVariableValue(
                 name="check is not left",
                 check=py_trees.common.ComparisonExpression(
@@ -143,17 +153,6 @@ def create_order_by_ping_root(
             ),
         ]
     )
-
-    # retry_wait_ping = py_trees.decorators.Retry(
-    #     name="Retry wait for good ping",
-    #     child=seq_sub_check,
-    #     num_failures=100_000,
-    # )
-    # timeout_wait_ping = py_trees.decorators.Timeout(
-    #     name="Timeout wait for good ping",
-    #     child=retry_wait_ping,
-    #     duration=timeout,
-    # )
 
     seq_confidence_check_threshold_check_octagon_torpedo = py_trees.composites.Sequence(
         name="Sequence check and first order",
@@ -174,7 +173,6 @@ def create_order_by_ping_root(
 
     seq_confidence_check_threshold_check_octagon_torpedo.add_children(
         children=[
-            # timeout_wait_ping,
             seq_sub_check,
             _create_grabber_root(is_open=True),
             octagon_torpedo_execution,
