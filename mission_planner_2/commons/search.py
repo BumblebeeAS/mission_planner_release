@@ -119,7 +119,7 @@ def _create_search_bot_root(
         poses=poses,
         wait_between_moves_sec=wait_between_moves_sec,
         specified_heading=True,  # dont need to face dir for this search
-        is_relative_movement=True,
+        # is_relative_movement=True,
         depth_override_value=search_depth,
     )
 

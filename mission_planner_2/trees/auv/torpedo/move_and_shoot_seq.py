@@ -1,5 +1,7 @@
 import py_trees
 import py_trees_ros
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
@@ -15,7 +17,6 @@ from mission_planner_2.commons.pose_utils import (
     within_threshold_xyz,
 )
 from mission_planner_2.trees.auv.goto import goto
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -28,7 +29,7 @@ def create_firing_root(
     actuation_topic: str,
     torp_string: str,
     shoot_repeats: int,
-    wait_after_fire_duration: int,
+    wait_after_fire_duration: float,
 ):
     root = py_trees.composites.Sequence(
         name="Repeated firing sequence",

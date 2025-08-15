@@ -97,7 +97,7 @@ map:
     child_frame_id: "map_ned/torpedo/post"
   - name: octagon
     # A
-    x: 18.0
+    x: 19.0
     y: -3.3
     # D
     # x: 18.0

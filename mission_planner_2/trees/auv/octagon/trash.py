@@ -286,6 +286,11 @@ def create_open_and_ascend_root(
         ),
     )
 
+    force_succeed_open_grabber = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed open grabber",
+        child=open_grabber,
+    )
+
     action_controlled_ascent = shared_action_client.FromConstant(
         name="Ascent to surface",
         shared_action=SharedAction.CONTROLLED_ASCENT,
@@ -299,13 +304,13 @@ def create_open_and_ascend_root(
 
     if open_grabber_first:
         children = [
-            open_grabber,
+            force_succeed_open_grabber,
             action_controlled_ascent,
         ]
     else:
         children = [
             action_controlled_ascent,
-            open_grabber,
+            force_succeed_open_grabber,
         ]
 
     seq_open_and_ascend.add_children(children=children)

@@ -1,6 +1,5 @@
 import py_trees
 from geometry_msgs.msg import TransformStamped
-from tf_transformations import euler_from_quaternion
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.pose_utils import (
@@ -8,8 +7,6 @@ from mission_planner_2.commons.pose_utils import (
 )
 from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
-
-_YAW_BEFORE_GATE_KEY = "/global/yaw_before_gate"
 
 
 def create_move_to_task(
@@ -19,7 +16,6 @@ def create_move_to_task(
     odom_key: str,
     zero_yaw_pose_key: str,
     goto_depth: float = 0.3,
-    yaw_before_gate_key: str = _YAW_BEFORE_GATE_KEY,
     specified_heading: bool = True,
 ):
     root = py_trees.composites.Sequence(
@@ -36,7 +32,7 @@ def create_move_to_task(
 
     dynamic_create_zero_yaw_pose = DynamicSetBlackboard(
         name="Set zero yaw pose",
-        key=[odom_key, yaw_before_gate_key],
+        key=odom_key,
         update_key=zero_yaw_pose_key,
         overwrite=True,
         func=get_zero_yaw_pose,
@@ -46,6 +42,7 @@ def create_move_to_task(
         name="Goto zero yaw",
         pose_key=zero_yaw_pose_key,
         depth_override_value=goto_depth,
+        stabilize_duration=8,
     )
 
     coords = compute_start_to_end_vector(start, end)
@@ -93,25 +90,14 @@ def compute_start_to_end_vector(start: dict, end: dict) -> dict:
 
 def get_zero_yaw_pose(
     tf: TransformStamped | None,
-    yaw_before_gate_tf: TransformStamped | None,
 ):
-    if tf is None or yaw_before_gate_tf is None:
+    if tf is None:
         return create_stamped_pose(
             frame_id="auv4/base_link_ned",
         )
-
-    _, _, y = euler_from_quaternion(
-        [
-            yaw_before_gate_tf.transform.rotation.x,
-            yaw_before_gate_tf.transform.rotation.y,
-            yaw_before_gate_tf.transform.rotation.z,
-            yaw_before_gate_tf.transform.rotation.w,
-        ]
-    )
-
     return create_stamped_pose(
         frame_id="world_ned",
-        yaw=y,
+        yaw=0.0,
         position_x=tf.transform.translation.x,
         position_y=tf.transform.translation.y,
         position_z=tf.transform.translation.z,

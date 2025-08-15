@@ -285,7 +285,7 @@ def create_gate_root():
             retry_start_vision,
             retry_cluster_gate,
             goto_see_pictures,
-            get_yaw_before_gate,
+            # get_yaw_before_gate,
             sub_gate_orientation,
             sel_gate_side,
             goto_through_gate,

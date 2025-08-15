@@ -5,16 +5,16 @@ import py_trees_ros
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import TransformStamped
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons.blackboard import MultiSetBlackboard
 from mission_planner_2.trees.auv.bins.bins import create_bin_root
 from mission_planner_2.trees.auv.gate.gate import create_gate_root
-from mission_planner_2.trees.auv.gate.move_to_task import create_move_to_gate_task_root
 from mission_planner_2.trees.auv.gate.return_home import create_return_root
 from mission_planner_2.trees.auv.mother.button_behaviors import create_button_start_root
 from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
 from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
 from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
-from std_srvs.srv import Trigger
 
 LEFT_BUTTON_TOPIC = "/auv4/button/left"
 RIGHT_BUTTON_TOPIC = "/auv4/button/right"
@@ -129,12 +129,12 @@ def create_mother(coords: dict):
         key_response=CHOICE_KEY,
     )
 
-    move_to_gate = create_move_to_gate_task_root(
-        world_coords=coords["gate_start"],
-        relative_coords=coords["rel_gate_start"],
-        flipped_relative_coords=coords["rel_gate_start_flip"],
-        is_relative=True,
-        is_flip=False,
+    move_to_gate = create_move_to_task(
+        task="gate",
+        start=coords["start"],
+        end=coords["gate_start"],
+        odom_key=CURRENT_ODOM_KEY,
+        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
     )
 
     gate_root = create_gate_root()
@@ -168,7 +168,7 @@ def create_mother(coords: dict):
 
     move_to_torpedo = create_move_to_task(
         task="torpedo",
-        start=coords["bin"],
+        start=coords["torpedo_post"],
         end=coords["torpedo_start"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
@@ -178,7 +178,7 @@ def create_mother(coords: dict):
 
     move_to_space = create_move_to_task(
         task="post_torpedo",
-        start=coords["torpedo"],
+        start=coords["octagon"],
         end=coords["torpedo_post"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
@@ -186,7 +186,7 @@ def create_mother(coords: dict):
 
     move_to_octagon = create_move_to_task(
         task="octagon",
-        start=coords["torpedo_post"],
+        start=coords["bin"],
         end=coords["octagon"],
         odom_key=CURRENT_ODOM_KEY,
         zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
@@ -216,14 +216,13 @@ def create_mother(coords: dict):
             # gate_root,
             # move_to_slalom,
             # move_to_slalom_end,
-            # slalom_root,
             # move_to_bin,
             # bin_root,
-            # move_to_torpedo,
-            # torpedo_root,
-            # move_to_space,
             # move_to_octagon,
             octagon_root,
+            # move_to_space,
+            # move_to_torpedo,
+            # torpedo_root,
         ]
     )
 

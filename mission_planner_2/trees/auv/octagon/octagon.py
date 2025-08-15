@@ -66,13 +66,13 @@ SHARK_VIEW_FRAME_HARDCODED = "trash/shark/clustered/view/hardcoded"
 TRASH_COUNT_SERVICE = "/auv4/trash/object_count/toggle"
 COLLECT_DURATION = 3.0
 
-TOTAL_DURATION = 480
+TOTAL_DURATION = 373
 ALIGN_AND_COLLECT_TIMEOUT = 60.0
 CONTROLLED_ASCENT_TIMEOUT = 30.0
 
-CLUSTER_DURATION = 5
+CLUSTER_DURATION = 4
 NUM_ROTATIONS = 3
-STABILIZE_DURATION = 5
+
 WAIT_BETWEEN_ROTATIONS = 3
 LOOK_AT_TARGET_PAUSE_DURATION = 4
 
@@ -587,6 +587,21 @@ def create_octagon_root():
         child=seq_spin,
     )
 
+    goto_table_centre_after_spin = create_goto_table_centre_root(
+        table_centre_frame=TABLE_CENTER_FRAME,
+        table_centre_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+        cluster_duration=CLUSTER_DURATION,
+        table_cluster_failure_count_key=_TABLE_CLUSTER_FAILURE_COUNT_KEY,
+        is_grabber_open=True,
+        trash=None,
+        depth_override=SEARCH_DEPTH,
+    )
+
+    force_success_goto_table_centre_after_spin = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed goto table centre after spin",
+        child=goto_table_centre_after_spin,
+    )
+
     srv_end_vision = py_trees_ros.service_clients.FromConstant(
         name="End vision pipeline",
         service_name=VISION_SERVER_TOPIC,
@@ -614,6 +629,7 @@ def create_octagon_root():
             sel_timeout,
             force_success_seq_search_and_look,
             force_success_seq_spin,
+            force_success_goto_table_centre_after_spin,
             srv_end_vision,
             check_end_vision_succeeded,
         ]
