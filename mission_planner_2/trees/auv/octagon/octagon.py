@@ -6,8 +6,8 @@ from bb_behavior_msgs.action import AlignAndCollect, ControlledSpin
 from bb_controls_msgs.srv import Controller
 from bb_perception_msgs.srv import ClusterTfSrv, GetObjectCount
 from lifecycle_msgs.srv import ChangeState
-
 from mission_planner_2.commons import checked_service, shared_action_client
+from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -22,7 +22,9 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.commons.search import create_search_bot_layered_square_root
+from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
+from mission_planner_2.trees.auv.octagon.helpers import get_table_relocalised_yaw
 from mission_planner_2.trees.auv.octagon.symbols import create_look_at_target_root
 from mission_planner_2.trees.auv.octagon.trash import (
     create_align_actuate_surface_root,
@@ -78,10 +80,10 @@ LOOK_AT_TARGET_PAUSE_DURATION = 4
 
 DROP_Z_DISTANCE = 0.30
 
-PICKUP_DEPTH_RATE = 0.05
+PICKUP_DEPTH_RATE = 0.08
 PICKUP_XY_THRESHOLD = 0.03
 PICKUP_CUTOFF_Z_DISTANCE = 0.2
-DROP_DEPTH_RATE = 0.05
+DROP_DEPTH_RATE = 0.08
 CONTROLLED_ASCENT_DEPTH_RATE = 0.05
 
 SURFACE_DEPTH_THRESHOLD = 0.00
@@ -100,9 +102,12 @@ SEARCH_FWD = 1.0
 SEARCH_BACK = 1.0
 SEARCH_LEFT = 1.0
 SEARCH_RIGHT = 1.0
-NUM_SQUARES = 1
-OFFSET_COEFF = 1.0
+NUM_SQUARES = 2
+OFFSET_COEFF = 0.7
 SEARCH_DEPTH = 0.3
+WAIT_BETWEEN_MOVES = 1.0
+CLUSTER_DISTANCE_THRESHOLD = 0.2
+MIN_CLUSTER_SIZE = 4
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -343,9 +348,11 @@ def create_item_pickup_root(
     return seq_item
 
 
-def create_octagon_root():
+def create_octagon_root(world_to_table_yaw: float, zero_yaw_key: str):
     """
     Create the root of the octagon tree.
+
+    world_to_table_yaw is the world zero to pink bucket yaw in NED in degrees.
     """
     root = py_trees.composites.Sequence(
         name="Octagon Root",
@@ -397,8 +404,10 @@ def create_octagon_root():
         object_frame=TABLE_CENTER_FRAME,
         object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
         offset_coeff=OFFSET_COEFF,
-        wait_between_moves=1.0,
+        wait_between_moves=WAIT_BETWEEN_MOVES,
         search_depth=SEARCH_DEPTH,
+        cluster_dist_threshold=CLUSTER_DISTANCE_THRESHOLD,
+        min_cluster_size=MIN_CLUSTER_SIZE,
     )
 
     goto_table_centre_after_search = goto.FromConstant(
@@ -602,6 +611,52 @@ def create_octagon_root():
         child=goto_table_centre_after_spin,
     )
 
+    seq_relocalise = py_trees.composites.Sequence(
+        name="Relocalize to table yaw",
+        memory=True,
+    )
+
+    _odom_tf_key = fk("odom_tf")
+    _base_link_to_table_centre_key = fk("table_centre")
+
+    get_odom = create_tf_checker_from_constant_root(
+        start_frames=["world_ned"],
+        end_frames=[BASE_LINK_FRAME],
+        update_keys=[_odom_tf_key],
+        fallback_val=[None],
+    )
+
+    lookup_base_link_to_table_centre = create_tf_checker_from_constant_root(
+        start_frames=[BASE_LINK_FRAME],
+        end_frames=[TABLE_CENTER_FRAME_CLUSTERED],
+        timeout=5.0,
+        update_keys=[_base_link_to_table_centre_key],
+        fallback_val=[None],
+    )
+
+    save_zeroed_yaw = DynamicSetBlackboard(
+        name="Create zeroed yaw pose",
+        key=[
+            _odom_tf_key,
+            _base_link_to_table_centre_key,
+        ],
+        update_key=zero_yaw_key,
+        overwrite=True,
+        func=lambda odom_tf, table_centre_tf: get_table_relocalised_yaw(
+            odom_tf,
+            table_centre_tf,
+            world_to_table_yaw,
+        ),
+    )
+
+    seq_relocalise.add_children(
+        [
+            get_odom,
+            lookup_base_link_to_table_centre,
+            save_zeroed_yaw,
+        ]
+    )
+
     srv_end_vision = py_trees_ros.service_clients.FromConstant(
         name="End vision pipeline",
         service_name=VISION_SERVER_TOPIC,
@@ -630,6 +685,7 @@ def create_octagon_root():
             force_success_seq_search_and_look,
             force_success_seq_spin,
             force_success_goto_table_centre_after_spin,
+            seq_relocalise,
             srv_end_vision,
             check_end_vision_succeeded,
         ]

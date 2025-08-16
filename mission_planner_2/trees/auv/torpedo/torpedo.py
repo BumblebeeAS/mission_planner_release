@@ -3,6 +3,7 @@ import operator
 import py_trees
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
+
 from mission_planner_2.commons import checked_service
 from mission_planner_2.commons.blackboard import MultiSetBlackboard
 from mission_planner_2.commons.detection_utils import (
@@ -53,7 +54,7 @@ DISTANCE_THRESHOLD = 0.025
 YAW_THRESHOLD = 1.0
 
 CLUSTER_DURATION = 4
-REALIGN_CLUSTER_DURATION = 4
+REALIGN_CLUSTER_DURATION = 2
 STABILIZE_DURATION = 3
 WAIT_AFTER_FIRE_DURATION = 3.0
 NUM_RETRIES = 3

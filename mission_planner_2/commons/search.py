@@ -68,7 +68,7 @@ def _generate_layered_square_search_bot_pattern(
         right (float): Right distance of the square.
         num_squares (int): Number of squares/layers to generate in the pattern.
         offset_coeff (float): Coefficient to determine the distance between squares.
-            The distance between squares is `i * offset_coeff` where `i` is the square index (1-indexed).
+            The distance between squares is `i * offset_coeff` where `i` is the square index (0-indexed).
     Returns:
         list: A list of PoseStamped objects representing the search pattern.
     """
@@ -188,89 +188,111 @@ def create_search_bot_layered_square_root(
     right: float,
     num_squares: int,
     object_frame: str,
+    cluster_dist_threshold: float,
     object_frame_clustered: str,
     offset_coeff: float = 0.2,
     wait_between_moves: float = 5.0,
     search_depth: float = 0.3,
+    min_cluster_size: int = 2,
 ):
+    cluster_key = "bot_layered_cluster_resp"
+
     poses = _generate_layered_square_search_bot_pattern(
-        fwd, back, left, right, num_squares, offset_coeff
+        fwd,
+        back,
+        left,
+        right,
+        num_squares,
+        offset_coeff,
     )
 
-    cluster_node_start = py_trees_ros.service_clients.FromConstant(
-        name="Cluster search",
-        service_type=ClusterTfSrv,
-        service_name="/auv4/cluster_tfs_srv",
-        service_request=create_clustering_request(
-            enabled=True,
-            in_children=object_frame,
-            out_children=object_frame_clustered,
-            persistent=False,
-        ),
-    )
+    def cluster_node_start_func(persistent: bool):
+        return py_trees_ros.service_clients.FromConstant(
+            name="Cluster search",
+            service_type=ClusterTfSrv,
+            service_name="/auv4/cluster_tfs_srv",
+            service_request=create_clustering_request(
+                enabled=True,
+                in_children=object_frame,
+                out_children=object_frame_clustered,
+                persistent=persistent,
+                min_cluster_size=min_cluster_size,
+            ),
+        )
 
-    cluster_node_stop = py_trees_ros.service_clients.FromConstant(
-        name="Cluster search stop",
-        service_type=ClusterTfSrv,
-        service_name="/auv4/cluster_tfs_srv",
-        service_request=create_clustering_request(
-            enabled=False,
-            persistent=False,
-            in_children=object_frame,
-            out_children=object_frame_clustered,
-        ),
-    )
+    def cluster_node_stop_func(persistent: bool):
+        return py_trees_ros.service_clients.FromConstant(
+            name="Cluster search stop",
+            service_type=ClusterTfSrv,
+            service_name="/auv4/cluster_tfs_srv",
+            service_request=create_clustering_request(
+                enabled=False,
+                persistent=persistent,
+                in_children=object_frame,
+                out_children=object_frame_clustered,
+            ),
+            key_response=cluster_key,
+        )
 
-    root = _create_search_bot_root(
-        poses,
-        cluster_node_start=cluster_node_start,
-        cluster_node_end=cluster_node_stop,
-        wait_between_moves_sec=wait_between_moves,
-        search_depth=search_depth,
-    )
+    def cluster_validate_seq(
+        poses: List[PoseStamped],
+        cluster_dist_threshold: float,
+    ):
+        root = py_trees.composites.Sequence(
+            name="Seq bot search and validate",
+            memory=True,
+        )
+
+        seq_search_bot = _create_search_bot_root(
+            poses=poses,
+            cluster_node_start=cluster_node_start_func(True),
+            cluster_node_end=cluster_node_stop_func(True),
+            wait_between_moves_sec=wait_between_moves,
+            search_depth=search_depth,
+        )
+
+        check_valid_cluster = py_trees.behaviours.CheckBlackboardVariableValue(
+            name="Check valid cluster",
+            check=py_trees.common.ComparisonExpression(
+                variable=cluster_key,
+                value=cluster_dist_threshold,
+                operator=lambda x, y: x.cluster_spread < y or num_squares == 1,
+            ),
+        )
+
+        root.add_children(
+            [
+                seq_search_bot,
+                check_valid_cluster,
+            ]
+        )
+
+        return root
+
+    # root = _create_search_bot_root(
+    #     poses,
+    #     cluster_node_start=cluster_node_start_func(False),
+    #     cluster_node_end=cluster_node_stop_func(False),
+    #     wait_between_moves_sec=wait_between_moves,
+    #     search_depth=search_depth,
+    # )
 
     # cluster start finish one layer stop then go next
     # TODO: if u want to add logic to early stop add into the root children
-    # root_for_samuel = py_trees.composites.Sequence(
-    #     name="Search seq (bot cam) with layers",
-    #     memory=True,
-    # )
-    # children: List[py_trees.behaviour.Behaviour] = [
-    #     py_trees.composites.Sequence(
-    #         name=f"Search layer {i + 1}",
-    #         memory=True,
-    #         children=[
-    #             _create_search_bot_root(
-    #                 poses[i],
-    #                 cluster_node_start=py_trees_ros.service_clients.FromConstant(
-    #                     name="Cluster search",
-    #                     service_type=ClusterTfSrv,
-    #                     service_name="/auv4/cluster_tfs_srv",
-    #                     service_request=create_clustering_request(
-    #                         enabled=True,
-    #                         in_children=object_frame,
-    #                         out_children=object_frame_clustered,
-    #                         persistent=False,
-    #                     ),
-    #                 ),
-    #                 cluster_node_end=py_trees_ros.service_clients.FromConstant(
-    #                     name="Cluster search stop",
-    #                     service_type=ClusterTfSrv,
-    #                     service_name="/auv4/cluster_tfs_srv",
-    #                     service_request=create_clustering_request(
-    #                         enabled=False,
-    #                         persistent=False,
-    #                         in_children=object_frame,
-    #                         out_children=object_frame_clustered,
-    #                     ),
-    #                 ),
-    #                 wait_between_moves_sec=wait_between_moves,
-    #             )
-    #         ],
-    #     )
-    #     for i in range(len(poses))
-    # ]
-    # root_for_samuel.add_children(children)
+    root = py_trees.composites.Selector(
+        name="Search seq (bot cam) with layers",
+        memory=True,
+    )
+
+    root.add_children(
+        [
+            cluster_validate_seq(
+                poses=poses[layer_num * 4 : layer_num * 4 + 4],
+                cluster_dist_threshold=cluster_dist_threshold,
+            )
+            for layer_num in range(len(poses) // 4)
+        ]
+    )
 
     return root
 

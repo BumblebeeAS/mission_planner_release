@@ -5,6 +5,10 @@ import py_trees_ros
 from bb_perception_msgs.msg import PointCorrespondencesStamped
 from bb_perception_msgs.srv import IMPoseEstimatorToggleTemplate
 from lifecycle_msgs.srv import ChangeState
+from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import UInt8
+from std_srvs.srv import Trigger
+
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.cluster_goto import create_goto_cluster_from_bb_root
@@ -30,9 +34,6 @@ from mission_planner_2.trees.auv.bins.template_selector import (
     create_template_selector_root,
 )
 from mission_planner_2.trees.auv.goto import goto
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import UInt8
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -81,11 +82,14 @@ SEARCH_FWD = 1.0
 SEARCH_BACK = 0.3
 SEARCH_LEFT = 0.5
 SEARCH_RIGHT = 0.5
-NUM_SQUARES = 1
+NUM_SQUARES = 2
 OFFSET_COEFF = 1.0
 SEARCH_DEPTH = 0.3
 BETWEEN_DROPS_WAIT = 3.5
 EXTRA_DROP_WAIT = 0.5
+WAIT_BETWEEN_MOVES = 1.0
+CLUSTER_DIST_THRESHOLD = 0.2
+MIN_CLUSTER_SIZE = 4
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -142,8 +146,10 @@ def create_bin_root():
         object_frame=TEMPLATE_FRAME_YOLO,
         object_frame_clustered=TEMPLATE_FRAME_YOLO_CLUSTERED,
         offset_coeff=OFFSET_COEFF,
-        wait_between_moves=3.0,
+        wait_between_moves=WAIT_BETWEEN_MOVES,
         search_depth=SEARCH_DEPTH,
+        cluster_dist_threshold=CLUSTER_DIST_THRESHOLD,
+        min_cluster_size=MIN_CLUSTER_SIZE,
     )
 
     cluster_bin_centre = shared_action_client.FromConstant(
