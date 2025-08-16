@@ -4,7 +4,6 @@ import py_trees
 import py_trees_ros
 import yaml
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import TransformStamped
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.blackboard import MultiSetBlackboard
@@ -23,7 +22,7 @@ IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 BASE_LINK_KEY = "/global/base_link"
 WORLD_KEY = "/global/world"
 CURRENT_ODOM_KEY = "/global/current_odom"
-ZERO_YAW_POSE_KEY = "/global/zero_yaw_pose_key"
+ZERO_YAW_KEY = "/global/zero_yaw_key"
 CHOICE_KEY = "/global/choice_is_fish"
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 RESET_POSE_SRV_TOPIC = "/auv4/nav/reset_pose"
@@ -134,8 +133,7 @@ def create_mother(coords: dict):
         task="gate",
         start=coords["start"],
         end=coords["gate_start"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
     )
 
     gate_root = create_gate_root()
@@ -144,16 +142,14 @@ def create_mother(coords: dict):
         task="slalom",
         start=coords["gate_end"],
         end=coords["slalom_start"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
     )
 
     move_to_slalom_end = create_move_to_task(
         task="move_to_slalom_end",
         start=coords["slalom_start"],
         end=coords["slalom_end"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
         goto_depth=SLALOM_DEPTH,
     )
 
@@ -161,8 +157,7 @@ def create_mother(coords: dict):
         task="bin",
         start=coords["slalom_end"],
         end=coords["bin"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
     )
 
     bin_root = create_bin_root()
@@ -171,34 +166,34 @@ def create_mother(coords: dict):
         task="octagon",
         start=coords["bin"],
         end=coords["octagon"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
     )
 
-    octagon_root = create_octagon_root()
+    octagon_root = create_octagon_root(
+        world_to_table_yaw=coords["table"]["yaw"],
+        zero_yaw_key=ZERO_YAW_KEY,
+    )
 
     move_to_space = create_move_to_task(
         task="post_torpedo",
         start=coords["octagon"],
         end=coords["torpedo_post"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
     )
 
     move_to_torpedo = create_move_to_task(
         task="torpedo",
         start=coords["torpedo_post"],
         end=coords["torpedo_start"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
     )
 
     torpedo_root = create_torpedo_root()
 
-    set_testing_keys = MultiSetBlackboard(
-        name="Set is_left, yaw_before_gate",
-        keys=[IS_LEFT_KEY, YAW_BEFORE_GATE_KEY],
-        values=[True, TransformStamped()],
+    set_keys = MultiSetBlackboard(
+        name="Set is_left, zero_yaw",
+        keys=[IS_LEFT_KEY, ZERO_YAW_KEY],
+        values=[True, 0.0],
         overwrite=True,
     )
 
@@ -209,7 +204,7 @@ def create_mother(coords: dict):
             srv_get_choice,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
-            set_testing_keys,  # if dont do gate
+            set_keys,
             #################
             move_to_gate,
             gate_root,

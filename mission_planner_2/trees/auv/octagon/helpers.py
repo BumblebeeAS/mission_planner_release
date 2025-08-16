@@ -3,6 +3,7 @@ from bb_behavior_msgs.action import ControlledSpin
 from bb_perception_msgs.srv import GetObjectCount
 from geometry_msgs.msg import PoseStamped, TransformStamped, Vector3
 from std_srvs.srv import Trigger
+from tf_transformations import euler_from_quaternion
 
 from mission_planner_2.commons.pose_utils import create_stamped_pose
 
@@ -91,3 +92,36 @@ def create_spin_goal(response: GetObjectCount.Response):
         yaw_rate=20.0,
         timeout_seconds=30.0,
     )
+
+
+def get_table_relocalised_yaw(
+    odom_tf: TransformStamped | None,
+    table_centre_tf: TransformStamped | None,
+    table_offset: float,
+):
+    if odom_tf is None or table_centre_tf is None:
+        return 0.0
+
+    table_offset_rad = np.deg2rad(table_offset)
+
+    _, _, odom_y = euler_from_quaternion(
+        [
+            odom_tf.transform.rotation.x,
+            odom_tf.transform.rotation.y,
+            odom_tf.transform.rotation.z,
+            odom_tf.transform.rotation.w,
+        ]
+    )
+
+    _, _, table_centre_y = euler_from_quaternion(
+        [
+            table_centre_tf.transform.rotation.x,
+            table_centre_tf.transform.rotation.y,
+            table_centre_tf.transform.rotation.z,
+            table_centre_tf.transform.rotation.w,
+        ]
+    )
+
+    final = (odom_y + table_centre_y - table_offset_rad) % (2 * np.pi)
+
+    return final

@@ -4,16 +4,17 @@ import py_trees
 import py_trees_ros
 import yaml
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import TransformStamped
 from std_srvs.srv import Trigger
 
 from mission_planner_2.commons.blackboard import MultiSetBlackboard
+from mission_planner_2.trees.auv.bins.bins import create_bin_root
 from mission_planner_2.trees.auv.gate.gate import create_gate_root
 from mission_planner_2.trees.auv.mother.button_behaviors import (
     create_button_start_coinflip_root,
 )
 from mission_planner_2.trees.auv.mother.move_to_task import create_move_to_task
 from mission_planner_2.trees.auv.octagon.octagon import create_octagon_root
+from mission_planner_2.trees.auv.torpedo.torpedo import create_torpedo_root
 
 LEFT_BUTTON_TOPIC = "/auv4/button/left"
 RIGHT_BUTTON_TOPIC = "/auv4/button/right"
@@ -21,7 +22,7 @@ IS_LEFT_KEY = "/global/is_left_side"  # Global key for left option or not
 BASE_LINK_KEY = "/global/base_link"
 WORLD_KEY = "/global/world"
 CURRENT_ODOM_KEY = "/global/current_odom"
-ZERO_YAW_POSE_KEY = "/global/zero_yaw_pose_key"
+ZERO_YAW_KEY = "/global/zero_yaw_key"
 CHOICE_KEY = "/global/choice_is_fish"
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 RESET_POSE_SRV_TOPIC = "/auv4/nav/reset_pose"
@@ -135,8 +136,7 @@ def create_mother(coords: dict):
         task="gate",
         start=coords["start"],
         end=coords["gate_start"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
     )
 
     gate_root = create_gate_root()
@@ -149,33 +149,66 @@ def create_mother(coords: dict):
         task="slalom",
         start=coords["gate_end"],
         end=coords["slalom_start"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
     )
 
     move_to_slalom_end = create_move_to_task(
         task="move_to_slalom_end",
         start=coords["slalom_start"],
         end=coords["slalom_end"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
         goto_depth=SLALOM_DEPTH,
     )
 
     move_to_octagon = create_move_to_task(
         task="octagon",
-        start=coords["slalom_end"],
+        start=coords["gate_end"],
         end=coords["octagon"],
-        odom_key=CURRENT_ODOM_KEY,
-        zero_yaw_pose_key=ZERO_YAW_POSE_KEY,
+        zero_yaw_key=ZERO_YAW_KEY,
     )
 
-    octagon_root = create_octagon_root()
+    octagon_root = create_octagon_root(
+        world_to_table_yaw=coords["table"]["yaw"],
+        zero_yaw_key=ZERO_YAW_KEY,
+    )
 
-    set_testing_keys = MultiSetBlackboard(
-        name="Set is_left, yaw_before_gate",
-        keys=[IS_LEFT_KEY, YAW_BEFORE_GATE_KEY],
-        values=[True, TransformStamped()],
+    move_to_space = create_move_to_task(
+        task="torpedo post",
+        start=coords["octagon"],
+        end=coords["torpedo_post"],
+        zero_yaw_key=ZERO_YAW_KEY,
+    )
+
+    move_to_torpedo = create_move_to_task(
+        task="torpedo",
+        start=coords["torpedo_post"],
+        end=coords["torpedo_start"],
+        zero_yaw_key=ZERO_YAW_KEY,
+    )
+
+    move_to_bin = create_move_to_task(
+        task="bin",
+        start=coords["torpedo"],
+        end=coords["bin"],
+        zero_yaw_key=ZERO_YAW_KEY,
+    )
+
+    bin_root = create_bin_root()
+    force_succeed_bin = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed bin",
+        child=bin_root,
+    )
+
+    torpedo_root = create_torpedo_root()
+    force_succeed_torpedo = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed torpedo",
+        child=torpedo_root,
+    )
+
+    set_keys = MultiSetBlackboard(
+        name="Set is_left, zero_yaw",
+        keys=[IS_LEFT_KEY, ZERO_YAW_KEY],
+        values=[True, 0.0],
         overwrite=True,
     )
 
@@ -186,13 +219,18 @@ def create_mother(coords: dict):
             srv_get_choice,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
-            set_testing_keys,  # if dont do gate
+            set_keys,  # if dont do gate
             move_to_gate,
             force_succeed_gate,
-            move_to_slalom,
-            move_to_slalom_end,
+            # move_to_slalom,
+            # move_to_slalom_end,
             move_to_octagon,
             octagon_root,
+            move_to_space,
+            move_to_torpedo,
+            force_succeed_torpedo,
+            move_to_bin,
+            force_succeed_bin,
         ]
     )
 

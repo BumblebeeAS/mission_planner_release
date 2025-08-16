@@ -6,6 +6,7 @@ from bb_behavior_msgs.action import AlignAndCollect, ControlledSpin
 from bb_controls_msgs.srv import Controller
 from bb_perception_msgs.srv import ClusterTfSrv, GetObjectCount
 from lifecycle_msgs.srv import ChangeState
+
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.detection_utils import (
@@ -80,10 +81,10 @@ LOOK_AT_TARGET_PAUSE_DURATION = 4
 
 DROP_Z_DISTANCE = 0.30
 
-PICKUP_DEPTH_RATE = 0.08
+PICKUP_DEPTH_RATE = 0.07
 PICKUP_XY_THRESHOLD = 0.03
 PICKUP_CUTOFF_Z_DISTANCE = 0.2
-DROP_DEPTH_RATE = 0.08
+DROP_DEPTH_RATE = 0.07
 CONTROLLED_ASCENT_DEPTH_RATE = 0.05
 
 SURFACE_DEPTH_THRESHOLD = 0.00
@@ -106,7 +107,7 @@ NUM_SQUARES = 2
 OFFSET_COEFF = 0.7
 SEARCH_DEPTH = 0.3
 WAIT_BETWEEN_MOVES = 1.0
-CLUSTER_DISTANCE_THRESHOLD = 0.2
+CLUSTER_DISTANCE_THRESHOLD = 0.5
 MIN_CLUSTER_SIZE = 4
 #########################################################################
 
@@ -236,7 +237,7 @@ def create_search_root():
         action_goal=ControlledSpin.Goal(
             yaw_amount=360.0,
             yaw_tolerance=3.0,
-            yaw_rate=5.0,
+            yaw_rate=20.0,
             timeout_seconds=30.0,
         ),
     )

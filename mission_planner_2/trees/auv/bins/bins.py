@@ -88,7 +88,7 @@ SEARCH_DEPTH = 0.3
 BETWEEN_DROPS_WAIT = 3.5
 EXTRA_DROP_WAIT = 0.5
 WAIT_BETWEEN_MOVES = 1.0
-CLUSTER_DIST_THRESHOLD = 0.2
+CLUSTER_DIST_THRESHOLD = 0.5
 MIN_CLUSTER_SIZE = 4
 #########################################################################
 

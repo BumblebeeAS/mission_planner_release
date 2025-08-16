@@ -9,6 +9,7 @@ _OCTAGON_START = "octagon"
 _ACOUSTIC_END = "acoustic_end"
 _TORPEDO = "torpedo"
 _TORPEDO_POST = "torpedo_post"
+_BIN = "bin"
 
 
 PARTITION_OFFSET = 0
@@ -23,6 +24,7 @@ def _create_octagon_torpedo_root(
     goto_depth: float,
     specified_heading_octagon: bool = True,
     specified_heading_torpedo: bool = True,
+    specified_heading_bin: bool = True,
 ):
     root = py_trees.composites.Sequence(
         name="Octagon - torpedo seq",
@@ -62,6 +64,13 @@ def _create_octagon_torpedo_root(
         child=torpedo,
     )
 
+    move_to_bin = move_func(
+        start_coords=_TORPEDO,
+        end_coords=_BIN,
+        goto_depth=goto_depth,
+        specified_heading=specified_heading_bin,
+    )
+
     root.add_children(
         [
             move_to_octagon,
@@ -69,6 +78,7 @@ def _create_octagon_torpedo_root(
             move_to_torpedo_post,
             move_to_torpedo_start,
             force_succeed_torpedo,
+            move_to_bin,
         ]
     )
 
@@ -82,6 +92,7 @@ def _create_torpedo_octagon_root(
     goto_depth: float,
     specified_heading_octagon: bool = True,
     specified_heading_torpedo: bool = True,
+    specified_heading_bin: bool = True,
 ):
     root = py_trees.composites.Sequence(
         name="Octagon - torpedo seq",
@@ -128,6 +139,13 @@ def _create_torpedo_octagon_root(
         child=octagon,
     )
 
+    move_to_bin = move_func(
+        start_coords=_OCTAGON_START,
+        end_coords=_BIN,
+        goto_depth=goto_depth,
+        specified_heading=specified_heading_bin,
+    )
+
     root.add_children(
         [
             move_to_torpedo_post,
@@ -136,6 +154,7 @@ def _create_torpedo_octagon_root(
             move_to_torpedo_post_octagon,
             move_to_post_octagon,
             force_succeed_octagon,
+            move_to_bin,
         ]
     )
 
@@ -151,6 +170,7 @@ def create_acoustics_root(
     goto_depth: float = 0.3,
     specified_heading_torpedo: bool = True,
     specified_heading_octagon: bool = True,
+    specified_heading_bin: bool = True,
 ) -> py_trees.behaviour.Behaviour:
     octagon_on_left_adjustment = 0 if is_octagon_on_right else 180
 
@@ -161,6 +181,7 @@ def create_acoustics_root(
         goto_depth=goto_depth,
         specified_heading_octagon=specified_heading_octagon,
         specified_heading_torpedo=specified_heading_torpedo,
+        specified_heading_bin=specified_heading_bin,
     )
 
     seq_torpedo_octagon = _create_torpedo_octagon_root(
@@ -170,6 +191,7 @@ def create_acoustics_root(
         goto_depth=goto_depth,
         specified_heading_octagon=specified_heading_octagon,
         specified_heading_torpedo=specified_heading_torpedo,
+        specified_heading_bin=specified_heading_bin,
     )
 
     return create_order_by_ping_root(

@@ -290,7 +290,7 @@ def create_gate_root():
             sel_gate_side,
             goto_through_gate,
             goto_after_gate,
-            seq_yaw_spin,
+            # seq_yaw_spin,
             force_success_stop_vision,
         ]
     )
