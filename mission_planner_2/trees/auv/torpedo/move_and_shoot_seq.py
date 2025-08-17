@@ -1,6 +1,9 @@
+import numpy as np
 import py_trees
 import py_trees_ros
+from geometry_msgs.msg import TransformStamped
 from std_srvs.srv import Trigger
+from tf_transformations import euler_from_quaternion
 
 from mission_planner_2.commons import shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -16,6 +19,10 @@ from mission_planner_2.commons.pose_utils import (
     within_threshold_rpy,
     within_threshold_xyz,
 )
+from mission_planner_2.commons.tf_checker import (
+    create_tf_checker_from_bb_root,
+    create_tf_checker_from_constant_root,
+)
 from mission_planner_2.trees.auv.goto import goto
 
 NAMESPACE = generate_namespace()
@@ -23,6 +30,8 @@ fk = full_key_generator(NAMESPACE)
 
 _CLUSTERING_GOAL_KEY = fk("clustering_goal")
 _CLUSTERING_GOAL_CHECK_KEY = fk("clustering_goal_check")
+
+BASE_LINK_FRAME = "auv4/base_link_ned"
 
 
 def create_firing_root(
@@ -79,6 +88,8 @@ def create_move_and_shoot_generator(
     realign_cluster_duration: int,
     actuation_topic_left: str,
     actuation_topic_right: str,
+    world_to_torp_yaw: float,
+    zero_yaw_key: str,
     distance_threshold=0.05,
     yaw_threshold=3.0,
     retries=3,
@@ -226,20 +237,108 @@ def create_move_and_shoot_generator(
             wait_after_fire_duration=wait_after_fire_duration,
         )
 
+        seq_relocalise = py_trees.composites.Sequence(
+            name="Relocalize to torpedo yaw",
+            memory=True,
+        )
+
+        _odom_tf_key = fk("odom_tf")
+        _base_link_to_torp_view_frame_key = fk("bl_to_torp_view_frame")
+
+        get_odom = create_tf_checker_from_constant_root(
+            start_frames=["world_ned"],
+            end_frames=[BASE_LINK_FRAME],
+            update_keys=[_odom_tf_key],
+            fallback_val=[None],
+        )
+
+        lookup_base_link_to_torp_view = create_tf_checker_from_bb_root(
+            start_frame_keys=["/global/base_link"],
+            end_frame_keys=[pose_frame_key],
+            update_keys=[_base_link_to_torp_view_frame_key],
+            fallback_val=[None],
+        )
+
+        save_zeroed_yaw = DynamicSetBlackboard(
+            name="Create zeroed yaw pose",
+            key=[
+                _odom_tf_key,
+                _base_link_to_torp_view_frame_key,
+            ],
+            update_key=zero_yaw_key,
+            overwrite=True,
+            func=lambda odom_tf, torp_view_tf: get_torp_relocalised_yaw(
+                odom_tf,
+                torp_view_tf,
+                world_to_torp_yaw,
+            ),
+        )
+
+        seq_relocalise.add_children(
+            [
+                get_odom,
+                lookup_base_link_to_torp_view,
+                save_zeroed_yaw,
+            ]
+        )
+
+        force_success_seq_relocalise = py_trees.decorators.FailureIsSuccess(
+            name="Force succeed relocalise",
+            child=seq_relocalise,
+        )
+
+        children = [
+            set_anchor_frame,
+            dynamic_set_pose,
+            dynamic_set_frame,
+            dynamic_set_cluster_goal,
+            dynamic_set_cluster_goal_check,
+            goto_cluster,
+            seq_repeated_fire,
+        ]
+
+        if not first:
+            children.append(force_success_seq_relocalise)
+
         root = py_trees.composites.Sequence(
             f"Move and shoot {torp_string} torpedo",
             memory=True,
-            children=[
-                set_anchor_frame,
-                dynamic_set_pose,
-                dynamic_set_frame,
-                dynamic_set_cluster_goal,
-                dynamic_set_cluster_goal_check,
-                goto_cluster,
-                seq_repeated_fire,
-            ],
+            children=children,
         )
 
         return root
 
     return f
+
+
+def get_torp_relocalised_yaw(
+    odom_tf: TransformStamped | None,
+    torp_view_tf: TransformStamped | None,
+    torp_offset: float,
+):
+    if odom_tf is None or torp_view_tf is None:
+        return 0.0
+
+    torp_offset_rad = np.deg2rad(torp_offset)
+
+    _, _, odom_y = euler_from_quaternion(
+        [
+            odom_tf.transform.rotation.x,
+            odom_tf.transform.rotation.y,
+            odom_tf.transform.rotation.z,
+            odom_tf.transform.rotation.w,
+        ]
+    )
+
+    _, _, torp_y = euler_from_quaternion(
+        [
+            torp_view_tf.transform.rotation.x,
+            torp_view_tf.transform.rotation.y,
+            torp_view_tf.transform.rotation.z,
+            torp_view_tf.transform.rotation.w,
+        ]
+    )
+
+    final = (odom_y + torp_y - torp_offset_rad) % (2 * np.pi)
+
+    return final

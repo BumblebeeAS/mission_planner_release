@@ -5,7 +5,8 @@ from mission_planner_2.trees.auv.acoustics.order_by_ping import (
 )
 
 _TORPEDO_START = "torpedo_start"
-_OCTAGON_START = "octagon"
+_OCTAGON_START = "octagon_start"
+_OCTAGON = "octagon"
 _ACOUSTIC_END = "acoustic_end"
 _TORPEDO = "torpedo"
 _TORPEDO_POST = "torpedo_post"
@@ -45,7 +46,7 @@ def _create_octagon_torpedo_root(
     )
 
     move_to_torpedo_post = move_func(
-        start_coords=_OCTAGON_START,
+        start_coords=_OCTAGON,
         end_coords=_TORPEDO_POST,
         goto_depth=goto_depth,
         specified_heading=specified_heading_torpedo,
@@ -140,7 +141,7 @@ def _create_torpedo_octagon_root(
     )
 
     move_to_bin = move_func(
-        start_coords=_OCTAGON_START,
+        start_coords=_OCTAGON,
         end_coords=_BIN,
         goto_depth=goto_depth,
         specified_heading=specified_heading_bin,

@@ -145,25 +145,10 @@ def create_mother(coords: dict):
         child=gate_root,
     )
 
-    move_to_slalom = create_move_to_task(
-        task="slalom",
-        start=coords["gate_end"],
-        end=coords["slalom_start"],
-        zero_yaw_key=ZERO_YAW_KEY,
-    )
-
-    move_to_slalom_end = create_move_to_task(
-        task="move_to_slalom_end",
-        start=coords["slalom_start"],
-        end=coords["slalom_end"],
-        zero_yaw_key=ZERO_YAW_KEY,
-        goto_depth=SLALOM_DEPTH,
-    )
-
     move_to_octagon = create_move_to_task(
         task="octagon",
         start=coords["gate_end"],
-        end=coords["octagon"],
+        end=coords["octagon_start"],
         zero_yaw_key=ZERO_YAW_KEY,
     )
 
@@ -186,6 +171,15 @@ def create_mother(coords: dict):
         zero_yaw_key=ZERO_YAW_KEY,
     )
 
+    torpedo_root = create_torpedo_root(
+        world_to_torp_yaw=coords["torpedo_with_yaw"]["yaw"],
+        zero_yaw_key=ZERO_YAW_KEY,
+    )
+    force_succeed_torpedo = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed torpedo",
+        child=torpedo_root,
+    )
+
     move_to_bin = create_move_to_task(
         task="bin",
         start=coords["torpedo"],
@@ -197,12 +191,6 @@ def create_mother(coords: dict):
     force_succeed_bin = py_trees.decorators.FailureIsSuccess(
         name="Force succeed bin",
         child=bin_root,
-    )
-
-    torpedo_root = create_torpedo_root()
-    force_succeed_torpedo = py_trees.decorators.FailureIsSuccess(
-        name="Force succeed torpedo",
-        child=torpedo_root,
     )
 
     set_keys = MultiSetBlackboard(
@@ -222,8 +210,6 @@ def create_mother(coords: dict):
             set_keys,  # if dont do gate
             move_to_gate,
             force_succeed_gate,
-            # move_to_slalom,
-            # move_to_slalom_end,
             move_to_octagon,
             octagon_root,
             move_to_space,

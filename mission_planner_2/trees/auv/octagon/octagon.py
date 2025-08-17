@@ -6,6 +6,7 @@ from bb_behavior_msgs.action import AlignAndCollect, ControlledSpin
 from bb_controls_msgs.srv import Controller
 from bb_perception_msgs.srv import ClusterTfSrv, GetObjectCount
 from lifecycle_msgs.srv import ChangeState
+from std_msgs.msg import Bool
 
 from mission_planner_2.commons import checked_service, shared_action_client
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
@@ -22,7 +23,9 @@ from mission_planner_2.commons.pose_utils import (
     create_clustering_request,
     create_stamped_pose,
 )
-from mission_planner_2.commons.search import create_search_bot_layered_square_root
+from mission_planner_2.commons.search import (
+    create_homing_search_bot_layered_square_root,
+)
 from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
 from mission_planner_2.trees.auv.goto import goto
 from mission_planner_2.trees.auv.octagon.helpers import get_table_relocalised_yaw
@@ -99,6 +102,8 @@ MAX_TABLE_CLUSTER_FAILURE = 3
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 GRABBER_ACTION_TOPIC = "/auv4/actuation/grabber"
 
+# TODO: Check with Samuel for actual topic name
+IN_TABLE_VIEW_TOPIC = "/auv4/trash/in_table_view"
 SEARCH_FWD = 1.0
 SEARCH_BACK = 1.0
 SEARCH_LEFT = 1.0
@@ -396,18 +401,20 @@ def create_octagon_root(world_to_table_yaw: float, zero_yaw_key: str):
         overwrite=True,
     )
 
-    seq_search_for_table = create_search_bot_layered_square_root(
+    seq_search_for_table = create_homing_search_bot_layered_square_root(
         fwd=SEARCH_FWD,
         back=SEARCH_BACK,
         left=SEARCH_LEFT,
         right=SEARCH_RIGHT,
         num_squares=NUM_SQUARES,
         object_frame=TABLE_CENTER_FRAME,
+        cluster_dist_threshold=CLUSTER_DISTANCE_THRESHOLD,
         object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+        check_topic=IN_TABLE_VIEW_TOPIC,
+        check_topic_type=Bool,
         offset_coeff=OFFSET_COEFF,
         wait_between_moves=WAIT_BETWEEN_MOVES,
         search_depth=SEARCH_DEPTH,
-        cluster_dist_threshold=CLUSTER_DISTANCE_THRESHOLD,
         min_cluster_size=MIN_CLUSTER_SIZE,
     )
 
@@ -658,6 +665,11 @@ def create_octagon_root(world_to_table_yaw: float, zero_yaw_key: str):
         ]
     )
 
+    force_success_seq_relocalise = py_trees.decorators.FailureIsSuccess(
+        name="Force succeed relocalise",
+        child=seq_relocalise,
+    )
+
     srv_end_vision = py_trees_ros.service_clients.FromConstant(
         name="End vision pipeline",
         service_name=VISION_SERVER_TOPIC,
@@ -686,7 +698,7 @@ def create_octagon_root(world_to_table_yaw: float, zero_yaw_key: str):
             force_success_seq_search_and_look,
             force_success_seq_spin,
             force_success_goto_table_centre_after_spin,
-            seq_relocalise,
+            force_success_seq_relocalise,
             srv_end_vision,
             check_end_vision_succeeded,
         ]

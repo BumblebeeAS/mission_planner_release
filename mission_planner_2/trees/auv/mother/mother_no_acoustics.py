@@ -188,7 +188,10 @@ def create_mother(coords: dict):
         zero_yaw_key=ZERO_YAW_KEY,
     )
 
-    torpedo_root = create_torpedo_root()
+    torpedo_root = create_torpedo_root(
+        world_to_torp_yaw=coords["torpedo_with_yaw"]["yaw"],
+        zero_yaw_key=ZERO_YAW_KEY,
+    )
 
     set_keys = MultiSetBlackboard(
         name="Set is_left, zero_yaw",
@@ -199,24 +202,24 @@ def create_mother(coords: dict):
 
     root.add_children(
         [
-            button_coin_flip_start,
+            # button_coin_flip_start,
             seq_reset_clustering,
             srv_get_choice,
             set_base_link_frame,
             set_world_frame,  # TODO: use multi set bb?
             set_keys,
             #################
-            move_to_gate,
-            gate_root,
-            move_to_slalom,
-            move_to_slalom_end,
-            move_to_bin,
-            bin_root,
-            move_to_octagon,
+            # move_to_gate,
+            # gate_root,
+            # move_to_slalom,
+            # move_to_slalom_end,
+            # move_to_bin,
+            # bin_root,
+            # move_to_octagon,
             octagon_root,
-            move_to_space,
-            move_to_torpedo,
-            torpedo_root,
+            # move_to_space,
+            # move_to_torpedo,
+            # torpedo_root,
         ]
     )
 

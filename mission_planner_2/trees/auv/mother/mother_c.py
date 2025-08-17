@@ -146,21 +146,6 @@ def create_mother(coords: dict):
         child=gate_root,
     )
 
-    move_to_slalom = create_move_to_task(
-        task="slalom",
-        start=coords["gate_end"],
-        end=coords["slalom_start"],
-        zero_yaw_key=ZERO_YAW_KEY,
-    )
-
-    move_to_slalom_end = create_move_to_task(
-        task="move_to_slalom_end",
-        start=coords["slalom_start"],
-        end=coords["slalom_end"],
-        zero_yaw_key=ZERO_YAW_KEY,
-        goto_depth=SLALOM_DEPTH,
-    )
-
     bin_root = create_bin_root()
     force_succeed_bin = py_trees.decorators.FailureIsSuccess(
         name="Force succeed bin",
@@ -190,10 +175,16 @@ def create_mother(coords: dict):
             zero_yaw_key=ZERO_YAW_KEY,
         )
 
+    def torpedo_root():
+        return create_torpedo_root(
+            world_to_torp_yaw=coords["torpedo_with_yaw"]["yaw"],
+            zero_yaw_key=ZERO_YAW_KEY,
+        )
+
     acoustics_root = create_acoustics_root(
         move_func,
         octagon_root=octagon_root,
-        torpedo_root=create_torpedo_root,
+        torpedo_root=torpedo_root,
         timeout=ACOUSTIC_TIMEOUT,
         is_octagon_on_right=IS_OCTAGON_ON_RIGHT,
     )
@@ -215,8 +206,6 @@ def create_mother(coords: dict):
             set_keys,  # if dont do gate
             move_to_gate,
             force_succeed_gate,
-            # move_to_slalom,
-            # move_to_slalom_end,
             move_to_acoustic_start,
             acoustics_root,  # move to bin is done inside acoustics root
             force_succeed_bin,

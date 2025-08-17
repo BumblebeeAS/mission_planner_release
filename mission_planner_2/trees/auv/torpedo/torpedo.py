@@ -92,7 +92,10 @@ _CORRECT_SHARK_KEY = fk("correct_shark")
 _CORRECT_CLUSTERED_KEY = fk("correct_clustered")
 
 
-def create_torpedo_root():
+def create_torpedo_root(
+    world_to_torp_yaw: float,
+    zero_yaw_key: str,
+):
     """
     Create the root of the torpedo tree.
 
@@ -147,6 +150,8 @@ def create_torpedo_root():
         num_retries_clustering=NUM_RETRIES,
         wait_after_fire_duration=WAIT_AFTER_FIRE_DURATION,
         shoot_repeats=SHOOT_REPEATS,
+        world_to_torp_yaw=world_to_torp_yaw,
+        zero_yaw_key=zero_yaw_key,
     )
 
     seq_launch_torpedo = py_trees.composites.Sequence(
@@ -189,11 +194,6 @@ def create_torpedo_root():
     goto_torp_centre = goto.FromConstant(
         name="Goto torp centre",
         pose=create_stamped_pose(CENTRE_VIEW_FRAME),
-    )
-
-    stabilise_before_matching = py_trees.timers.Timer(
-        name="Stabilise before match",
-        duration=STABILIZE_DURATION,
     )
 
     seq_check_point_correspondences = create_point_correspondences_check_root(
@@ -367,7 +367,6 @@ def create_torpedo_root():
             seq_search,
             # cluster_board_centre,
             goto_torp_centre,
-            # stabilise_before_matching,
             seq_check_point_correspondences,
             sel_correct_stuff,
             retry_enable_detections,

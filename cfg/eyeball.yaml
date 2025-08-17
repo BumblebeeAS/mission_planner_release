@@ -48,6 +48,12 @@ map:
     y: -7.6
     parent_frame_id: "map_ned"
     child_frame_id: "map_ned/torpedo"
+  - name: torpedo_with_yaw
+    x: 13.7
+    y: -7.6
+    yaw: -30
+    parent_frame_id: "map_ned"
+    child_frame_id: "map_ned/torpedo_with_yaw"
   - name: torpedo_post
     x: 12.5
     y: -2.2

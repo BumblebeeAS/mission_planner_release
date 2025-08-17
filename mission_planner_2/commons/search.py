@@ -5,6 +5,8 @@ import py_trees
 import py_trees_ros
 from bb_perception_msgs.srv import ClusterTfSrv
 from geometry_msgs.msg import PoseStamped
+from py_trees_ros.subscribers import operator
+from rclpy.qos import qos_profile_sensor_data
 
 from mission_planner_2.commons.blackboard import DynamicSetBlackboard
 from mission_planner_2.commons.pose_utils import (
@@ -179,6 +181,158 @@ def create_search_bot_constant_root(
     )
 
     return root
+
+
+def create_homing_search_bot_layered_square_root(
+    fwd: float,
+    back: float,
+    left: float,
+    right: float,
+    num_squares: int,
+    object_frame: str,
+    cluster_dist_threshold: float,
+    object_frame_clustered: str,
+    check_topic: str,
+    check_topic_type,
+    offset_coeff: float = 0.2,
+    wait_between_moves: float = 5.0,
+    search_depth: float = 0.3,
+    min_cluster_size: int = 2,
+):
+    # TODO: dont use the cluster node start let people pass in for the hornets to figure out
+    cluster_key = "homing_bot_layered_cluster_resp"
+    check_topic_sub_key = f"{check_topic}_message"
+    poses = _generate_layered_square_search_bot_pattern(
+        fwd,
+        back,
+        left,
+        right,
+        num_squares,
+        offset_coeff,
+    )
+
+    root = py_trees.composites.Sequence(
+        name="Seq homing search with early stop",
+        memory=True,
+    )
+
+    def cluster_node_start_func(persistent: bool):
+        return py_trees_ros.service_clients.FromConstant(
+            name="Cluster search",
+            service_type=ClusterTfSrv,
+            service_name="/auv4/cluster_tfs_srv",
+            service_request=create_clustering_request(
+                enabled=True,
+                in_children=object_frame,
+                out_children=object_frame_clustered,
+                persistent=persistent,
+                min_cluster_size=min_cluster_size,
+            ),
+        )
+
+    def cluster_node_stop_func(persistent: bool):
+        return py_trees_ros.service_clients.FromConstant(
+            name="Cluster search stop",
+            service_type=ClusterTfSrv,
+            service_name="/auv4/cluster_tfs_srv",
+            service_request=create_clustering_request(
+                enabled=False,
+                persistent=persistent,
+                in_children=object_frame,
+                out_children=object_frame_clustered,
+            ),
+            key_response=cluster_key,
+        )
+
+    srv_start_cluster = cluster_node_start_func(persistent=False)
+
+    par_search_check = py_trees.composites.Parallel(
+        name="Search layered - check par",
+        policy=py_trees.common.ParallelPolicy.SuccessOnOne(),
+    )
+
+    goto_search_pattern = goto.NFromConstant(
+        name="Goto search pattern",
+        poses=poses,
+        wait_between_moves_sec=wait_between_moves,
+        specified_heading=True,  # dont need to face dir for this search
+        depth_override_value=search_depth,
+    )
+
+    seq_check_seen = py_trees.composites.Sequence(
+        name="Seq sub and check seen something",
+        memory=True,
+    )
+
+    sub_check_topic = py_trees_ros.subscribers.ToBlackboard(
+        name=f"Sub {check_topic}",
+        topic_name=check_topic,
+        topic_type=check_topic_type,
+        qos_profile=qos_profile_sensor_data,
+        blackboard_variables={check_topic_sub_key: "data"},
+    )
+
+    check_check_ok = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check early stopping",
+        check=py_trees.common.ComparisonExpression(
+            variable=check_topic_sub_key,
+            value=True,
+            operator=operator.eq,
+        ),
+    )
+
+    seq_check_seen.add_children(
+        [
+            sub_check_topic,
+            check_check_ok,
+        ]
+    )
+
+    par_search_check.add_children(
+        [
+            goto_search_pattern,
+            seq_check_seen,
+        ]
+    )
+
+    seq_stop_search = py_trees.composites.Sequence(
+        name="Seq check stop search",
+        memory=True,
+    )
+
+    srv_stop_cluster = cluster_node_stop_func(persistent=False)
+
+    check_valid_cluster = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Check valid cluster",
+        check=py_trees.common.ComparisonExpression(
+            variable=cluster_key,
+            value=cluster_dist_threshold,
+            operator=lambda x, y: x.cluster_spread < y or num_squares == 1,
+        ),
+    )
+
+    seq_stop_search.add_children(
+        [
+            srv_stop_cluster,
+            check_valid_cluster,
+        ]
+    )
+
+    root.add_children(
+        [
+            srv_start_cluster,
+            par_search_check,
+            seq_stop_search,
+        ]
+    )
+
+    retry_homing_seq = py_trees.decorators.Retry(
+        name="Retry homing search",
+        child=root,
+        num_failures=10000,
+    )
+
+    return retry_homing_seq
 
 
 def create_search_bot_layered_square_root(
