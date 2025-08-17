@@ -261,7 +261,7 @@ def create_homing_search_bot_layered_square_root(
 
     seq_check_seen = py_trees.composites.Sequence(
         name="Seq sub and check seen something",
-        memory=True,
+        memory=False,
     )
 
     sub_check_topic = py_trees_ros.subscribers.ToBlackboard(
@@ -281,6 +281,12 @@ def create_homing_search_bot_layered_square_root(
         ),
     )
 
+    goto_stationkeep = goto.FromConstant(
+        name="goto stationkeep",
+        pose=create_stamped_pose(frame_id="auv4/base_link_ned"),
+        depth_override_value=search_depth,
+    )
+
     seq_check_seen.add_children(
         [
             sub_check_topic,
@@ -288,10 +294,15 @@ def create_homing_search_bot_layered_square_root(
         ]
     )
 
+    always_running = py_trees.decorators.FailureIsRunning(
+        name="Keep running on failure check",
+        child=seq_check_seen,
+    )
+
     par_search_check.add_children(
         [
             goto_search_pattern,
-            seq_check_seen,
+            always_running,
         ]
     )
 
@@ -322,6 +333,7 @@ def create_homing_search_bot_layered_square_root(
         [
             srv_start_cluster,
             par_search_check,
+            goto_stationkeep,
             seq_stop_search,
         ]
     )
