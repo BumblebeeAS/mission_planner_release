@@ -104,7 +104,8 @@ CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 GRABBER_ACTION_TOPIC = "/auv4/actuation/grabber"
 
 # TODO: Check with Samuel for actual topic name
-IN_TABLE_VIEW_TOPIC = "/auv4/trash/in_table_view"
+IN_TABLE_VIEW_TOPIC = "/auv4/trash/trash/yolo/detections/is_table_in_view"
+IN_TABLE_VIEW_TOPIC_TYPE = Bool
 SEARCH_FWD = 1.0
 SEARCH_BACK = 1.0
 SEARCH_LEFT = 1.0
@@ -412,7 +413,7 @@ def create_octagon_root(world_to_table_yaw: float, zero_yaw_key: str):
         cluster_dist_threshold=CLUSTER_DISTANCE_THRESHOLD,
         object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
         check_topic=IN_TABLE_VIEW_TOPIC,
-        check_topic_type=Bool,
+        check_topic_type=IN_TABLE_VIEW_TOPIC_TYPE,
         offset_coeff=OFFSET_COEFF,
         wait_between_moves=WAIT_BETWEEN_MOVES,
         search_depth=SEARCH_DEPTH,
