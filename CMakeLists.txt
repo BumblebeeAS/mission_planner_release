@@ -16,11 +16,7 @@ find_package(rclpy REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-add_executable(choice_server src/choice_server.cpp)
-ament_target_dependencies(choice_server rclcpp std_srvs)
-
 install(TARGETS
-  choice_server 
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
@@ -40,10 +36,8 @@ ament_python_install_package(${PROJECT_NAME})
 
 # Install Python executables
 install(PROGRAMS
-  scripts/ax_test.py
   scripts/main.py
   scripts/test.py
-  scripts/mission_tfs.py
   scripts/mission_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
