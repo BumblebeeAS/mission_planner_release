@@ -325,16 +325,16 @@ def create_homing_search_bot_layered_square_root(
     seq_stop_search.add_children(
         [
             srv_stop_cluster,
-            check_valid_cluster,
+            # check_valid_cluster,
         ]
     )
 
     root.add_children(
         [
-            srv_start_cluster,
+            # srv_start_cluster,
             par_search_check,
             goto_stationkeep,
-            seq_stop_search,
+            # seq_stop_search,
         ]
     )
 
