@@ -32,7 +32,7 @@ BUTTON_RETRIES = 1000000
 ACOUSTIC_TIMEOUT = 10.0
 SLALOM_DEPTH = 0.15
 
-IS_OCTAGON_ON_RIGHT = False
+IS_OCTAGON_ON_RIGHT = True
 
 
 def load_mission_coordinates():
