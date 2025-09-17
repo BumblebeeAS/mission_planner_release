@@ -59,7 +59,7 @@ ACTUATION_UINT = UInt8(data=6)
 
 CLUSTERING_DURATION = 2
 STABILIZE_CONTROLS_DURATION = 5.0
-RETRIES = 5
+RETRIES = 4
 NUM_RETRIES = 3
 
 BIN_DEPTH_OVERRIDE_VALUE = 1.3
@@ -81,7 +81,7 @@ SEARCH_FWD = 1.0
 SEARCH_BACK = 0.3
 SEARCH_LEFT = 0.5
 SEARCH_RIGHT = 0.5
-NUM_SQUARES = 2
+NUM_SQUARES = 3
 OFFSET_COEFF = 1.0
 SEARCH_DEPTH = 0.3
 BETWEEN_DROPS_WAIT = 3.5
@@ -314,29 +314,6 @@ def create_bin_root():
         num_failures=100,
     )
 
-    srv_disable_detections = checked_service.FromConstant(
-        name="Disable detections",
-        service_name=TOGGLE_TEMPLATE_TOPIC,
-        service_type=IMPoseEstimatorToggleTemplate,
-        service_request=create_img_matching_request(
-            enable=False,
-            camera_frame_id=CAMERA_FRAME,
-            template_name=TEMPLATE_NAME,
-        ),
-        check_func=lambda x: x is not None and x.new_state == False,
-    )
-
-    retry_disable_detections = py_trees.decorators.Retry(
-        name="Retry Disable Detections",
-        child=srv_disable_detections,
-        num_failures=NUM_RETRIES,
-    )
-
-    force_success_disable_detections = py_trees.decorators.FailureIsSuccess(
-        name="Force success disable detections",
-        child=retry_disable_detections,
-    )
-
     sel_update_template = create_template_selector_root(
         points_1_key=_POINTS_1_KEY,
         points_2_key=_POINTS_2_KEY,
@@ -346,8 +323,8 @@ def create_bin_root():
         template_name=TEMPLATE_NAME,
         rotated_template_name=ROTATED_TEMPLATE_NAME,
         clustering_goal_key=_CLUSTERING_GOAL_KEY,
-        template_frame_optical=TEMPLATE_FRAME_YOLO,
-        rotated_template_frame_optical=TEMPLATE_FRAME_YOLO,
+        template_frame_optical=TEMPLATE_FRAME_OPTICAL,
+        rotated_template_frame_optical=ROTATED_TEMPLATE_FRAME_OPTICAL,
         template_frame_optical_clustered=TEMPLATE_FRAME_OPTICAL_CLUSTERED,
         clustering_duration=CLUSTERING_DURATION,
         choice_key="/global/choice_is_fish",
@@ -357,6 +334,22 @@ def create_bin_root():
         fish_bin_view_rotated_frame=FISH_BIN_VIEW_ROTATED_FRAME,
         shark_bin_view_frame=SHARK_BIN_VIEW_FRAME,
         shark_bin_view_rotated_frame=SHARK_BIN_VIEW_ROTATED_FRAME,
+    )
+
+    srv_enable_correct_detections = checked_service.FromBlackboard(
+        "Enable correct detection template",
+        service_type=IMPoseEstimatorToggleTemplate,
+        service_name=TOGGLE_TEMPLATE_TOPIC,
+        key_request=_BIN_CORRECT_DETECTIONS_REQ_KEY,
+        key_response=_BIN_CORRECT_ENABLE_DETECTIONS_KEY,
+        check_func=lambda x: x.new_state
+        == True,  # check if the service call was successful
+    )
+
+    retry_enable_correct_detections = py_trees.decorators.Retry(
+        name="Retry enable correct detections",
+        child=srv_enable_correct_detections,
+        num_failures=NUM_RETRIES,
     )
 
     action_cluster_for_goto = shared_action_client.FromBlackboard(
@@ -388,6 +381,7 @@ def create_bin_root():
         name="Align to target",
         pose_key=_POSE_KEY,
         anchor_frame_name="auv4/dropper",
+        depth_override_value=BIN_DEPTH_OVERRIDE_VALUE,
     )
 
     set_anchor_frame = py_trees.behaviours.SetBlackboardVariable(
@@ -425,6 +419,18 @@ def create_bin_root():
     #     within_threshold=within_threshold_dist,
     # )
 
+    stabilise_before_dropping = py_trees.timers.Timer(
+        "Stabilise before dropping", duration=STABILIZE_CONTROLS_DURATION
+    )
+
+    # Step 10: Set dropper actuation value
+    set_dropper_actuation = py_trees.behaviours.SetBlackboardVariable(
+        name="Set dropper actuation",
+        variable_name=fk("bin_actuation"),
+        variable_value=ACTUATION_UINT,
+        overwrite=True,
+    )
+
     # Step 11: Fire first dropper
     pub_fire_dropper_first = py_trees_ros.service_clients.FromConstant(
         name="Fire dropper first",
@@ -453,6 +459,30 @@ def create_bin_root():
         memory=True,
     )
 
+    # Step 13: Disable detections
+    srv_disable_detections = checked_service.FromConstant(
+        name="Disable detections",
+        service_name=TOGGLE_TEMPLATE_TOPIC,
+        service_type=IMPoseEstimatorToggleTemplate,
+        service_request=create_img_matching_request(
+            enable=False,
+            camera_frame_id=CAMERA_FRAME,
+            template_name=TEMPLATE_NAME,
+        ),
+        check_func=lambda x: x is not None and x.new_state == False,
+    )
+
+    retry_disable_detections = py_trees.decorators.Retry(
+        name="Retry Disable Detections",
+        child=srv_disable_detections,
+        num_failures=NUM_RETRIES,
+    )
+
+    force_success_disable_detections = py_trees.decorators.FailureIsSuccess(
+        name="Force success disable detections",
+        child=retry_disable_detections,
+    )
+
     # Step 14: End vision pipeline
     srv_end_vision = checked_service.FromConstant(
         name="End vision pipeline",
@@ -475,6 +505,7 @@ def create_bin_root():
 
     seq_stop_vision.add_children(
         children=[
+            force_success_disable_detections,
             force_success_end_vision,
         ],
     )
@@ -488,14 +519,16 @@ def create_bin_root():
             extract_tf,
             calculate_acute_pose,
             goto_bin_centre,
+            # stabilise,
             retry_enable_detections,
             sub_get_points_first_sequence_retry,
             retry_enable_rotated_detections,
             sub_get_points_second_sequence_retry,
-            force_success_disable_detections,
             sel_update_template,
+            retry_enable_correct_detections,
             set_anchor_frame,
             seq_goto_cluster,
+            set_dropper_actuation,
             pub_fire_dropper_first,
             py_trees.timers.Timer(
                 name="Wait between drops",
@@ -509,6 +542,13 @@ def create_bin_root():
             pub_fire_dropper_third,
             seq_stop_vision,
         ],
+    )
+
+    # Build root sequence
+    seq_bin_root.add_children(
+        children=[
+            seq_drop_into_bin,
+        ]
     )
 
     sel_bin_failure_fallback = py_trees.composites.Selector(
@@ -560,7 +600,7 @@ def create_bin_root():
 
     sel_bin_failure_fallback.add_children(
         [
-            seq_drop_into_bin,
+            seq_bin_root,
             seq_always_drop,
         ]
     )
