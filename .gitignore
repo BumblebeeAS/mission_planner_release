@@ -6,3 +6,5 @@
 *.dot
 
 scripts/render.py
+
+__pycache__/
