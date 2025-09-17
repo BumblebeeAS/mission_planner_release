@@ -95,7 +95,7 @@ def create_align_actuate_surface_root(
 
         par_children = [
             cluster_trash,
-            check_collections_changed,
+            # check_collections_changed,
         ]
     else:
         par_children = [
@@ -590,7 +590,9 @@ def create_check_collections_changed_root(
     check_is_changed = py_trees.behaviours.CheckBlackboardVariableValue(
         name="Check table count dropped",
         check=py_trees.common.ComparisonExpression(
-            variable=is_changed_key, value=True, operator=operator.eq
+            variable=is_changed_key,
+            value=True,
+            operator=operator.eq,
         ),
     )
 

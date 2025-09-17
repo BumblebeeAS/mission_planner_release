@@ -24,7 +24,6 @@ from mission_planner_2.commons.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.commons.search import (
-    create_homing_search_bot_layered_square_root,
     create_search_bot_layered_square_root,
 )
 from mission_planner_2.commons.tf_checker import create_tf_checker_from_constant_root
@@ -73,7 +72,7 @@ SHARK_VIEW_FRAME_HARDCODED = "trash/shark/clustered/view/hardcoded"
 TRASH_COUNT_SERVICE = "/auv4/trash/object_count/toggle"
 COLLECT_DURATION = 3.0
 
-TOTAL_DURATION = 367
+TOTAL_DURATION = 397
 ALIGN_AND_COLLECT_TIMEOUT = 60.0
 CONTROLLED_ASCENT_TIMEOUT = 30.0
 
@@ -403,34 +402,50 @@ def create_octagon_root(world_to_table_yaw: float, zero_yaw_key: str):
         overwrite=True,
     )
 
-    seq_search_for_table = create_homing_search_bot_layered_square_root(
+    # seq_search_for_table = create_homing_search_bot_layered_square_root(
+    #     fwd=SEARCH_FWD,
+    #     back=SEARCH_BACK,
+    #     left=SEARCH_LEFT,
+    #     right=SEARCH_RIGHT,
+    #     num_squares=NUM_SQUARES,
+    #     object_frame=TABLE_CENTER_FRAME,
+    #     cluster_dist_threshold=CLUSTER_DISTANCE_THRESHOLD,
+    #     object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+    #     check_topic=IN_TABLE_VIEW_TOPIC,
+    #     check_topic_type=IN_TABLE_VIEW_TOPIC_TYPE,
+    #     offset_coeff=OFFSET_COEFF,
+    #     wait_between_moves=WAIT_BETWEEN_MOVES,
+    #     search_depth=SEARCH_DEPTH,
+    #     min_cluster_size=MIN_CLUSTER_SIZE,
+    # )
+
+    seq_jic_search_for_table = create_search_bot_layered_square_root(
         fwd=SEARCH_FWD,
         back=SEARCH_BACK,
         left=SEARCH_LEFT,
         right=SEARCH_RIGHT,
         num_squares=NUM_SQUARES,
-        object_frame=TABLE_CENTER_FRAME,
         cluster_dist_threshold=CLUSTER_DISTANCE_THRESHOLD,
+        object_frame=TABLE_CENTER_FRAME,
         object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
-        check_topic=IN_TABLE_VIEW_TOPIC,
-        check_topic_type=IN_TABLE_VIEW_TOPIC_TYPE,
-        offset_coeff=OFFSET_COEFF,
-        wait_between_moves=WAIT_BETWEEN_MOVES,
-        search_depth=SEARCH_DEPTH,
         min_cluster_size=MIN_CLUSTER_SIZE,
+        offset_coeff=OFFSET_COEFF,
+        search_depth=SEARCH_DEPTH,
     )
 
-    seq_jic_search_for_table = create_search_bot_layered_square_root(
-        fwd=0.5,
-        back=0.5,
-        left=0.5,
-        right=0.5,
-        num_squares=1,
-        cluster_dist_threshold=-1.0,
-        object_frame=TABLE_CENTER_FRAME,
-        object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
-        min_cluster_size=MIN_CLUSTER_SIZE,
-    )
+    # seq_jic_search_for_table = create_search_bot_layered_square_root(
+    #     fwd=0.5,
+    #     back=0.5,
+    #     left=0.5,
+    #     right=0.5,
+    #     num_squares=1,
+    #     cluster_dist_threshold=-1.0,
+    #     object_frame=TABLE_CENTER_FRAME,
+    #     object_frame_clustered=TABLE_CENTER_FRAME_CLUSTERED,
+    #     min_cluster_size=MIN_CLUSTER_SIZE,
+    #     offset_coeff=OFFSET_COEFF,
+    #     search_depth=SEARCH_DEPTH,
+    # )
 
     goto_table_centre_after_search = goto.FromConstant(
         name="Goto after table search",
@@ -706,7 +721,7 @@ def create_octagon_root(world_to_table_yaw: float, zero_yaw_key: str):
             check_start_vision_succeeded,
             init_table_clustering_count,
             init_collection_results,
-            seq_search_for_table,
+            # seq_search_for_table,
             seq_jic_search_for_table,
             goto_table_centre_after_search,
             sel_timeout,
