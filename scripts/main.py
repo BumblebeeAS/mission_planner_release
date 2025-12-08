@@ -6,21 +6,21 @@ import py_trees
 import py_trees.console as console
 import rclpy
 
-from mission_planner_2.commons.bumble_tree import BumbleTree
-from mission_planner_2.commons.hooks import stop_on_success_or_failure
-from mission_planner_2.commons.led_management import LedVisitor
-from mission_planner_2.commons.node_registry import TreeNode
-from mission_planner_2.commons.visitors import LoggingSnapshotVisitor
-from mission_planner_2.trees.auv.mother.mother_c import (
+from mission_planner_2.common.core.bumble_tree import BumbleTree
+from mission_planner_2.common.core.hooks import stop_on_success_or_failure
+from mission_planner_2.common.core.visitors import LoggingSnapshotVisitor
+from mission_planner_2.vehicles.auv.config.node_registry import AUVTreeNode
+from mission_planner_2.vehicles.auv.trees.robosub24.mother.mother_c import (
     create_mother,
     load_mission_coordinates,
 )
+from mission_planner_2.vehicles.auv.trees.shared.led_management import LedVisitor
 
-# from mission_planner_2.trees.auv.mother.mother import (
+# from mission_planner_2.vehicles.auv.trees.robosub24.mother.mother import (
 #     create_mother,
 #     load_mission_coordinates,
 # )
-# from mission_planner_2.trees.auv.mother.mother_no_acoustics import (
+# from mission_planner_2.vehicles.auv.trees.robosub24.mother.mother_no_acoustics import (
 #     create_mother,
 #     load_mission_coordinates,
 # )
@@ -32,7 +32,8 @@ def main():
     root = create_mother(coords)
     py_trees.logging.level = py_trees.logging.Level.DEBUG
     tree = BumbleTree(root=root)
-    node = TreeNode()
+    # TODO: add the shared actions and services needed for the tree
+    node = AUVTreeNode()
 
     ####### Add visitors #######
     led_visitor = LedVisitor(full=True)
