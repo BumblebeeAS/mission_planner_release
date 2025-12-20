@@ -39,6 +39,7 @@ install(PROGRAMS
   scripts/main.py
   scripts/test.py
   scripts/mission_node.py
+  scripts/uav2_main.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
