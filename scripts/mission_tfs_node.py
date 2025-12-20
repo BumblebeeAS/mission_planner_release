@@ -8,24 +8,30 @@ import rclpy
 import yaml
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
-from std_srvs.srv import SetBool, Trigger
 from tf2_ros import StaticTransformBroadcaster
 from tf_transformations import quaternion_from_euler
 
 
-class MissionNode(Node):
+class MissionTfsNode(Node):
     """
-    ROS2 Node responsible for RS25 mission tfs and fish/shark choice.
+    ROS2 Node responsible for mission tfs.
     """
+
     def __init__(self):
-        super().__init__("mission_tf_publisher")
+        super().__init__("mission_tfs_node")
         self.declare_parameter("static_tf_file", "")
         self.declare_parameter("dynamic_tf_file", "")
         self.declare_parameter("default_suffix", "view")
 
-        static_config_path = self.get_parameter("static_tf_file").get_parameter_value().string_value
-        dynamic_config_path = self.get_parameter("dynamic_tf_file").get_parameter_value().string_value
-        self.default_suffix = self.get_parameter("default_suffix").get_parameter_value().string_value
+        static_config_path = (
+            self.get_parameter("static_tf_file").get_parameter_value().string_value
+        )
+        dynamic_config_path = (
+            self.get_parameter("dynamic_tf_file").get_parameter_value().string_value
+        )
+        self.default_suffix = (
+            self.get_parameter("default_suffix").get_parameter_value().string_value
+        )
 
         if not static_config_path and not dynamic_config_path:
             self.get_logger().error(
@@ -51,26 +57,13 @@ class MissionNode(Node):
         # Publish all transforms
         if all_transforms:
             self.tf_static_broadcaster.sendTransform(all_transforms)
-            self.get_logger().info(f"Published {len(all_transforms)} mission transforms")
+            self.get_logger().info(
+                f"Published {len(all_transforms)} mission transforms"
+            )
             for tf in all_transforms:
-                self.get_logger().info(f"Published {tf.header.frame_id} -> {tf.child_frame_id}")
-        
-        # Choice server
-        self.is_fish = True
-
-        self.set_is_fish_srv = self.create_service(
-            SetBool,
-            "/auv4/choice/set_is_fish",
-            self.handle_set_is_fish
-        )
-
-        self.get_is_fish_srv = self.create_service(
-            Trigger,
-            "/auv4/choice/get_is_fish",
-            self.handle_get_is_fish
-        )
-
-        self.get_logger().info("choice server ready, init to fish")
+                self.get_logger().info(
+                    f"Published {tf.header.frame_id} -> {tf.child_frame_id}"
+                )
 
     def load_config_file(self, config_file_path: str) -> Dict[str, Any]:
         """Load and parse YAML config file."""
@@ -131,7 +124,9 @@ class MissionNode(Node):
                     transforms = self.create_dynamic_transforms(dynamic_config)
                     dynamic_transforms.extend(transforms)
 
-            self.get_logger().info(f"Loaded {len(dynamic_transforms)} dynamic transforms")
+            self.get_logger().info(
+                f"Loaded {len(dynamic_transforms)} dynamic transforms"
+            )
             return dynamic_transforms
 
         except Exception:
@@ -161,7 +156,9 @@ class MissionNode(Node):
             )
             raise
 
-    def create_dynamic_transforms(self, dynamic_config: Dict[str, Any]) -> List[TransformStamped]:
+    def create_dynamic_transforms(
+        self, dynamic_config: Dict[str, Any]
+    ) -> List[TransformStamped]:
         """Create TransformStamped messages from dynamic configuration."""
         try:
             transforms = []
@@ -201,7 +198,7 @@ class MissionNode(Node):
         pitch: float,
         yaw: float,
         parent_frame: str,
-        child_frame: str
+        child_frame: str,
     ) -> TransformStamped:
         """Create a TransformStamped message from transform parameters."""
         try:
@@ -228,42 +225,20 @@ class MissionNode(Node):
 
         except Exception:
             self.get_logger().error(
-                f"Error creating transform. "
-                f"Traceback:\n{traceback.format_exc()}"
+                f"Error creating transform. " f"Traceback:\n{traceback.format_exc()}"
             )
             raise
-
-    def handle_set_is_fish(
-        self,
-        request: SetBool.Request,
-        response: SetBool.Response
-    ) -> SetBool.Response:
-        self.is_fish = request.data
-        response.success = True
-        response.message = "fish" if self.is_fish else "shark"
-        self.get_logger().info(
-            f"Choice set to {'fish' if self.is_fish else 'shark'}"
-        )
-        return response
-
-    def handle_get_is_fish(self, _, response: Trigger.Response) -> Trigger.Response:
-        response.success = self.is_fish
-        response.message = "fish" if self.is_fish else "shark"
-        self.get_logger().info(
-            f"Responding to queries henceforth with {'fish' if self.is_fish else 'shark'}"
-        )
-        return response
 
 
 def main(args=None):
     rclpy.init(args=args)
-    mission_tf_publisher = MissionNode()
+    mission_tfs_node = MissionTfsNode()
     try:
-        rclpy.spin(mission_tf_publisher)
+        rclpy.spin(mission_tfs_node)
     except KeyboardInterrupt:
         pass
     finally:
-        mission_tf_publisher.destroy_node()
+        mission_tfs_node.destroy_node()
         rclpy.try_shutdown()
 
 
