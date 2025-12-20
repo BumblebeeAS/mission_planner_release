@@ -17,7 +17,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.auv.trees.robosub24.octagon.helpers import (
     create_spin_goal,
@@ -80,7 +80,7 @@ def create_align_actuate_surface_root(
 
     cluster_trash = shared_action_client.FromConstant(
         name=f"Cluster trash ({trash_name})",
-        shared_action=SharedAction.CLUSTER,
+        shared_action=AUVSharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children=[object_frame_depth_from_table],
             out_children=[object_frame_clustered],
@@ -130,7 +130,7 @@ def create_align_actuate_surface_root(
 
     call_trash_pickup = shared_action_client.FromConstant(
         name=f"Call trash align and collect ({trash_name})",
-        shared_action=SharedAction.ALIGN_AND_COLLECT,
+        shared_action=AUVSharedAction.ALIGN_AND_COLLECT,
         action_goal=AlignAndCollect.Goal(
             object_frame=object_frame_depth_from_odom,
             object_frame_clustered=object_frame_clustered,
@@ -150,7 +150,7 @@ def create_align_actuate_surface_root(
 
     action_controlled_ascent = shared_action_client.FromConstant(
         name="Ascend to surface",
-        shared_action=SharedAction.CONTROLLED_ASCENT,
+        shared_action=AUVSharedAction.CONTROLLED_ASCENT,
         action_goal=ControlledAscent.Goal(
             desired_depth=surface_depth_threshold,
             depth_tolerance=depth_tolerance,
@@ -282,7 +282,7 @@ def create_open_and_ascend_root(
 
     open_grabber = shared_action_client.FromConstant(
         name="Open grabber",
-        shared_action=SharedAction.GRABBER,
+        shared_action=AUVSharedAction.GRABBER,
         action_goal=Grabber.Goal(
             command=65535,
             tolerance=0,
@@ -297,7 +297,7 @@ def create_open_and_ascend_root(
 
     action_controlled_ascent = shared_action_client.FromConstant(
         name="Ascent to surface",
-        shared_action=SharedAction.CONTROLLED_ASCENT,
+        shared_action=AUVSharedAction.CONTROLLED_ASCENT,
         action_goal=ControlledAscent.Goal(
             timeout_seconds=controlled_ascent_timeout_seconds,
             desired_depth=surface_depth_threshold,
@@ -387,7 +387,7 @@ def create_goto_table_centre_root(
 
     cluster_table_centre = shared_action_client.FromConstant(
         name="Cluster centre",
-        shared_action=SharedAction.CLUSTER,
+        shared_action=AUVSharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children=table_centre_frame,
             out_children=table_centre_frame_clustered,
@@ -687,7 +687,7 @@ def create_spin_root(
 
     spin = shared_action_client.FromBlackboard(
         name="Call controlled spin",
-        shared_action=SharedAction.CONTROLLED_SPIN,
+        shared_action=AUVSharedAction.CONTROLLED_SPIN,
         key=spin_action_goal_key,
     )
 

@@ -1,7 +1,3 @@
-import typing
-from dataclasses import dataclass
-from enum import Enum
-
 import rclpy
 import rclpy.action
 from bb_auv_msgs.action import Grabber
@@ -12,22 +8,16 @@ from bb_perception_msgs.action import ClusterTfAction
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 from rclpy.qos import qos_profile_sensor_data
 
+from mission_planner_2.common.config.generic_registry import (
+    ActionRegistry,
+    ServiceRegistry,
+    SharedAction,
+    SharedService,
+)
 from mission_planner_2.common.core.tree_node import TreeNode
 
 
-@dataclass
-class ActionRegistry:
-    topic: str
-    type: typing.Any
-
-
-@dataclass
-class ServiceRegistry:
-    topic: str
-    type: typing.Any
-
-
-class SharedAction(Enum):
+class AUVSharedAction(SharedAction):
     LOCOMOTION = ActionRegistry("/auv4/controls", Locomotion)
     CLUSTER = ActionRegistry("/auv4/cluster_tf", ClusterTfAction)
     CLUSTER_MULTI = ActionRegistry("/auv4/cluster_tf_multi", ClusterTfAction)
@@ -38,7 +28,7 @@ class SharedAction(Enum):
     ALIGN_AND_COLLECT = ActionRegistry("/auv4/align_and_collect", AlignAndCollect)
 
 
-class SharedService(Enum):
+class AUVSharedService(SharedService):
     CONVERT_TO_CONTROLS_POSE = ServiceRegistry(
         "/auv4/convert_to_controls_pose", GetPoseToControlsFrame
     )

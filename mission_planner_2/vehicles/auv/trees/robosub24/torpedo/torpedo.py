@@ -183,7 +183,7 @@ def create_torpedo_root(
     # use this if not seq_search
     # cluster_board_centre = shared_action_client.FromConstant(
     #     name="Cluster centre (debug)",
-    #     shared_action=SharedAction.CLUSTER,
+    #     shared_action=AUVSharedAction.CLUSTER,
     #     action_goal=create_clustering_goal(
     #         in_children=TEMPLATE_FRAME_YOLO,
     #         out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,

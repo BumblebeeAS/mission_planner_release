@@ -5,7 +5,7 @@ import py_trees
 import py_trees_ros
 from py_trees_ros import exceptions
 
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.common.config.generic_registry import SharedAction
 
 
 class FromBlackboard(py_trees_ros.action_clients.FromBlackboard):

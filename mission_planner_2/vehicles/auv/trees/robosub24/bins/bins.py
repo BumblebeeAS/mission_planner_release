@@ -24,7 +24,7 @@ from mission_planner_2.common.util.pose_utils import (
     tf_to_stamped_pose,
     within_threshold_xyz,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.bins.helpers import find_acute_angle
 from mission_planner_2.vehicles.auv.trees.robosub24.bins.template_selector import (
     create_template_selector_root,
@@ -159,7 +159,7 @@ def create_bin_root():
 
     cluster_bin_centre = shared_action_client.FromConstant(
         name="Cluster bin centre (debug)",
-        shared_action=SharedAction.CLUSTER,
+        shared_action=AUVSharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_YOLO,
             out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
@@ -360,7 +360,7 @@ def create_bin_root():
 
     action_cluster_for_goto = shared_action_client.FromBlackboard(
         name="Cluster transforms for dropping",
-        shared_action=SharedAction.CLUSTER,
+        shared_action=AUVSharedAction.CLUSTER,
         key=_CLUSTERING_GOAL_KEY,
     )
 
@@ -372,7 +372,7 @@ def create_bin_root():
 
     action_cluster_for_goto_check = shared_action_client.FromBlackboard(
         name="Cluster transforms for dropping",
-        shared_action=SharedAction.CLUSTER,
+        shared_action=AUVSharedAction.CLUSTER,
         key=_CLUSTERING_GOAL_KEY,
     )
 

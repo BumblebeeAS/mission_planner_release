@@ -18,7 +18,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.auv.trees.robosub24.slalom.channel_movement_mix import (
     create_movement_strategy_root,
@@ -184,7 +184,7 @@ def create_slalom_root():
 
     cluster_action_1 = shared_action_client.FromConstant(
         name="Initial cluster 1",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
@@ -200,7 +200,7 @@ def create_slalom_root():
     )
     cluster_action_2 = shared_action_client.FromConstant(
         name="Initial cluster 2",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
@@ -216,7 +216,7 @@ def create_slalom_root():
     )
     cluster_action_3 = shared_action_client.FromConstant(
         name="Initial cluster 3",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[

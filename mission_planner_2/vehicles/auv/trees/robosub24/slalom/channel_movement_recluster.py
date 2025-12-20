@@ -16,7 +16,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.shared.trees.blackboard import DynamicSetBlackboard
 from mission_planner_2.vehicles.shared.trees.tf_checker import (
@@ -89,7 +89,7 @@ def _recluster_and_goto_sequence(
 
     recluster_action = shared_action_client.FromConstant(
         name=f"Recluster transforms ({side}, missing layers: {missing_layers})",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=clustering_in_children,
             out_children=[
@@ -162,7 +162,7 @@ def _sweep_and_goto_sequence(
 
     recluster_action = shared_action_client.FromConstant(
         name=f"Recluster during sweep ({side}, missing layers: {missing_layers})",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=clustering_in_children,
             out_children=[

@@ -2,24 +2,27 @@ import py_trees
 from lifecycle_msgs.srv import ChangeState
 from py_trees.decorators import Retry
 
-from mission_planner_2.commons import checked_service, shared_action_client
-from mission_planner_2.commons.detection_utils import (
+from mission_planner_2.common.core import (
+    checked_service,
+    shared_action_client,
+)
+from mission_planner_2.common.util.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
 )
-from mission_planner_2.commons.namespace_utils import (
+from mission_planner_2.common.util.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.commons.node_registry import SharedAction
-from mission_planner_2.commons.pose_utils import create_clustering_goal
+from mission_planner_2.common.util.pose_utils import create_clustering_goal
+from mission_planner_2.vehicles.uav2.trees.goto import goto
+from mission_planner_2.vehicles.uav2.config.node_registry import UAV2SharedAction
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
 
 ######################### UPDATE CONSTANTS HERE #########################
 VISION_SERVER_TOPIC = "/uav2/tins/manage_nodes"
-CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 
 CLUSTERING_DURATION = 4
 STABILIZE_DURATION = 3.0
@@ -27,7 +30,7 @@ STABILIZE_DURATION = 3.0
 FORWARD_DISTANCE = 3.0
 NUM_RETRIES = 3
 
-BASE_LINK_FRAME = "auv4/base_link_frd"
+BASE_LINK_FRAME = "uav2/base_link_frd"
 WORLD_FRAME = "odom_ned"
 CAMERA_FRAME = "uav2/wide_cam_optical"
 TEMPLATE_FRAME_YOLO = "helipad"
@@ -65,7 +68,7 @@ def create_helipad_root():
 
     action_cluster_helipad = shared_action_client.FromConstant(
         name="Cluster helipad transforms",
-        shared_action=SharedAction.CLUSTER,
+        shared_action=UAV2SharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_YOLO,
             out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,

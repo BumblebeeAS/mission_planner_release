@@ -8,7 +8,7 @@ from mission_planner_2.common.util.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -21,7 +21,7 @@ _PING_RESPONSE_KEY = fk("ping")
 def _create_grabber_root(is_open: bool = False):
     grabber = shared_action_client.FromConstant(
         name="Close grabber for pings",
-        shared_action=SharedAction.GRABBER,
+        shared_action=AUVSharedAction.GRABBER,
         action_goal=Grabber.Goal(
             command=65535 if is_open else 5,
             tolerance=0,

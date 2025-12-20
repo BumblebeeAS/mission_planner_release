@@ -10,7 +10,7 @@ from mission_planner_2.common.util.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.common.util.pose_utils import create_clustering_goal
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.shared.trees.blackboard import DynamicSetBlackboard
 from mission_planner_2.vehicles.shared.trees.tf_checker import (
     create_tf_checker_from_constant_root,
@@ -55,7 +55,7 @@ def create_aruco_root():
 
     action_cluster_detections = shared_action_client.FromConstant(
         name="Cluster detections",
-        shared_action=SharedAction.CLUSTER,
+        shared_action=AUVSharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children="aruco_board",
             out_children="aruco_board/clustered",

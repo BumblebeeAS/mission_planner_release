@@ -18,7 +18,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.auv.trees.robosub24.slalom.channel_movement_mix import (
     create_movement_strategy_root,
@@ -176,7 +176,7 @@ def _create_goto_sweep_and_cluster(
 
     recluster_action = shared_action_client.FromConstant(
         name=f"Recluster for stop {stop} at angle {angle}",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             # in_children=[
             #     CHANNEL_PAIR_ZERO_FRAME,

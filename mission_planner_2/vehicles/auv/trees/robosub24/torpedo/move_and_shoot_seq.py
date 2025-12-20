@@ -16,7 +16,7 @@ from mission_planner_2.common.util.pose_utils import (
     within_threshold_rpy,
     within_threshold_xyz,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.shared.trees.blackboard import DynamicSetBlackboard
 from mission_planner_2.vehicles.shared.trees.cluster_goto import (
@@ -177,7 +177,7 @@ def create_move_and_shoot_generator(
 
         cluster_node = shared_action_client.FromBlackboard(
             name=f"Cluster the transforms before {torp_string} shot",
-            shared_action=SharedAction.CLUSTER,
+            shared_action=AUVSharedAction.CLUSTER,
             key=_CLUSTERING_GOAL_KEY,
         )
 
@@ -189,7 +189,7 @@ def create_move_and_shoot_generator(
 
         cluster_node_check = shared_action_client.FromBlackboard(
             name=f"Cluster the transforms before {torp_string} shot",
-            shared_action=SharedAction.CLUSTER,
+            shared_action=AUVSharedAction.CLUSTER,
             key=_CLUSTERING_GOAL_CHECK_KEY,
         )
 

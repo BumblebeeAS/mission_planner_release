@@ -22,8 +22,8 @@ from transforms3d.euler import quat2euler
 
 from mission_planner_2.common.core import shared_action_client
 from mission_planner_2.vehicles.auv.config.node_registry import (
-    SharedAction,
-    SharedService,
+    AUVSharedAction,
+    AUVSharedService,
 )
 from mission_planner_2.vehicles.shared.trees.blackboard import convert_to_safe_name
 
@@ -123,7 +123,7 @@ class FromBlackboard(shared_action_client.FromBlackboard):
 
         super().__init__(
             name,
-            SharedAction.LOCOMOTION,
+            AUVSharedAction.LOCOMOTION,
             py_trees.blackboard.Blackboard.absolute_name(
                 namespace, self.ACTION_GOAL_KEY
             ),
@@ -167,7 +167,7 @@ class FromBlackboard(shared_action_client.FromBlackboard):
             return
 
         self.service_client = self.node.service_clients[
-            SharedService.CONVERT_TO_CONTROLS_POSE.name
+            AUVSharedService.CONVERT_TO_CONTROLS_POSE.name
         ]
         self._check_srv_setup()
 

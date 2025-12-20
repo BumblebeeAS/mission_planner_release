@@ -14,7 +14,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 
 NAMESPACE = generate_namespace()
@@ -67,7 +67,7 @@ def create_return_root():
 
     action_cluster_gate = shared_action_client.FromConstant(
         name="Cluster gate transforms",
-        shared_action=SharedAction.CLUSTER,
+        shared_action=AUVSharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_YOLO,
             out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,

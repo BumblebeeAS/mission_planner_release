@@ -21,7 +21,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_clustering_request,
     create_stamped_pose,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.auv.trees.robosub24.octagon.helpers import (
     get_table_relocalised_yaw,
@@ -245,7 +245,7 @@ def create_search_root():
 
     controlled_spin_for_search = shared_action_client.FromConstant(
         name="Goto search poses",
-        shared_action=SharedAction.CONTROLLED_SPIN,
+        shared_action=AUVSharedAction.CONTROLLED_SPIN,
         action_goal=ControlledSpin.Goal(
             yaw_amount=360.0,
             yaw_tolerance=3.0,

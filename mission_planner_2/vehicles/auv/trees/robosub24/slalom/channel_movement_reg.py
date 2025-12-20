@@ -18,7 +18,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_slalom_clustering_stop_srv_request,
     create_stamped_pose,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.shared.trees.blackboard import DynamicSetBlackboard
 from mission_planner_2.vehicles.shared.trees.tf_checker import (
@@ -328,7 +328,7 @@ def create_move_between_layers_root(
 
     recluster_action = shared_action_client.FromConstant(
         name=f"Recluster Transforms from Layer {current_layer} to Layer {next_layer}",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
@@ -497,7 +497,7 @@ def create_move_between_layers_root(
 
     recluster_sweep_pre = shared_action_client.FromConstant(
         name=f"Recluster before Sweep from Layer {current_layer} to Layer {next_layer}",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
@@ -512,7 +512,7 @@ def create_move_between_layers_root(
 
     recluster_sweep_0 = shared_action_client.FromConstant(
         name=f"Recluster during Sweep from Layer {current_layer} to Layer {next_layer}",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[
@@ -527,7 +527,7 @@ def create_move_between_layers_root(
 
     recluster_sweep_1 = shared_action_client.FromConstant(
         name=f"Recluster during Sweep from Layer {current_layer} to Layer {next_layer}",
-        shared_action=SharedAction.CLUSTER_MULTI,
+        shared_action=AUVSharedAction.CLUSTER_MULTI,
         action_goal=create_clustering_goal(
             in_children=CLUSTERING_IN_CHILDREN_NEAR,
             out_children=[

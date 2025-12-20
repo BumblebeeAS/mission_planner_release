@@ -22,7 +22,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_clustering_goal,
     create_stamped_pose,
 )
-from mission_planner_2.vehicles.auv.config.node_registry import SharedAction
+from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
 from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 from mission_planner_2.vehicles.shared.trees.tf_checker import (
     create_tf_checker_from_constant_root,
@@ -98,7 +98,7 @@ def create_gate_root():
     # Step 3: Cluster gate transforms
     action_cluster_gate = shared_action_client.FromConstant(
         name="Cluster gate transforms",
-        shared_action=SharedAction.CLUSTER,
+        shared_action=AUVSharedAction.CLUSTER,
         action_goal=create_clustering_goal(
             in_children=TEMPLATE_FRAME_YOLO,
             out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
@@ -230,7 +230,7 @@ def create_gate_root():
 
     spin = shared_action_client.FromConstant(
         name="Call controlled spin",
-        shared_action=SharedAction.CONTROLLED_SPIN,
+        shared_action=AUVSharedAction.CONTROLLED_SPIN,
         action_goal=ControlledSpin.Goal(
             yaw_amount=720.0,
             yaw_tolerance=3.0,

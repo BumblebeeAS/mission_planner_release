@@ -1,6 +1,5 @@
 import py_trees
-
-from mission_planner_2.trees.uav2.tins.tins import create_helipad_root
+from mission_planner_2.vehicles.uav2.tins.tins import create_helipad_root
 
 
 def create_mother():
