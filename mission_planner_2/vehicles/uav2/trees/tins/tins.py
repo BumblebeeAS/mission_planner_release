@@ -1,11 +1,6 @@
 import py_trees
 from lifecycle_msgs.srv import ChangeState
-from py_trees.decorators import Retry
-
-from mission_planner_2.common.core import (
-    checked_service,
-    shared_action_client,
-)
+from mission_planner_2.common.core import checked_service, shared_action_client
 from mission_planner_2.common.util.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -14,9 +9,13 @@ from mission_planner_2.common.util.namespace_utils import (
     full_key_generator,
     generate_namespace,
 )
-from mission_planner_2.common.util.pose_utils import create_clustering_goal
-from mission_planner_2.vehicles.uav2.trees.goto import goto
+from mission_planner_2.common.util.pose_utils import (
+    create_clustering_goal,
+    create_stamped_pose,
+)
 from mission_planner_2.vehicles.uav2.config.node_registry import UAV2SharedAction
+from mission_planner_2.vehicles.uav2.trees.goto.goto_pose import create_goto_pose_root
+from py_trees.decorators import Retry
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -33,8 +32,9 @@ NUM_RETRIES = 3
 BASE_LINK_FRAME = "uav2/base_link_frd"
 WORLD_FRAME = "odom_ned"
 CAMERA_FRAME = "uav2/wide_cam_optical"
-TEMPLATE_FRAME_YOLO = "helipad"
-TEMPLATE_FRAME_YOLO_CLUSTERED = "helipad/clustered"
+OBJECT_FRAME_YOLO = "helipad"
+OBJECT_FRAME_YOLO_CLUSTERED = "helipad/clustered"
+OBJECT_FRAME_VIEW = "helipad/view"
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -70,8 +70,8 @@ def create_helipad_root():
         name="Cluster helipad transforms",
         shared_action=UAV2SharedAction.CLUSTER,
         action_goal=create_clustering_goal(
-            in_children=TEMPLATE_FRAME_YOLO,
-            out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
+            in_children=OBJECT_FRAME_YOLO,
+            out_children=OBJECT_FRAME_YOLO_CLUSTERED,
             out_parents=WORLD_FRAME,
             duration=CLUSTERING_DURATION,
             use_cache=False,
@@ -82,6 +82,10 @@ def create_helipad_root():
         name="Retry Cluster Helipad",
         child=action_cluster_helipad,
         num_failures=NUM_RETRIES,
+    )
+
+    goto_helipad_view = create_goto_pose_root(
+        pose=create_stamped_pose(OBJECT_FRAME_VIEW), anchor_frame_name=BASE_LINK_FRAME
     )
 
     srv_end_vision = checked_service.FromConstant(
@@ -109,6 +113,7 @@ def create_helipad_root():
         children=[
             retry_start_vision,
             retry_cluster_helipad,
+            goto_helipad_view,
             force_success_stop_vision,
         ]
     )
