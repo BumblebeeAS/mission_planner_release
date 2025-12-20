@@ -1,0 +1,5 @@
+helipad:
+  - name: helipad_center
+    z: -2.0
+    parent_frame_id: helipad/clustered
+    child_frame_id: helipad/view
