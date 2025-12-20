@@ -6,11 +6,11 @@ import py_trees
 import py_trees.console as console
 import rclpy
 
-from mission_planner_2.commons.bumble_tree import BumbleTree
-from mission_planner_2.commons.hooks import stop_on_success_or_failure
-from mission_planner_2.commons.uav2.node_registry import TreeNode
-from mission_planner_2.commons.visitors import LoggingSnapshotVisitor
-from mission_planner_2.trees.uav2.mother.mother import create_mother
+from mission_planner_2.common.core.bumble_tree import BumbleTree
+from mission_planner_2.common.core.hooks import stop_on_success_or_failure
+from mission_planner_2.vehicles.uav2.config.node_registry import TreeNode
+from mission_planner_2.common.core.visitors import LoggingSnapshotVisitor
+from mission_planner_2.vehicles.uav2.trees.mother.mother import create_mother
 
 
 def main():
