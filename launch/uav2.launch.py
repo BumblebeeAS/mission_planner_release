@@ -11,14 +11,17 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "static_tf_file",
             default_value=PathJoinSubstitution(
-                [FindPackageShare("mission_planner_2"), "cfg", "static_tfs.yaml"]
+                [
+                    FindPackageShare("mission_planner_2"),
+                    "cfg",
+                    "uav2",
+                    "static_tfs.yaml",
+                ]
             ),
         ),
         DeclareLaunchArgument(
             "dynamic_tf_file",
-            default_value=PathJoinSubstitution(
-                [FindPackageShare("mission_planner_2"), "cfg", "dynamic_tfs.yaml"]
-            ),
+            default_value="",
         ),
         DeclareLaunchArgument(
             "default_suffix",
@@ -38,12 +41,6 @@ def generate_launch_description():
                     "default_suffix": LaunchConfiguration("default_suffix"),
                 }
             ],
-            output="screen",
-        ),
-        Node(
-            package="mission_planner_2",
-            executable="choice_server_node.py",
-            name="choice_server_node",
             output="screen",
         ),
     ]

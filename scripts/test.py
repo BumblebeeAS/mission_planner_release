@@ -5,27 +5,30 @@ import py_trees.console as console
 import py_trees_ros
 import rclpy
 
-# from mission_planner_2.trees.auv.tests.test_goto_nfrombb import (
+# from mission_planner_2.vehicles.auv.trees.robosub24.tests.test_goto_nfrombb import (
 #     create_test_multi_waypoint_root as tree_root,
 # )
-# from mission_planner_2.trees.auv.tests.test_convert_service import (
+# from mission_planner_2.vehicles.auv.trees.robosub24.tests.test_convert_service import (
 #     create_test_convert_service_root as tree_root,
 # )
-# from mission_planner_2.trees.auv.tests.test_preempt_controls import (
+# from mission_planner_2.vehicles.auv.trees.robosub24.tests.test_preempt_controls import (
 #     create_preempt_root as tree_root,
 # )
-# from mission_planner_2.trees.auv.tests.test_multi_cluster import (
+# from mission_planner_2.vehicles.auv.trees.robosub24.tests.test_multi_cluster import (
 #     create_test_multi_cluster_root as tree_root,
 # )
-# from mission_planner_2.trees.auv.tests.test_multi_waypoint import (
+# from mission_planner_2.vehicles.auv.trees.robosub24.tests.test_multi_waypoint import (
 #     create_test_multi_waypoint_root as tree_root,
 # )
-from mission_planner_2.commons.hooks import stop_on_success_or_failure
-from mission_planner_2.commons.node_registry import TreeNode
-# from mission_planner_2.trees.auv.tests.test_goto import create_goto_test as tree_root
+from mission_planner_2.common.core.hooks import stop_on_success_or_failure
+from mission_planner_2.trees.turtlesim.turtle_circle import (
+    create_turtle_circle_root as tree_root,
+)
+from mission_planner_2.vehicles.auv.config.node_registry import TreeNode
+from mission_planner_2.vehicles.auv.trees.shared.led_management import create_led_tree
 
-from mission_planner_2.trees.turtlesim.turtle_circle import create_turtle_circle_root as tree_root
-from mission_planner_2.commons.led_management import create_led_tree
+# from mission_planner_2.vehicles.auv.trees.robosub24.tests.test_goto import create_goto_test as tree_root
+
 
 def main():
     rclpy.init(args=None)

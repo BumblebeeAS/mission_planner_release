@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
@@ -30,8 +29,8 @@ def generate_launch_description():
     nodes = [
         Node(
             package="mission_planner_2",
-            executable="mission_tfs.py",
-            name="mission_tf_publisher",
+            executable="mission_tfs_node.py",
+            name="mission_tfs_node",
             parameters=[
                 {
                     "static_tf_file": LaunchConfiguration("static_tf_file"),
