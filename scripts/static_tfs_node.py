@@ -12,47 +12,47 @@ from tf2_ros import StaticTransformBroadcaster
 from tf_transformations import quaternion_from_euler
 
 
-class MissionTfsNode(Node):
+class StaticTfsNode(Node):
     """
-    ROS2 Node responsible for mission tfs.
+    Publishes multiple static transforms in a single ROS2 node.
+    This helps to reduce the number of nodes when many static transforms are needed
+    compared to using multiple static_transform_publisher nodes.
     """
 
     def __init__(self):
-        super().__init__("mission_tfs_node")
-        self.declare_parameter("static_tf_file", "")
-        self.declare_parameter("dynamic_tf_file", "")
+        super().__init__("static_tfs_node")
+        self.declare_parameter("single_tfs_file", "")
+        self.declare_parameter("grouped_tfs_file", "")
         self.declare_parameter("default_suffix", "view")
 
-        static_config_path = (
-            self.get_parameter("static_tf_file").get_parameter_value().string_value
+        single_tfs_config_path = (
+            self.get_parameter("single_tfs_file").get_parameter_value().string_value
         )
-        dynamic_config_path = (
-            self.get_parameter("dynamic_tf_file").get_parameter_value().string_value
+        grouped_tfs_config_path = (
+            self.get_parameter("grouped_tfs_file").get_parameter_value().string_value
         )
         self.default_suffix = (
             self.get_parameter("default_suffix").get_parameter_value().string_value
         )
 
-        if not static_config_path and not dynamic_config_path:
+        if not single_tfs_config_path and not grouped_tfs_config_path:
             self.get_logger().error(
-                "No config files provided! Use --ros-args -p static_tf_file:=<path> "
-                "and/or -p dynamic_tf_file:=<path>"
+                "No config files provided! Use --ros-args -p single_tfs_file:=<path> "
+                "and/or -p grouped_tfs_file:=<path>"
             )
             return
 
         self.tf_static_broadcaster = StaticTransformBroadcaster(self)
 
-        all_transforms = []
+        all_transforms: List[TransformStamped] = []
 
-        # Load and process static transforms
-        if static_config_path:
-            static_transforms = self.load_static_transforms(static_config_path)
-            all_transforms.extend(static_transforms)
+        if single_tfs_config_path:
+            single_tfs = self.load_single_tfs(single_tfs_config_path)
+            all_transforms.extend(single_tfs)
 
-        # Load and process dynamic transforms
-        if dynamic_config_path:
-            dynamic_transforms = self.load_dynamic_transforms(dynamic_config_path)
-            all_transforms.extend(dynamic_transforms)
+        if grouped_tfs_config_path:
+            grouped_tfs = self.load_grouped_tfs(grouped_tfs_config_path)
+            all_transforms.extend(grouped_tfs)
 
         # Publish all transforms
         if all_transforms:
@@ -93,50 +93,50 @@ class MissionTfsNode(Node):
             )
             raise
 
-    def load_static_transforms(self, config_file_path: str) -> List[TransformStamped]:
-        """Load transforms from static YAML config and return them."""
+    def load_single_tfs(self, config_file_path: str) -> List[TransformStamped]:
+        """Load transforms from single YAML config and return them."""
         try:
             config = self.load_config_file(config_file_path)
-            static_transforms = []
+            single_transforms: List[TransformStamped] = []
 
             for _, transforms_list in config.items():
                 for tf_config in transforms_list:
-                    transform = self.create_static_transform(tf_config)
-                    static_transforms.append(transform)
+                    transform = self.create_single_transform(tf_config)
+                    single_transforms.append(transform)
 
-            self.get_logger().info(f"Loaded {len(static_transforms)} static transforms")
-            return static_transforms
+            self.get_logger().info(f"Loaded {len(single_transforms)} single transforms")
+            return single_transforms
 
         except Exception:
             self.get_logger().error(
-                f"Error loading static transforms. Traceback:\n{traceback.format_exc()}"
+                f"Error loading single transforms. Traceback:\n{traceback.format_exc()}"
             )
             raise
 
-    def load_dynamic_transforms(self, config_file_path: str) -> List[TransformStamped]:
-        """Load transforms from dynamic YAML config and return them."""
+    def load_grouped_tfs(self, config_file_path: str) -> List[TransformStamped]:
+        """Load transforms from grouped YAML config and return them."""
         try:
             config = self.load_config_file(config_file_path)
-            dynamic_transforms = []
+            grouped_transforms: List[TransformStamped] = []
 
-            for _, dynamic_configs in config.items():
-                for dynamic_config in dynamic_configs:
-                    transforms = self.create_dynamic_transforms(dynamic_config)
-                    dynamic_transforms.extend(transforms)
+            for _, grouped_configs in config.items():
+                for grouped_config in grouped_configs:
+                    transforms = self.create_grouped_transforms(grouped_config)
+                    grouped_transforms.extend(transforms)
 
             self.get_logger().info(
-                f"Loaded {len(dynamic_transforms)} dynamic transforms"
+                f"Loaded {len(grouped_transforms)} grouped transforms"
             )
-            return dynamic_transforms
+            return grouped_transforms
 
         except Exception:
             self.get_logger().error(
-                f"Error loading dynamic transforms. Traceback:\n{traceback.format_exc()}"
+                f"Error loading grouped transforms. Traceback:\n{traceback.format_exc()}"
             )
             raise
 
-    def create_static_transform(self, tf_config: Dict[str, Any]) -> TransformStamped:
-        """Create a TransformStamped message from static tf configuration."""
+    def create_single_transform(self, tf_config: Dict[str, Any]) -> TransformStamped:
+        """Create a TransformStamped message from single tf configuration."""
         try:
             return self.create_transform(
                 x=tf_config.get("x", 0.0),
@@ -151,30 +151,30 @@ class MissionTfsNode(Node):
 
         except Exception:
             self.get_logger().error(
-                f"Error creating static transform from config: {tf_config}. "
+                f"Error creating single transform from config: {tf_config}. "
                 f"Traceback:\n{traceback.format_exc()}"
             )
             raise
 
-    def create_dynamic_transforms(
-        self, dynamic_config: Dict[str, Any]
+    def create_grouped_transforms(
+        self, grouped_config: Dict[str, Any]
     ) -> List[TransformStamped]:
-        """Create TransformStamped messages from dynamic configuration."""
+        """Create TransformStamped messages from grouped configuration."""
         try:
-            transforms = []
-            parents = dynamic_config.get("parents", [])
+            transforms: List[TransformStamped] = []
+            parents = grouped_config.get("parents", [])
 
-            suffix = dynamic_config.get("suffix", self.default_suffix)
+            suffix = grouped_config.get("suffix", self.default_suffix)
 
             for parent_frame in parents:
                 child_frame = f"{parent_frame}/{suffix}"
                 transform = self.create_transform(
-                    x=dynamic_config.get("x", 0.0),
-                    y=dynamic_config.get("y", 0.0),
-                    z=dynamic_config.get("z", 0.0),
-                    roll=dynamic_config.get("roll", 0.0),
-                    pitch=dynamic_config.get("pitch", 0.0),
-                    yaw=dynamic_config.get("yaw", 0.0),
+                    x=grouped_config.get("x", 0.0),
+                    y=grouped_config.get("y", 0.0),
+                    z=grouped_config.get("z", 0.0),
+                    roll=grouped_config.get("roll", 0.0),
+                    pitch=grouped_config.get("pitch", 0.0),
+                    yaw=grouped_config.get("yaw", 0.0),
                     parent_frame=parent_frame,
                     child_frame=child_frame,
                 )
@@ -184,7 +184,7 @@ class MissionTfsNode(Node):
 
         except Exception:
             self.get_logger().error(
-                f"Error creating dynamic transforms from config: {dynamic_config}. "
+                f"Error creating grouped transforms from config: {grouped_config}. "
                 f"Traceback:\n{traceback.format_exc()}"
             )
             raise
@@ -232,13 +232,13 @@ class MissionTfsNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    mission_tfs_node = MissionTfsNode()
+    static_tfs_node = StaticTfsNode()
     try:
-        rclpy.spin(mission_tfs_node)
+        rclpy.spin(static_tfs_node)
     except KeyboardInterrupt:
         pass
     finally:
-        mission_tfs_node.destroy_node()
+        static_tfs_node.destroy_node()
         rclpy.try_shutdown()
 
 

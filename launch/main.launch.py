@@ -9,15 +9,15 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     launch_objects = [
         DeclareLaunchArgument(
-            "static_tf_file",
+            "single_tfs_file",
             default_value=PathJoinSubstitution(
-                [FindPackageShare("mission_planner_2"), "cfg", "static_tfs.yaml"]
+                [FindPackageShare("mission_planner_2"), "cfg", "single_tfs.yaml"]
             ),
         ),
         DeclareLaunchArgument(
-            "dynamic_tf_file",
+            "grouped_tfs_file",
             default_value=PathJoinSubstitution(
-                [FindPackageShare("mission_planner_2"), "cfg", "dynamic_tfs.yaml"]
+                [FindPackageShare("mission_planner_2"), "cfg", "grouped_tfs.yaml"]
             ),
         ),
         DeclareLaunchArgument(
@@ -33,8 +33,8 @@ def generate_launch_description():
             name="mission_tfs_node",
             parameters=[
                 {
-                    "static_tf_file": LaunchConfiguration("static_tf_file"),
-                    "dynamic_tf_file": LaunchConfiguration("dynamic_tf_file"),
+                    "single_tfs_file": LaunchConfiguration("single_tfs_file"),
+                    "grouped_tfs_file": LaunchConfiguration("grouped_tfs_file"),
                     "default_suffix": LaunchConfiguration("default_suffix"),
                 }
             ],
