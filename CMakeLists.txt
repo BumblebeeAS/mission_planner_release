@@ -38,7 +38,6 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/choice_server_node.py
   scripts/main.py
-  scripts/mission_tfs_node.py
   scripts/test.py
   scripts/uav2_main.py
   DESTINATION lib/${PROJECT_NAME}

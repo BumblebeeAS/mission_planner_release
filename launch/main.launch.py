@@ -28,9 +28,9 @@ def generate_launch_description():
 
     nodes = [
         Node(
-            package="mission_planner_2",
-            executable="mission_tfs_node.py",
-            name="mission_tfs_node",
+            package="frames",
+            executable="static_tfs_node.py",
+            name="static_tfs_node",
             parameters=[
                 {
                     "single_tfs_file": LaunchConfiguration("single_tfs_file"),
