@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 
 
-"""
-Behaviours for ROS services
-"""
-
 import time
 import uuid
-from typing import Callable
+from typing import Any, Callable
 
 import action_msgs
 import action_msgs.msg as action_msgs
 import py_trees
-import py_trees_ros
 from bb_controls_msgs.action import Locomotion
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 from geometry_msgs.msg import PoseStamped
@@ -20,15 +15,15 @@ from numpy import rad2deg
 from rclpy.task import Future
 from transforms3d.euler import quat2euler
 
-from mission_planner_2.common.core import shared_action_client
 from mission_planner_2.vehicles.auv.config.node_registry import (
     AUVSharedAction,
     AUVSharedService,
 )
 from mission_planner_2.vehicles.shared.trees.blackboard import convert_to_safe_name
+from mission_planner_2.vehicles.shared.trees.goto import goto_base
 
 
-class FromBlackboard(shared_action_client.FromBlackboard):
+class FromBlackboard(goto_base.FromBlackboard):
     """
     Interface to communicate with controls `Locomotion Action Server` using a pose stored in the blackboard.
 
@@ -97,8 +92,6 @@ class FromBlackboard(shared_action_client.FromBlackboard):
                                        goal is rejected, or action fails
     """
 
-    ACTION_GOAL_KEY = "goto_goal"
-
     def __init__(
         self,
         name: str,
@@ -111,28 +104,25 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         z_threshold: float = 0.03,
         yaw_threshold: float = 0.01,
         stabilize_duration: int = 5,
-        generate_feedback_message: Callable | None = None,
+        generate_feedback_message: Callable[[Any], str] = None,
         wait_for_server_timeout_sec: int = -3,
         wait_for_service_timeout_sec: int = -3,
         is_relative_movement: bool = False,
         depth_override_value: float | None = None,
     ):
-        namespace = py_trees.blackboard.Blackboard.absolute_name(
-            "/", convert_to_safe_name(name) + "/" + str(uuid.uuid4()).replace("-", "")
-        )
 
         super().__init__(
             name,
-            AUVSharedAction.LOCOMOTION,
-            py_trees.blackboard.Blackboard.absolute_name(
-                namespace, self.ACTION_GOAL_KEY
-            ),
-            generate_feedback_message,
-            wait_for_server_timeout_sec,
+            pose_key,
+            action_client_type=AUVSharedAction.LOCOMOTION,
+            service_client_type=AUVSharedService.CONVERT_TO_CONTROLS_POSE,
+            anchor_frame_name=anchor_frame_name,
+            generate_feedback_message=generate_feedback_message,
+            wait_for_server_timeout_sec=wait_for_server_timeout_sec,
+            wait_for_service_timeout_sec=wait_for_service_timeout_sec,
         )
 
-        self.wait_for_service_timeout_sec = wait_for_service_timeout_sec
-        self.anchor_frame_name = anchor_frame_name
+        # Set AUV specific parameters
         self.specified_heading = specified_heading
         self.ignore_depth = ignore_depth
         self.x_threshold = x_threshold
@@ -143,32 +133,16 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         self.is_relative_movement = is_relative_movement
         self.depth_override_value = depth_override_value
 
-        # Register the pose_key on the BB as the req to be converted
-        # pose_key entry should be a pose stamped
-        self.blackboard.register_key(
-            key="request",
-            access=py_trees.common.Access.READ,
-            remap_to=py_trees.blackboard.Blackboard.absolute_name(
-                namespace="/",
-                key=pose_key,
-            ),
-        )
-
-        self.service_client = None
-
     def setup(self, **kwargs):
         """
-        We ride on the super class (action_client) setup which creates the action client and the node
-        using the same node instance we will create our service client
+        Call the grandparent setup method.
         """
-        super().setup(**kwargs)
+        super(goto_base.FromBlackboard, self).setup(**kwargs)
 
         if self.is_relative_movement:
             return
 
-        self.service_client = self.node.service_clients[
-            AUVSharedService.CONVERT_TO_CONTROLS_POSE.name
-        ]
+        self.service_client = self.node.service_clients[self.service_client_type.name]
         self._check_srv_setup()
 
     def initialise(self):
@@ -179,18 +153,7 @@ class FromBlackboard(shared_action_client.FromBlackboard):
         """
         self.logger.debug("{}.initialise()".format(self.qualified_name))
 
-        # Temporary variable
-        self.service_future = None
-
-        # None declarations from super.initialise
-        self.goal_handle = None
-        self.send_goal_future = None
-        self.get_result_future = None
-
-        self.result_message = None
-        self.result_status = None
-        self.result_status_string = None
-        self.is_goal_sent = False
+        self._reset_internal_vars()
 
         poses = self.blackboard.get("request")
         # self.node.get_logger().info(f"poses: {poses}")
@@ -199,87 +162,6 @@ class FromBlackboard(shared_action_client.FromBlackboard):
             self._initialise_relative(poses)
         else:
             self._initialise_absolute(poses)
-
-    def update(self):
-        """
-        Check whether if underlying service server has succeeded, is running,
-        or has cancelled/aborted and map these to behaviour return states
-        """
-        self.logger.debug("{}.update()".format(self.qualified_name))
-
-        if self.service_future is None:
-            # No request on blackboard or wrong request type or unready server
-            self.feedback_message = "no service request to send"
-            return py_trees.common.Status.FAILURE
-        elif not self.service_future.done():
-            # service has been called but has yet to return a result
-            return py_trees.common.Status.RUNNING
-
-        # at this point service is done
-        if not self.service_future.result().tf_success:
-            return py_trees.common.Status.FAILURE
-
-        # check that in the callback attached the new attr has been set
-        # also checks if the attr has been set to True which implies that the send_goal_req has been
-        # run to completion
-        # this ensures that the call to send_goal_request has completed
-        if not self.is_goal_sent:
-            return py_trees.common.Status.RUNNING
-
-        # no race condition cuz is RW WR either way the code wont break
-        if self.send_goal_future is None:
-            self.feedback_message = "no goal to send"
-            return py_trees.common.Status.FAILURE
-        if self.goal_handle is not None and not self.goal_handle.accepted:
-            # goal was rejected
-            self.feedback_message = "goal rejected"
-            return py_trees.common.Status.FAILURE
-        if self.result_status is None:
-            return py_trees.common.Status.RUNNING
-        elif not self.get_result_future.done():
-            # should never get here
-            self.node.get_logger().warn(
-                "got result, but future not yet done [{}]".format(self.qualified_name)
-            )
-            return py_trees.common.Status.RUNNING
-        else:
-            self.node.get_logger().debug("goal result [{}]".format(self.qualified_name))
-            self.node.get_logger().debug(
-                "  status: {}".format(self.result_status_string)
-            )
-            self.node.get_logger().debug("  message: {}".format(self.result_message))
-            if self.result_status == action_msgs.GoalStatus.STATUS_SUCCEEDED:  # noqa
-                self.feedback_message = "successfully completed"
-                return py_trees.common.Status.SUCCESS
-            else:
-                self.feedback_message = "failed"
-                return py_trees.common.Status.FAILURE
-
-    def terminate(self, new_status: py_trees.common.Status):
-        """
-        If running and current request has not already succeeded, cancel it.
-        The behaviour transitions to new_status.
-        """
-        super().terminate(new_status)
-
-        self.logger.debug(
-            "{}.terminate({})".format(
-                self.qualified_name,
-                (
-                    "{}->{}".format(self.status, new_status)
-                    if self.status != new_status
-                    else "{}".format(new_status)
-                ),
-            )
-        )
-        if (self.service_future is not None) and (not self.service_future.done()):
-            self.service_client.remove_pending_request(self.service_future)
-
-    def shutdown(self):
-        """
-        Clean up service client when shutting down
-        """
-        super().shutdown()
 
     def _initialise_relative(self, poses):
         self.service_future = Future()
@@ -304,13 +186,14 @@ class FromBlackboard(shared_action_client.FromBlackboard):
 
     def _gen_srv_req(self, poses: list[PoseStamped] | PoseStamped):
         request = GetPoseToControlsFrame.Request()
-        if isinstance(poses, PoseStamped):
-            poses = [poses]
-        request.input_poses = poses
+        request.input_poses = poses if isinstance(poses, list) else [poses]
         request.anchor_frame_name = self.anchor_frame_name
         return request
 
-    def _gen_goal(self, poses: list[PoseStamped], specified_heading: bool = True):
+    def _gen_goal(self, poses: list[PoseStamped] | PoseStamped):
+        if not isinstance(poses, list):
+            poses = [poses]
+
         output_poses = [p.pose for p in poses]
 
         goal_msg = Locomotion.Goal()
@@ -329,7 +212,7 @@ class FromBlackboard(shared_action_client.FromBlackboard):
             print(e)
             goal_msg.depth_ctrl = 0
 
-        goal_msg.specified_heading = specified_heading
+        goal_msg.specified_heading = self.specified_heading
 
         forward_setpoints = []
         sidemove_setpoints = []
@@ -377,67 +260,6 @@ class FromBlackboard(shared_action_client.FromBlackboard):
 
         return goal_msg
 
-    def _check_srv_setup(self):
-        result = None
-        if self.wait_for_service_timeout_sec > 0.0:
-            result = self.service_client.wait_for_service(
-                timeout_sec=self.wait_for_service_timeout_sec
-            )
-        elif self.wait_for_service_timeout_sec == 0.0:
-            result = True  # don't wait and don't check if the server is ready
-        else:
-            iterations = 0
-            period_sec = -1.0 * self.wait_for_service_timeout_sec
-            while not result:
-                iterations += 1
-                result = self.service_client.wait_for_service(timeout_sec=period_sec)
-                if not result:
-                    self.node.get_logger().warning(
-                        "waiting for service server ... [{}s][{}][{}]".format(
-                            iterations * period_sec,
-                            self.node.resolve_service_name(
-                                self.shared_action.value.topic
-                            ),
-                            self.qualified_name,
-                        )
-                    )
-
-        if not result:
-            self.feedback_message = "timed out waiting for the server [{}]".format(
-                self.node.resolve_service_name(self.shared_action.value.topic)
-            )
-            self.node.get_logger().error(
-                "{}[{}]".format(self.feedback_message, self.qualified_name)
-            )
-            raise py_trees_ros.exceptions.TimedOutError(self.feedback_message)
-        else:
-            self.feedback_message = "... connected to service server [{}]".format(
-                self.node.resolve_service_name(self.shared_action.value.topic)
-            )
-            self.node.get_logger().info(
-                "{}[{}]".format(self.feedback_message, self.qualified_name)
-            )
-
-    def _send_goal_request(self, poses):
-        """
-        Send the goal request to the action server.
-        This method is called after the service call has been completed and the poses have been converted.
-        """
-        goal = self._gen_goal(poses, specified_heading=self.specified_heading)
-
-        # send_goal_request sets teh send_goal_future attr
-        self.send_goal_request(goal)
-        # separate flag to check goal has been sent in that case the send_goal_future must have been set
-        self.is_goal_sent = True
-        self.feedback_message = "sent action goal request"
-
-    def _srv_done_callback(self, fut):
-        resp = fut.result()
-        if not resp.tf_success:
-            return
-
-        self._send_goal_request(resp.output_poses)
-
 
 class FromConstant(FromBlackboard):
     """
@@ -484,7 +306,7 @@ class FromConstant(FromBlackboard):
         z_threshold: float = 0.03,
         yaw_threshold: float = 0.01,
         stabilize_duration: int = 5,
-        generate_feedback_message=None,
+        generate_feedback_message: Callable[[Any], str] = None,
         wait_for_server_timeout_sec=-3,
         wait_for_service_timeout_sec=-3,
         is_relative_movement: bool = False,
