@@ -14,7 +14,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.vehicles.uav2.config.node_registry import UAV2SharedAction
-from mission_planner_2.vehicles.uav2.trees.goto.goto_pose import create_goto_pose_root
+from mission_planner_2.vehicles.uav2.trees.goto import goto
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -83,8 +83,9 @@ def create_helipad_root():
         num_failures=NUM_RETRIES,
     )
 
-    goto_helipad_view = create_goto_pose_root(
-        pose=create_stamped_pose(OBJECT_FRAME_VIEW), anchor_frame_name=BASE_LINK_FRAME
+    goto_helipad_view = goto.FromConstant(
+        name="Goto controls pose",
+        pose=create_stamped_pose(frame_id=OBJECT_FRAME_VIEW),
     )
 
     srv_end_vision = checked_service.FromConstant(

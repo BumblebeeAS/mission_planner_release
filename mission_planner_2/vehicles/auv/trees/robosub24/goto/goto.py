@@ -190,10 +190,7 @@ class FromBlackboard(goto_base.FromBlackboard):
         request.anchor_frame_name = self.anchor_frame_name
         return request
 
-    def _gen_goal(self, poses: list[PoseStamped] | PoseStamped):
-        if not isinstance(poses, list):
-            poses = [poses]
-
+    def _gen_goal(self, poses: list[PoseStamped]):
         output_poses = [p.pose for p in poses]
 
         goal_msg = Locomotion.Goal()

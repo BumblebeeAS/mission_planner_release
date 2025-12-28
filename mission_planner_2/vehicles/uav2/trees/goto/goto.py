@@ -77,16 +77,12 @@ class FromBlackboard(goto_base.FromBlackboard):
         self.y_threshold = y_threshold
         self.z_threshold = z_threshold
 
-    def _gen_goal(self, poses: list[PoseStamped] | PoseStamped):
+    def _gen_goal(self, poses: list[PoseStamped]):
         goal_msg = GoToPosition.Goal()
-        if not isinstance(poses, list):
-            goal_msg.x = poses.pose.position.x
-            goal_msg.y = poses.pose.position.y
-            goal_msg.z = poses.pose.position.z
-        else:
-            raise ValueError(
-                "UAV2 GoToPosition action only supports single PoseStamped goals."
-            )
+        pose = poses[0]
+        goal_msg.x = pose.pose.position.x
+        goal_msg.y = pose.pose.position.y
+        goal_msg.z = pose.pose.position.z
         goal_msg.x_threshold = self.x_threshold
         goal_msg.y_threshold = self.y_threshold
         goal_msg.z_threshold = self.z_threshold
@@ -94,7 +90,11 @@ class FromBlackboard(goto_base.FromBlackboard):
 
     def _gen_srv_req(self, poses: list[PoseStamped] | PoseStamped):
         req = GetPoseToControlsFrame.Request()
-        req.input_poses = poses if isinstance(poses, list) else [poses]
+        if isinstance(poses, list):
+            raise ValueError(
+                "UAV2 GoToPosition action only supports single PoseStamped goals."
+            )
+        req.input_poses = [poses]
         req.anchor_frame_name = self.anchor_frame_name
         return req
 

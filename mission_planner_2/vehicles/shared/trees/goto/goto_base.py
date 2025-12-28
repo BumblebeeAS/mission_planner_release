@@ -178,7 +178,7 @@ class FromBlackboard(shared_action_client.FromBlackboard, ABC):
         pass
 
     @abstractmethod
-    def _gen_goal(self, poses: list[PoseStamped] | PoseStamped) -> Any:
+    def _gen_goal(self, poses: list[PoseStamped]) -> Any:
         pass
 
     def _check_srv_setup(self):
