@@ -15,7 +15,6 @@ from mission_planner_2.common.util.pose_utils import (
 )
 from mission_planner_2.vehicles.uav2.config.node_registry import UAV2SharedAction
 from mission_planner_2.vehicles.uav2.trees.goto.goto_pose import create_goto_pose_root
-from py_trees.decorators import Retry
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -60,7 +59,7 @@ def create_helipad_root():
         check_func=lambda x: x.success,
     )
 
-    retry_start_vision = Retry(
+    retry_start_vision = py_trees.decorators.Retry(
         name="Retry Start Vision",
         child=srv_start_vision,
         num_failures=NUM_RETRIES,
@@ -97,7 +96,7 @@ def create_helipad_root():
         check_func=lambda x: x.success,
     )
 
-    retry_end_vision = Retry(
+    retry_end_vision = py_trees.decorators.Retry(
         name="Retry End Vision",
         child=srv_end_vision,
         num_failures=NUM_RETRIES,
