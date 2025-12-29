@@ -119,6 +119,7 @@ class FromConstant(FromBlackboard):
         self,
         name,
         pose: PoseStamped,
+        anchor_frame_name: str = "uav2/base_link_frd",
         x_threshold: float = 0.03,
         y_threshold: float = 0.03,
         z_threshold: float = 0.03,
@@ -135,6 +136,7 @@ class FromConstant(FromBlackboard):
         super().__init__(
             name=name,
             pose_key=pose_key,
+            anchor_frame_name=anchor_frame_name,
             x_threshold=x_threshold,
             y_threshold=y_threshold,
             z_threshold=z_threshold,

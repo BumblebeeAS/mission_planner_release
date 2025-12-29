@@ -12,6 +12,10 @@ from mission_planner_2.vehicles.shared.trees.tf_checker import (
 )
 
 
+def _default_func(tf):
+    raise NotImplementedError("Please provide a function to check within threshold")
+
+
 def _gen_namespace():
     """Generate a unique namespace for the cluster and goto nodes."""
     unique_id = uuid.uuid4()
@@ -91,9 +95,7 @@ def create_goto_cluster_from_bb_root(
     stabilization_duration: float = 5.0,
     name="cluster_and_goto",
     within_threshold_list: Sequence[Callable[[TransformStamped], bool]] = [
-        lambda x: NotImplementedError(
-            "Please provide a function to check within threshold"
-        )
+        _default_func
     ],
 ):
     root = py_trees.composites.Sequence(
@@ -149,9 +151,7 @@ def create_goto_cluster_from_constant_root(
     stabilization_duration: float = 5.0,
     name: str = "cluster_and_goto",
     within_threshold_list: Sequence[Callable[[TransformStamped], bool]] = [
-        lambda x: NotImplementedError(
-            "Please provide a function to check within threshold"
-        )
+        _default_func
     ],
 ):
     root = py_trees.composites.Sequence(
