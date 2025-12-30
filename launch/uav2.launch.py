@@ -21,7 +21,14 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "grouped_tfs_file",
-            default_value="",
+            default_value=PathJoinSubstitution(
+                [
+                    FindPackageShare("mission_planner_2"),
+                    "cfg",
+                    "uav2",
+                    "grouped_tfs.yaml",
+                ]
+            ),
         ),
         DeclareLaunchArgument(
             "default_suffix",

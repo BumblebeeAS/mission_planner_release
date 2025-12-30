@@ -3,12 +3,3 @@ helipad:
     z: -2.0
     parent_frame_id: helipad/clustered
     child_frame_id: helipad/view
-tins:
-  - name: red_tin_0_view
-    z: -2.0
-    parent_frame_id: red_tin_0/from_odom/clustered
-    child_frame_id: red_tin_0/from_odom/view
-  - name: red_tin_0_pickup_view
-    z: -0.05
-    parent_frame_id: red_tin_0/from_odom/clustered
-    child_frame_id: red_tin_0/from_odom/pickup_view
