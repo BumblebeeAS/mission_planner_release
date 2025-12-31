@@ -1,7 +1,6 @@
 import py_trees
 from bb_perception_msgs.srv import TrashToggleFrame
 from lifecycle_msgs.srv import ChangeState
-
 from mission_planner_2.common.core import checked_service, shared_action_client
 from mission_planner_2.common.util.detection_utils import (
     create_end_vision_req,
@@ -168,7 +167,7 @@ def create_helipad_root():
         cluster_node=retry_cluster_tins,
         cluster_node_check=retry_cluster_tins_check,
         goto_node=goto_tins_xy,
-        start_frame_keys=["uav2/base_link_frd"],
+        start_frames=["uav2/base_link_frd"],
         retries=NUM_RETRIES,
         goto_pose_frame=TIN_FRAME_VIEW,
         within_threshold_list=[

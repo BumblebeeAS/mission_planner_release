@@ -4,7 +4,6 @@ from collections.abc import Callable, Sequence
 
 import py_trees
 from geometry_msgs.msg import TransformStamped
-
 from mission_planner_2.vehicles.shared.trees.blackboard import DynamicSetBlackboard
 from mission_planner_2.vehicles.shared.trees.tf_checker import (
     create_tf_checker_from_bb_root,
@@ -146,7 +145,7 @@ def create_goto_cluster_from_constant_root(
     cluster_node_check: py_trees.behaviour.Behaviour,
     goto_node: py_trees.behaviour.Behaviour,
     retries: int = 3,
-    start_frame_keys: list[str] = ["auv4/base_link_ned"],
+    start_frames: list[str] = ["auv4/base_link_ned"],
     goto_pose_frame: str = "auv4/base_link_ned",
     stabilization_duration: float = 5.0,
     name: str = "cluster_and_goto",
@@ -158,7 +157,7 @@ def create_goto_cluster_from_constant_root(
         name=name,
         memory=True,
     )
-    if len(within_threshold_list) != len(start_frame_keys):
+    if len(within_threshold_list) != len(start_frames):
         raise ValueError(
             "The length of within_threshold_list must match the number of start_frame_keys."
         )
@@ -169,7 +168,7 @@ def create_goto_cluster_from_constant_root(
 
     tf_checker = create_tf_checker_from_constant_root(
         # start_frames=[anchor_frame, "auv4/base_link_ned"],
-        start_frames=start_frame_keys,
+        start_frames=start_frames,
         end_frames=[goto_pose_frame] * num,
         update_keys=tf_keys,
         fallback_val=[None] * num,
