@@ -47,7 +47,7 @@ class AUVTreeNode(TreeNode):
 
     def _register_action_clients(self):
         action_clients = dict()
-        for action in SharedAction:
+        for action in AUVSharedAction:
             action_clients[action.name] = rclpy.action.ActionClient(
                 node=self,
                 action_type=action.value.type,
@@ -57,7 +57,7 @@ class AUVTreeNode(TreeNode):
 
     def _register_service_clients(self):
         service_clients = dict()
-        for service in SharedService:
+        for service in AUVSharedService:
             service_clients[service.name] = self.create_client(
                 srv_type=service.value.type,
                 srv_name=service.value.topic,
