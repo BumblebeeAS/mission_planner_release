@@ -19,6 +19,40 @@ from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 
 ######################### UPDATE CONSTANTS HERE #########################
 AUV4_FRAME_ID = "auv4/base_link_ned"
+
+X_START = 0.0
+Y_START = 0.0
+Z_START = 0.0
+YAW_START = 0.0
+
+STARTING_POINT = create_stamped_pose( #TODO idk if it is supposed to be "map"
+    frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_START,yaw=YAW_START
+)
+
+PAST_GATE_POSE_1 = create_stamped_pose(
+    frame_id=AUV4_FRAME_ID, position_x=5.0, position_y=0, position_z=0
+)
+
+PILLAIR_POSE_1 = create_stamped_pose(
+    frame_id=AUV4_FRAME_ID, position_x=15.0, position_y=5, position_z=0, yaw=0.0
+)
+
+PILLAIR_POSE_2 = create_stamped_pose(
+    frame_id=AUV4_FRAME_ID, position_x=5, position_y=-5, position_z=0, yaw=-90.0
+)
+
+PILLAIR_POSE_3 = create_stamped_pose(
+    frame_id=AUV4_FRAME_ID, position_x=5, position_y=5, position_z=0, yaw=-90.0
+)
+
+PAST_GATE_POSE_2 = create_stamped_pose(
+    frame_id=AUV4_FRAME_ID, position_x=15.0, position_y=5, position_z=0.0, yaw=0.0
+)
+
+BACK_TO_STARTING_POINT = create_stamped_pose(
+    frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_START,yaw=(YAW_START + 180.0)
+)
+    
 #########################################################################
 
 
@@ -27,18 +61,53 @@ def create_mother():
         name="AUV4 Prequali Root", memory=True
     )
 
-    goto_forward = goto.FromConstant(
-        name="Goto forward test",
-        pose=create_stamped_pose(frame_id=AUV4_FRAME_ID, position_x=5.0),
+    waypt_1 = goto.FromConstant(
+        name="Start Point",
+        pose=STARTING_POINT,
     )
 
-    seq_prequali_root.add_children(
-        [
-            goto_forward,
-        ]
+    waypt_2 = goto.FromConstant(
+        name="Past Gate Pose 1",
+        pose=PAST_GATE_POSE_1,
     )
+    
+    waypt_3 = goto.FromConstant(
+        name="Pillar Pose 1",
+        pose=PILLAIR_POSE_1,
+    )
+    
+    waypt_4 = goto.FromConstant(
+        name="Pillar Pose 2",
+        pose=PILLAIR_POSE_2,
+    )
+    
+    waypt_5 = goto.FromConstant(
+        name="Pillar Pose 3",
+        pose=PILLAIR_POSE_3,
+    )
+    
+    waypt_6 = goto.FromConstant(
+        name="Past Gate Pose 2",
+        pose=PAST_GATE_POSE_2,
+    )
+    
+    waypt_7 = goto.FromConstant(
+        name="Back to Starting Point",
+        pose=BACK_TO_STARTING_POINT,
+    )
+
+    seq_prequali_root.add_children([
+        waypt_1,
+        waypt_2,
+        waypt_3,
+        waypt_4,
+        waypt_5,
+        waypt_6,
+        waypt_7,
+    ])
 
     return seq_prequali_root
+
 
 
 def main():
