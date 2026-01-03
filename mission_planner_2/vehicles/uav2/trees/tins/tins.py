@@ -11,7 +11,7 @@ from mission_planner_2.common.util.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.common.util.pose_utils import (
-    create_clustering_goal,
+    create_pose_clustering_goal,
     create_stamped_pose,
     within_threshold_xyz,
 )
@@ -27,24 +27,28 @@ fk = full_key_generator(NAMESPACE)
 ######################### UPDATE CONSTANTS HERE #########################
 VISION_SERVER_TOPIC = "/uav2/tins/manage_nodes"
 TOGGLE_TRASH_FRAME_SERVICE = "/uav2/tins/toggle_frame_clustered"
-
-CLUSTERING_DURATION = 4
-STABILIZE_DURATION = 3.0
-
-FORWARD_DISTANCE = 3.0
 NUM_RETRIES = 3
 
+CLUSTER_DURATION = 5.0
+CLUSTER_MIN_POSES = 10
+CLUSTER_SYNC_TOLERANCE = 0.10
+
+ODOM_TOPIC = "/uav2/odom_ned"
 BASE_LINK_FRAME = "uav2/base_link_frd"
 WORLD_FRAME = "odom_ned"
 CAMERA_FRAME = "uav2/wide_cam_optical"
-OBJECT_FRAME_YOLO = "helipad"
-OBJECT_FRAME_YOLO_CLUSTERED = "helipad/clustered"
-OBJECT_FRAME_VIEW = "helipad/view"
 
-TIN_FRAME_YOLO = "red_tin_0/from_odom"
-TIN_FRAME_YOLO_CLUSTERED = "red_tin_0/from_odom/clustered"
-TIN_FRAME_VIEW = "red_tin_0/from_odom/view"
-TIN_FRAME_PICKUP_VIEW = "red_tin_0/from_odom/pickup_view"
+HELIPAD_TOPIC = "/uav2/tins/tins/helipad/pose"
+HELIPAD_FRAME_CLUSTERED = "helipad/clustered"
+HELIPAD_FRAME_VIEW = "helipad/view"
+
+TIN_COLOUR = "red"
+TIN_TOPIC = f"/uav2/tins/{TIN_COLOUR}_tin_0/from_odom/pose"
+TIN_FRAME_CLUSTERED = f"{TIN_COLOUR}_tin_0/from_odom/clustered"
+TIN_FRAME_VIEW = f"{TIN_COLOUR}_tin_0/from_odom/clustered/view"
+TIN_FRAME_PICKUP_VIEW = f"{TIN_COLOUR}_tin_0/from_odom/clustered/pickup_view"
+
+ACTUATION_FRAME = "uav2/actuation"
 
 DISTANCE_THRESHOLD_XYZ = 0.03
 #########################################################################
@@ -54,7 +58,6 @@ DISTANCE_THRESHOLD_XYZ = 0.03
 _START_VISION_KEY = fk("helipad_start_vision")
 _STOP_VISION_KEY = fk("helipad_stop_vision")
 _SRV_SURFACE_DEPTH_KEY = fk("helipad_surface_depth")
-_ANCHOR_FRAME_KEY = fk("anchor_frame")
 
 
 def create_helipad_root():
@@ -63,13 +66,6 @@ def create_helipad_root():
     seq_helipad_root = py_trees.composites.Sequence(
         name="Helipad root",
         memory=True,
-    )
-
-    set_anchor_frame = py_trees.behaviours.SetBlackboardVariable(
-        name="Set anchor frame",
-        variable_name=_ANCHOR_FRAME_KEY,
-        variable_value=BASE_LINK_FRAME,
-        overwrite=True,
     )
 
     srv_start_vision = checked_service.FromConstant(
@@ -88,14 +84,15 @@ def create_helipad_root():
     )
 
     action_cluster_helipad = shared_action_client.FromConstant(
-        name="Cluster helipad transforms",
+        name="Cluster helipad poses",
         shared_action=UAV2SharedAction.CLUSTER,
-        action_goal=create_clustering_goal(
-            in_children=OBJECT_FRAME_YOLO,
-            out_children=OBJECT_FRAME_YOLO_CLUSTERED,
-            out_parents=WORLD_FRAME,
-            duration=CLUSTERING_DURATION,
-            use_cache=False,
+        action_goal=create_pose_clustering_goal(
+            odom_topic=ODOM_TOPIC,
+            pose_stamped_topic=HELIPAD_TOPIC,
+            clustered_child_frame_id=HELIPAD_FRAME_CLUSTERED,
+            collection_duration=CLUSTER_DURATION,
+            sync_tolerance=CLUSTER_SYNC_TOLERANCE,
+            min_poses=CLUSTER_MIN_POSES,
         ),
     )
 
@@ -107,7 +104,7 @@ def create_helipad_root():
 
     goto_helipad_view = goto.FromConstant(
         name="Goto controls pose",
-        pose=create_stamped_pose(frame_id=OBJECT_FRAME_VIEW),
+        pose=create_stamped_pose(frame_id=HELIPAD_FRAME_VIEW),
     )
 
     srv_surface_depth = checked_service.FromConstant(
@@ -115,7 +112,7 @@ def create_helipad_root():
         service_type=TrashToggleFrame,
         service_name=TOGGLE_TRASH_FRAME_SERVICE,
         service_request=TrashToggleFrame.Request(
-            trash_frame_clustered=OBJECT_FRAME_YOLO_CLUSTERED,
+            trash_frame_clustered=HELIPAD_FRAME_CLUSTERED,
             enable=True,
         ),
         key_response=_SRV_SURFACE_DEPTH_KEY,
@@ -125,12 +122,13 @@ def create_helipad_root():
     cluster_node = shared_action_client.FromConstant(
         name="Cluster tins",
         shared_action=UAV2SharedAction.CLUSTER,
-        action_goal=create_clustering_goal(
-            in_children=TIN_FRAME_YOLO,
-            out_children=TIN_FRAME_YOLO_CLUSTERED,
-            out_parents=WORLD_FRAME,
-            duration=CLUSTERING_DURATION,
-            use_cache=False,
+        action_goal=create_pose_clustering_goal(
+            odom_topic=ODOM_TOPIC,
+            pose_stamped_topic=TIN_TOPIC,
+            clustered_child_frame_id=TIN_FRAME_CLUSTERED,
+            collection_duration=CLUSTER_DURATION,
+            sync_tolerance=CLUSTER_SYNC_TOLERANCE,
+            min_poses=CLUSTER_MIN_POSES,
         ),
     )
 
@@ -143,12 +141,13 @@ def create_helipad_root():
     cluster_node_check = shared_action_client.FromConstant(
         name="Check Cluster Tins",
         shared_action=UAV2SharedAction.CLUSTER,
-        action_goal=create_clustering_goal(
-            in_children=TIN_FRAME_YOLO,
-            out_children=TIN_FRAME_YOLO_CLUSTERED,
-            out_parents=WORLD_FRAME,
-            duration=CLUSTERING_DURATION,
-            use_cache=False,
+        action_goal=create_pose_clustering_goal(
+            odom_topic=ODOM_TOPIC,
+            pose_stamped_topic=TIN_TOPIC,
+            clustered_child_frame_id=TIN_FRAME_CLUSTERED,
+            collection_duration=CLUSTER_DURATION,
+            sync_tolerance=CLUSTER_SYNC_TOLERANCE,
+            min_poses=CLUSTER_MIN_POSES,
         ),
     )
 
@@ -160,6 +159,7 @@ def create_helipad_root():
 
     goto_tins_xy = goto.FromConstant(
         name="Goto tins view",
+        anchor_frame_name=ACTUATION_FRAME,
         pose=create_stamped_pose(frame_id=TIN_FRAME_VIEW),
     )
 
@@ -175,9 +175,14 @@ def create_helipad_root():
         ],
         stabilization_duration=0.5,
     )
+    force_success_goto_cluster = py_trees.decorators.FailureIsSuccess(
+        name="Force success goto cluster",
+        child=goto_cluster,
+    )
 
     goto_tins = goto.FromConstant(
         name="Goto tins view",
+        anchor_frame_name=ACTUATION_FRAME,
         pose=create_stamped_pose(frame_id=TIN_FRAME_PICKUP_VIEW),
     )
 
@@ -201,15 +206,13 @@ def create_helipad_root():
         child=retry_end_vision,
     )
 
-    # Assemble tree in execution order
     seq_helipad_root.add_children(
         children=[
-            set_anchor_frame,
             retry_start_vision,
             retry_cluster_helipad,
             goto_helipad_view,
             srv_surface_depth,
-            goto_cluster,
+            force_success_goto_cluster,
             goto_tins,
             force_success_stop_vision,
         ]
