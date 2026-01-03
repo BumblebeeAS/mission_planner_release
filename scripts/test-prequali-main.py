@@ -20,37 +20,67 @@ from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
 ######################### UPDATE CONSTANTS HERE #########################
 AUV4_FRAME_ID = "auv4/base_link_ned"
 
-X_START = 0.0
+X_START = 2.5
 Y_START = 0.0
-Z_START = 0.0
+Z_DEFAULT = -1.5 # we don't expect to move in Z for prequali
 YAW_START = 0.0
 
+# attemp using AUV4_FRAME_ID
+# STARTING_POINT = create_stamped_pose( #TODO idk if it is supposed to be "map"
+#     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=YAW_START
+# )
+
+# PAST_GATE_POSE_1 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=3.0, position_y=0.0, position_z=Z_DEFAULT, yaw=0.0
+# )
+
+# PILLAIR_POSE_1 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=9.5, position_y=-1.3, position_z=Z_DEFAULT, yaw=0.0
+# )
+
+# PILLAIR_POSE_2 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=1.3, position_z=Z_DEFAULT, yaw=-90.0
+# )
+
+# PILLAIR_POSE_3 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=1.3, position_z=Z_DEFAULT, yaw=-90.0
+# )
+
+# PAST_GATE_POSE_2 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=9.5, position_y=-1.3, position_z=Z_DEFAULT, yaw=0.0
+# )
+
+# BACK_TO_STARTING_POINT = create_stamped_pose(
+#     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=(YAW_START + 180.0)
+# )
+
+# Attempt using "map" frame
 STARTING_POINT = create_stamped_pose( #TODO idk if it is supposed to be "map"
-    frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_START,yaw=YAW_START
+    frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=YAW_START
 )
 
 PAST_GATE_POSE_1 = create_stamped_pose(
-    frame_id=AUV4_FRAME_ID, position_x=5.0, position_y=0, position_z=0
+    frame_id="map", position_x=3.5, position_y=0.0, position_z=Z_DEFAULT, yaw=0.0
 )
 
 PILLAIR_POSE_1 = create_stamped_pose(
-    frame_id=AUV4_FRAME_ID, position_x=15.0, position_y=5, position_z=0, yaw=0.0
+    frame_id="map", position_x=13.0, position_y=-1.3, position_z=Z_DEFAULT, yaw=0.0
 )
 
 PILLAIR_POSE_2 = create_stamped_pose(
-    frame_id=AUV4_FRAME_ID, position_x=5, position_y=-5, position_z=0, yaw=-90.0
+    frame_id="map", position_x=14.0, position_y=0.0, position_z=Z_DEFAULT, yaw=-90.0
 )
 
 PILLAIR_POSE_3 = create_stamped_pose(
-    frame_id=AUV4_FRAME_ID, position_x=5, position_y=5, position_z=0, yaw=-90.0
+    frame_id="map", position_x=13.0, position_y=1.3, position_z=Z_DEFAULT, yaw=-180.0
 )
 
 PAST_GATE_POSE_2 = create_stamped_pose(
-    frame_id=AUV4_FRAME_ID, position_x=15.0, position_y=5, position_z=0.0, yaw=0.0
+    frame_id="map", position_x=3.5, position_y=0.0, position_z=Z_DEFAULT, yaw=180.0
 )
 
 BACK_TO_STARTING_POINT = create_stamped_pose(
-    frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_START,yaw=(YAW_START + 180.0)
+    frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=180.0
 )
     
 #########################################################################
