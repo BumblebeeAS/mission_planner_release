@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 import numpy as np
 from bb_controls_msgs.srv import Limits
-from bb_perception_msgs.action import ClusterTfAction
+from bb_perception_msgs.action import ClusterPosesAction, ClusterTfAction
 from bb_perception_msgs.srv import ClusterTfSrv
 from bb_robosub_msgs.srv import ClusterSlalomTfsStart, ClusterSlalomTfsStop
 from builtin_interfaces.msg import Time
@@ -171,6 +171,31 @@ def create_clustering_goal(
     goal.min_samples = min_samples
     goal.use_cache = use_cache
     goal.persistent = persistent
+    return goal
+
+
+def create_pose_clustering_goal(
+    odom_topic: str,
+    pose_stamped_topic: str,
+    clustered_child_frame_id: str,
+    collection_duration: float,
+    sync_tolerance: float,
+    min_poses: int,
+    min_cluster_size: int = 2,
+    min_samples: int = 1,
+    cluster_selection_epsilon: float = 0.05,
+):
+    """Create a ClusterPosesAction goal for collecting and clustering coordinate transforms."""
+    goal = ClusterPosesAction.Goal()
+    goal.odom_topic = odom_topic
+    goal.pose_stamped_topic = pose_stamped_topic
+    goal.clustered_child_frame_id = clustered_child_frame_id
+    goal.collection_duration = collection_duration
+    goal.sync_tolerance = sync_tolerance
+    goal.min_poses = min_poses
+    goal.min_cluster_size = min_cluster_size
+    goal.min_samples = min_samples
+    goal.cluster_selection_epsilon = cluster_selection_epsilon
     return goal
 
 
