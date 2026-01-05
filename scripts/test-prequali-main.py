@@ -83,7 +83,6 @@ PILLAIR_POSE_3 = create_stamped_pose(
 PAST_GATE_POSE_2 = create_stamped_pose(
     frame_id=AUV4_FRAME_ID, position_x=9.5, position_y=1.3, position_z=0.0, yaw=0.0
 )
-        stabilize_duration=30,
 
 BACK_TO_STARTING_POINT = create_stamped_pose(
     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=YAW_START+180.0
