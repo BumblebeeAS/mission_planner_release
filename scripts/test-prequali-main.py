@@ -25,63 +25,133 @@ Y_START = 0.0
 Z_DEFAULT = -1.5 # we don't expect to move in Z for prequali
 YAW_START = 0.0
 
-# attemp using AUV4_FRAME_ID
+# Attempt using AUV4_FRAME_ID 
+# no yaws (slower, because moving backward is slow)
 # STARTING_POINT = create_stamped_pose( #TODO idk if it is supposed to be "map"
 #     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=YAW_START
 # )
 
 # PAST_GATE_POSE_1 = create_stamped_pose(
-#     frame_id=AUV4_FRAME_ID, position_x=3.0, position_y=0.0, position_z=Z_DEFAULT, yaw=0.0
+#     frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=0.0, position_z=0.0, yaw=0.0
 # )
 
 # PILLAIR_POSE_1 = create_stamped_pose(
-#     frame_id=AUV4_FRAME_ID, position_x=9.5, position_y=-1.3, position_z=Z_DEFAULT, yaw=0.0
+#     frame_id=AUV4_FRAME_ID, position_x=9.5, position_y=-1.3, position_z=0.0, yaw=0.0
 # )
 
 # PILLAIR_POSE_2 = create_stamped_pose(
-#     frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=1.3, position_z=Z_DEFAULT, yaw=-90.0
+#     frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=1.3, position_z=0.0, yaw=0.0
 # )
 
 # PILLAIR_POSE_3 = create_stamped_pose(
-#     frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=1.3, position_z=Z_DEFAULT, yaw=-90.0
+#     frame_id=AUV4_FRAME_ID, position_x=-1.0, position_y=1.3, position_z=0.0, yaw=0.0
 # )
 
 # PAST_GATE_POSE_2 = create_stamped_pose(
-#     frame_id=AUV4_FRAME_ID, position_x=9.5, position_y=-1.3, position_z=Z_DEFAULT, yaw=0.0
+#     frame_id=AUV4_FRAME_ID, position_x=-9.5, position_y=-1.3, position_z=0.0, yaw=0.0
 # )
 
 # BACK_TO_STARTING_POINT = create_stamped_pose(
-#     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=(YAW_START + 180.0)
+#     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=YAW_START
 # )
 
-# Attempt using "map" frame
+#########################################################################
+
+# Attempt using AUV4_FRAME_ID 
+# with yaws
+
 STARTING_POINT = create_stamped_pose( #TODO idk if it is supposed to be "map"
     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=YAW_START
 )
 
 PAST_GATE_POSE_1 = create_stamped_pose(
-    frame_id="map", position_x=3.5, position_y=0.0, position_z=Z_DEFAULT, yaw=0.0
+    frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=0.0, position_z=0.0, yaw=0.0
 )
 
 PILLAIR_POSE_1 = create_stamped_pose(
-    frame_id="map", position_x=13.0, position_y=-1.3, position_z=Z_DEFAULT, yaw=0.0
+    frame_id=AUV4_FRAME_ID, position_x=9.5, position_y=-1.3, position_z=0.0, yaw=0.0
 )
 
 PILLAIR_POSE_2 = create_stamped_pose(
-    frame_id="map", position_x=14.0, position_y=0.0, position_z=Z_DEFAULT, yaw=-90.0
+    frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=1.3, position_z=0.0, yaw=90.0
 )
 
 PILLAIR_POSE_3 = create_stamped_pose(
-    frame_id="map", position_x=13.0, position_y=1.3, position_z=Z_DEFAULT, yaw=-180.0
+    frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=1.3, position_z=0.0, yaw=90.0
 )
 
 PAST_GATE_POSE_2 = create_stamped_pose(
-    frame_id="map", position_x=3.5, position_y=0.0, position_z=Z_DEFAULT, yaw=180.0
+    frame_id=AUV4_FRAME_ID, position_x=9.5, position_y=1.3, position_z=0.0, yaw=0.0
 )
+        stabilize_duration=30,
 
 BACK_TO_STARTING_POINT = create_stamped_pose(
-    frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=180.0
+    frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=YAW_START+180.0
 )
+
+#########################################################################
+
+# Attempt using ONLY AUV4_FRAME_ID (will be teleoped to starting point first)
+# TODO: remove waypt_1 if using this
+
+# STARTING_POINT = create_stamped_pose( #TODO idk if it is supposed to be "map"
+#     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=YAW_START
+# )
+
+# PAST_GATE_POSE_1 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=0.0, position_z=0.0, yaw=0.0
+# )
+
+# PILLAIR_POSE_1 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=9.5, position_y=-1.3, position_z=0.0, yaw=0.0
+# )
+
+# PILLAIR_POSE_2 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=1.0, position_y=1.3, position_z=0.0, yaw=0.0
+# )
+
+# PILLAIR_POSE_3 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=-1.0, position_y=1.3, position_z=0.0, yaw=0.0
+# )
+
+# PAST_GATE_POSE_2 = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=-9.5, position_y=-1.3, position_z=0.0, yaw=0.0
+# )
+
+# BACK_TO_STARTING_POINT = create_stamped_pose(
+#     frame_id=AUV4_FRAME_ID, position_x=-1.0, position_y=0.0, position_z=0.0, yaw=0.0
+# )
+
+#########################################################################
+
+# Attempt using "map" frame
+# STARTING_POINT = create_stamped_pose( #TODO idk if it is supposed to be "map"
+#     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=YAW_START
+# )
+
+# PAST_GATE_POSE_1 = create_stamped_pose(
+#     frame_id="map", position_x=3.5, position_y=0.0, position_z=Z_DEFAULT, yaw=0.0
+# )
+
+# PILLAIR_POSE_1 = create_stamped_pose(
+#     frame_id="map", position_x=13.0, position_y=-1.3, position_z=Z_DEFAULT, yaw=0.0
+# )
+
+# PILLAIR_POSE_2 = create_stamped_pose(
+#     frame_id="map", position_x=14.0, position_y=0.0, position_z=Z_DEFAULT, yaw=-90.0
+# )
+
+# PILLAIR_POSE_3 = create_stamped_pose(
+#     frame_id="map", position_x=13.0, position_y=1.3, position_z=Z_DEFAULT, yaw=-180.0
+# )
+
+# PAST_GATE_POSE_2 = create_stamped_pose(
+#     frame_id="map", position_x=3.5, position_y=0.0, position_z=Z_DEFAULT, yaw=180.0
+# )
+
+# BACK_TO_STARTING_POINT = create_stamped_pose(
+#     frame_id="map", position_x=X_START, position_y=Y_START, position_z=Z_DEFAULT,yaw=180.0
+# )
     
 #########################################################################
 
@@ -94,36 +164,43 @@ def create_mother():
     waypt_1 = goto.FromConstant(
         name="Start Point",
         pose=STARTING_POINT,
+        stabilize_duration=30,
     )
 
     waypt_2 = goto.FromConstant(
         name="Past Gate Pose 1",
         pose=PAST_GATE_POSE_1,
+        stabilize_duration=30,
     )
     
     waypt_3 = goto.FromConstant(
         name="Pillar Pose 1",
         pose=PILLAIR_POSE_1,
+        stabilize_duration=30,
     )
     
     waypt_4 = goto.FromConstant(
         name="Pillar Pose 2",
         pose=PILLAIR_POSE_2,
+        stabilize_duration=30,
     )
     
     waypt_5 = goto.FromConstant(
         name="Pillar Pose 3",
         pose=PILLAIR_POSE_3,
+        stabilize_duration=30,
     )
     
     waypt_6 = goto.FromConstant(
         name="Past Gate Pose 2",
         pose=PAST_GATE_POSE_2,
+        stabilize_duration=30,
     )
     
     waypt_7 = goto.FromConstant(
         name="Back to Starting Point",
         pose=BACK_TO_STARTING_POINT,
+        stabilize_duration=30,
     )
 
     seq_prequali_root.add_children([
