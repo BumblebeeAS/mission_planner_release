@@ -3,24 +3,27 @@ import rclpy.client
 import rclpy.node
 from bb_perception_msgs.action import ClusterPosesAction
 from bb_planner_msgs.srv import GetPoseToControlsFrame
-from bb_uav_msgs.action import GoToPosition
+from bb_uav_msgs.action import GoToPosition, Takeoff
 from mission_planner_2.common.config.generic_registry import (
     ActionRegistry,
     ServiceRegistry,
     SharedAction,
     SharedService,
 )
+from std_srvs.srv import Trigger
 
 
 class UAV2SharedAction(SharedAction):
     CLUSTER = ActionRegistry("/uav2/cluster_poses", ClusterPosesAction)
     GOTO = ActionRegistry("/uav2/offboard_node/go_to_position", GoToPosition)
+    TAKEOFF = ActionRegistry("/uav2/offboard_node/takeoff", Takeoff)
 
 
 class UAV2SharedService(SharedService):
     CONVERT_TO_CONTROLS_POSE = ServiceRegistry(
         "/uav2/convert_to_controls_pose", GetPoseToControlsFrame
     )
+    LAND = ServiceRegistry("/uav2/offboard_node/land", Trigger)
 
 
 class TreeNode(rclpy.node.Node):
