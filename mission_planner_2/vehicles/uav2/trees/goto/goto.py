@@ -48,8 +48,6 @@ class FromBlackboard(goto_base.FromBlackboard):
                                        goal is rejected, or action fails
     """
 
-    ACTION_GOAL_KEY = "goto_goal"
-
     def __init__(
         self,
         name: str,
