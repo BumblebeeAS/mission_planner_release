@@ -40,6 +40,7 @@ install(PROGRAMS
   scripts/main.py
   scripts/test.py
   scripts/test-prequali-main.py
+  scripts/test-gate-main.py
   scripts/uav2_main.py
   DESTINATION lib/${PROJECT_NAME}
 )
