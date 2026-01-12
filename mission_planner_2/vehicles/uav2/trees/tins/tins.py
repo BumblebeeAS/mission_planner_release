@@ -52,6 +52,8 @@ TIN_FRAME_PICKUP_VIEW = f"{TIN_COLOUR}_tin_0/from_odom/clustered/pickup_view"
 ACTUATION_FRAME = "uav2/actuation"
 
 DISTANCE_THRESHOLD_XYZ = 0.03
+
+LAND_SLEEP_DURATION = 7.0
 #########################################################################
 
 # THESE KEYS ARE USED INTERNALLY FOR THIS TASK AND SHOULD NOT NEED TO BE CHANGED UNLESS THEY CLASH
@@ -194,6 +196,11 @@ def create_helipad_root():
         action_goal=Land.Goal(timeout=20.0),
     )
 
+    sleep_for_land = py_trees.timers.Timer(
+        name="Sleep for land",
+        duration=LAND_SLEEP_DURATION,
+    )
+
     takeoff = shared_action_client.FromConstant(
         name="Takeoff after collecting tin",
         shared_action=UAV2SharedAction.TAKEOFF,
@@ -234,6 +241,7 @@ def create_helipad_root():
             force_success_goto_cluster,
             goto_tins,
             land,
+            sleep_for_land,
             takeoff,
             force_success_stop_vision,
         ]

@@ -1,7 +1,7 @@
 tins:
   - name: tins_view
     suffix: view
-    z: -1.0
+    z: -0.5
     parents: 
       - blue_tin_0/from_odom/clustered
       - red_tin_0/from_odom/clustered
