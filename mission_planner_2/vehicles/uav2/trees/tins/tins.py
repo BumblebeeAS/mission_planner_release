@@ -1,12 +1,8 @@
 import py_trees
 from bb_perception_msgs.srv import TrashToggleFrame
-from bb_uav_msgs.action import Takeoff
+from bb_uav_msgs.action import Land, Takeoff
 from lifecycle_msgs.srv import ChangeState
-from mission_planner_2.common.core import (
-    checked_service,
-    shared_action_client,
-    shared_service_client,
-)
+from mission_planner_2.common.core import checked_service, shared_action_client
 from mission_planner_2.common.util.detection_utils import (
     create_end_vision_req,
     create_start_vision_req,
@@ -23,12 +19,8 @@ from mission_planner_2.common.util.pose_utils import (
 from mission_planner_2.vehicles.shared.trees.cluster_goto import (
     create_goto_cluster_from_constant_root,
 )
-from mission_planner_2.vehicles.uav2.config.node_registry import (
-    UAV2SharedAction,
-    UAV2SharedService,
-)
+from mission_planner_2.vehicles.uav2.config.node_registry import UAV2SharedAction
 from mission_planner_2.vehicles.uav2.trees.goto import goto
-from std_srvs.srv import Trigger
 
 NAMESPACE = generate_namespace()
 fk = full_key_generator(NAMESPACE)
@@ -196,16 +188,21 @@ def create_helipad_root():
         pose=create_stamped_pose(frame_id=TIN_FRAME_PICKUP_VIEW),
     )
 
-    land = shared_service_client.FromConstant(
+    land = shared_action_client.FromConstant(
         name="Land to collect tin",
-        shared_service=UAV2SharedService.LAND,
-        service_request=Trigger.Request(),
+        shared_action=UAV2SharedAction.LAND,
+        action_goal=Land.Goal(timeout=20.0),
     )
 
     takeoff = shared_action_client.FromConstant(
         name="Takeoff after collecting tin",
         shared_action=UAV2SharedAction.TAKEOFF,
-        action_goal=Takeoff.Goal(altitude=3.0, x_threshold=0.1, y_threshold=0.1, z_threshold=0.1,),
+        action_goal=Takeoff.Goal(
+            altitude=3.0,
+            x_threshold=0.1,
+            y_threshold=0.1,
+            z_threshold=0.1,
+        ),
     )
 
     srv_end_vision = checked_service.FromConstant(
