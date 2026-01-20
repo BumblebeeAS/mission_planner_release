@@ -1,6 +1,6 @@
 import py_trees
 from bb_perception_msgs.srv import TrashToggleFrame
-from bb_uav_msgs.action import Land, Takeoff
+from bb_uav_msgs.action import Land, Takeoff, Actuation
 from lifecycle_msgs.srv import ChangeState
 from mission_planner_2.common.core import checked_service, shared_action_client
 from mission_planner_2.common.util.detection_utils import (
@@ -212,6 +212,14 @@ def create_helipad_root():
         ),
     )
 
+    drop_tins = shared_action_client.FromConstant(
+        name="Drop tins",
+        shared_action=UAV2SharedAction.ACTUATION,
+        action_goal=Actuation.Goal(
+            enable_actuation=True,
+        ),
+    )
+
     srv_end_vision = checked_service.FromConstant(
         name="End vision",
         service_type=ChangeState,
@@ -243,6 +251,7 @@ def create_helipad_root():
             land,
             sleep_for_land,
             takeoff,
+            drop_tins,
             force_success_stop_vision,
         ]
     )
