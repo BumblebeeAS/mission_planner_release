@@ -1,6 +1,6 @@
 import py_trees
 from bb_perception_msgs.srv import TrashToggleFrame
-from bb_uav_msgs.action import Land, Takeoff, Actuation
+from bb_uav_msgs.action import Actuation, Land, Takeoff
 from lifecycle_msgs.srv import ChangeState
 from mission_planner_2.common.core import checked_service, shared_action_client
 from mission_planner_2.common.util.detection_utils import (
@@ -43,13 +43,14 @@ HELIPAD_TOPIC = "/uav2/tins/tins/helipad/pose"
 HELIPAD_FRAME_CLUSTERED = "helipad/clustered"
 HELIPAD_FRAME_VIEW = "helipad/view"
 
-TIN_COLOUR = "red"
+TIN_COLOUR = "blue"
 TIN_TOPIC = f"/uav2/tins/{TIN_COLOUR}_tin_0/from_odom/pose"
 TIN_FRAME_CLUSTERED = f"{TIN_COLOUR}_tin_0/from_odom/clustered"
 TIN_FRAME_VIEW = f"{TIN_COLOUR}_tin_0/from_odom/clustered/view"
 TIN_FRAME_PICKUP_VIEW = f"{TIN_COLOUR}_tin_0/from_odom/clustered/pickup_view"
 
 ACTUATION_FRAME = "uav2/actuation"
+CAMERA_FRAME = "uav2/wide_a"
 
 DISTANCE_THRESHOLD_XYZ = 0.03
 
@@ -107,7 +108,7 @@ def create_helipad_root():
 
     goto_helipad_view = goto.FromConstant(
         name="Goto controls pose",
-        anchor_frame_name="uav2/wide_a",
+        anchor_frame_name=CAMERA_FRAME,
         pose=create_stamped_pose(frame_id=HELIPAD_FRAME_VIEW),
     )
 
@@ -196,16 +197,11 @@ def create_helipad_root():
         action_goal=Land.Goal(timeout=20.0),
     )
 
-    sleep_for_land = py_trees.timers.Timer(
-        name="Sleep for land",
-        duration=LAND_SLEEP_DURATION,
-    )
-
     takeoff = shared_action_client.FromConstant(
         name="Takeoff after collecting tin",
         shared_action=UAV2SharedAction.TAKEOFF,
         action_goal=Takeoff.Goal(
-            altitude=3.0,
+            altitude=1.5,
             x_threshold=0.1,
             y_threshold=0.1,
             z_threshold=0.1,
@@ -217,6 +213,14 @@ def create_helipad_root():
         shared_action=UAV2SharedAction.ACTUATION,
         action_goal=Actuation.Goal(
             enable_actuation=True,
+        ),
+    )
+
+    reset_actuation = shared_action_client.FromConstant(
+        name="Reset actuation",
+        shared_action=UAV2SharedAction.ACTUATION,
+        action_goal=Actuation.Goal(
+            enable_actuation=False,
         ),
     )
 
@@ -249,9 +253,9 @@ def create_helipad_root():
             force_success_goto_cluster,
             goto_tins,
             land,
-            sleep_for_land,
             takeoff,
             drop_tins,
+            reset_actuation,
             force_success_stop_vision,
         ]
     )
