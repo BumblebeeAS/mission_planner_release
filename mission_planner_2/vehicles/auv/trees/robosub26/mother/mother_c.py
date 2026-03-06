@@ -6,24 +6,9 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 from std_srvs.srv import Trigger
 
-from mission_planner_2.vehicles.auv.trees.robosub24.acoustics.acoustics import (
-    create_acoustics_root,
-)
-from mission_planner_2.vehicles.auv.trees.robosub24.bins.bins import create_bin_root
 from mission_planner_2.vehicles.auv.trees.robosub24.gate.gate import create_gate_root
-from mission_planner_2.vehicles.auv.trees.robosub24.mother.button_behaviors import (
-    create_button_start_coinflip_root,
-)
-from mission_planner_2.vehicles.auv.trees.robosub24.mother.move_to_task import (
-    create_move_to_task,
-)
-from mission_planner_2.vehicles.auv.trees.robosub24.octagon.octagon import (
-    create_octagon_root,
-)
-from mission_planner_2.vehicles.auv.trees.robosub24.torpedo.torpedo import (
-    create_torpedo_root,
-)
-from mission_planner_2.vehicles.shared.trees.blackboard import MultiSetBlackboard
+
+# from mission_planner_2.vehicles.shared.trees.blackboard import MultiSetBlackboard
 
 LEFT_BUTTON_TOPIC = "/auv4/button/left"
 RIGHT_BUTTON_TOPIC = "/auv4/button/right"
@@ -70,14 +55,6 @@ def create_mother(coords: dict):
     root = py_trees.composites.Sequence(
         name="mother",
         memory=True,
-    )
-
-    button_coin_flip_start = create_button_start_coinflip_root(
-        reset_pose_srv_topic=RESET_POSE_SRV_TOPIC,
-        controls_srv_topic=CONTROLS_SRV_TOPIC,
-        left_button_topic=LEFT_BUTTON_TOPIC,
-        right_button_topic=RIGHT_BUTTON_TOPIC,
-        button_retries=BUTTON_RETRIES,
     )
 
     seq_reset_clustering = py_trees.composites.Sequence(
@@ -133,90 +110,16 @@ def create_mother(coords: dict):
         overwrite=True,
     )
 
-    srv_get_choice = py_trees_ros.service_clients.FromConstant(
-        name="Get Choice",
-        service_name="/auv4/choice/get_is_fish",
-        service_type=Trigger,
-        service_request=Trigger.Request(),
-        key_response=CHOICE_KEY,
-    )
-
-    move_to_gate = create_move_to_task(
-        task="gate",
-        start=coords["start"],
-        end=coords["gate_start"],
-        zero_yaw_key=ZERO_YAW_KEY,
-    )
-
     gate_root = create_gate_root()
     force_succeed_gate = py_trees.decorators.FailureIsSuccess(
         name="Force succeed gate",
         child=gate_root,
     )
 
-    bin_root = create_bin_root()
-    force_succeed_bin = py_trees.decorators.FailureIsSuccess(
-        name="Force succeed bin",
-        child=bin_root,
-    )
-
-    move_to_acoustic_start = create_move_to_task(
-        task="acoustic_start",
-        start=coords["gate_end"],  # used to be bin
-        end=coords["acoustic_start"],
-        zero_yaw_key=ZERO_YAW_KEY,
-    )
-
-    def move_func(start_coords, end_coords, goto_depth, specified_heading):
-        return create_move_to_task(
-            task=f"Acoustic move from {start_coords} to {end_coords}",
-            start=coords[start_coords],
-            end=coords[end_coords],
-            zero_yaw_key=ZERO_YAW_KEY,
-            goto_depth=goto_depth,
-            specified_heading=specified_heading,
-        )
-
-    def octagon_root():
-        return create_octagon_root(
-            world_to_table_yaw=coords["table"]["yaw"],
-            zero_yaw_key=ZERO_YAW_KEY,
-        )
-
-    def torpedo_root():
-        return create_torpedo_root(
-            world_to_torp_yaw=coords["torpedo_with_yaw"]["yaw"],
-            zero_yaw_key=ZERO_YAW_KEY,
-        )
-
-    acoustics_root = create_acoustics_root(
-        move_func,
-        octagon_root=octagon_root,
-        torpedo_root=torpedo_root,
-        timeout=ACOUSTIC_TIMEOUT,
-        is_octagon_on_right=IS_OCTAGON_ON_RIGHT,
-    )
-
-    set_keys = MultiSetBlackboard(
-        name="Set is_left, zero_yaw",
-        keys=[IS_LEFT_KEY, ZERO_YAW_KEY],
-        values=[True, 0.0],
-        overwrite=True,
-    )
 
     root.add_children(
         [
-            #button_coin_flip_start,
-            seq_reset_clustering,
-            #srv_get_choice,
-            set_base_link_frame,
-            #set_world_frame,  # TODO: use multi set bb?
-            set_keys,  # if dont do gate
-            move_to_gate,
-            #force_succeed_gate,
-            #move_to_acoustic_start,
-            #acoustics_root,  # move to bin is done inside acoustics root
-            #force_succeed_bin,
+            force_succeed_gate
         ]
     )
 

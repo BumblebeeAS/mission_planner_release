@@ -38,6 +38,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/choice_server_node.py
   scripts/main.py
+  scripts/main26.py
   scripts/test.py
   scripts/test-prequali-main.py
   scripts/test-gate-main.py
