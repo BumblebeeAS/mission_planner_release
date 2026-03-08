@@ -23,7 +23,7 @@ from mission_planner_2.common.util.pose_utils import (
     create_stamped_pose,
 )
 from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
-from mission_planner_2.vehicles.auv.trees.robosub26.goto import goto
+from mission_planner_2.vehicles.auv.trees.goto import goto
 from mission_planner_2.vehicles.shared.trees.tf_checker import (
     create_tf_checker_from_constant_root,
 )
@@ -35,11 +35,11 @@ fk = full_key_generator(NAMESPACE)
 VISION_SERVER_TOPIC = "/auv4/gate/manage_nodes"
 CONTROLS_SRV_TOPIC = "/auv4/controls/controller"
 
-CLUSTERING_DURATION = 4
-STABILIZE_DURATION = 3.0
+CLUSTERING_DURATION = 10
+STABILIZE_DURATION = 6.0
 
 FORWARD_DISTANCE = 3.0
-NUM_RETRIES = 3
+NUM_RETRIES = 1
 
 BASE_LINK_FRAME = "auv4/base_link_ned"
 WORLD_FRAME = "world_ned"
@@ -50,7 +50,7 @@ GATE_CENTRE_FRAME = "gate/centre/view"
 GATE_LEFT_FRAME = "gate/left/view"
 GATE_RIGHT_FRAME = "gate/right/view"
 
-GATE_DEPTH = 0.4
+GATE_DEPTH = 1.3
 
 GATE_ORIENTATION_TOPIC = "/auv4/gate/shark_fish"
 #########################################################################
@@ -134,11 +134,8 @@ def create_gate_root():
         depth_override_value=GATE_DEPTH,
     )
 
-
     # Step 11: Pass through gate
-    forward_pose = create_stamped_pose(
-        "auv4/base_link_ned", position_x=FORWARD_DISTANCE
-    )
+    forward_pose = create_stamped_pose(GATE_RIGHT_FRAME, position_x=FORWARD_DISTANCE)
     goto_through_gate = goto.FromConstant(
         name="Goto through gate",
         pose=forward_pose,
@@ -153,11 +150,11 @@ def create_gate_root():
 
     goto_pole = goto.FromConstant(
         name="Goto imaginary pole",
-        pose=create_stamped_pose("gate/centre/after_gate", position_x=10.0),
+        pose=create_stamped_pose("gate/centre/after_gate", position_x=2.0),
         depth_override_value=GATE_DEPTH,
     )
 
-    goto_back_to_gate= goto.FromConstant(
+    goto_back_to_gate = goto.FromConstant(
         name="Goto centre after gate",
         pose=create_stamped_pose("gate/centre/after_gate", yaw=180.0),
         depth_override_value=GATE_DEPTH,
@@ -165,13 +162,14 @@ def create_gate_root():
 
     goto_return_right_approach = goto.FromConstant(
         name="Goto returning right approach",
-        pose=create_stamped_pose(GATE_RIGHT_FRAME, position_x=FORWARD_DISTANCE, yaw=180.0),
+        pose=create_stamped_pose(
+            GATE_LEFT_FRAME, position_x=FORWARD_DISTANCE, yaw=180.0
+        ),
         depth_override_value=GATE_DEPTH,
     )
 
     goto_return_through_gate = goto.FromConstant(
-        name="finish",
-        pose=create_stamped_pose(GATE_LEFT_FRAME, yaw=180.0)
+        name="finish", pose=create_stamped_pose(GATE_LEFT_FRAME, yaw=180.0)
     )
 
     # Start of spinning
@@ -236,9 +234,8 @@ def create_gate_root():
     )
 
     force_success_stop_vision = py_trees.decorators.FailureIsSuccess(
-        name="Force success stop vision",
-        child=retry_end_vision
-    ) 
+        name="Force success stop vision", child=retry_end_vision
+    )
 
     # Assemble tree in execution order
     seq_gate_root.add_children(

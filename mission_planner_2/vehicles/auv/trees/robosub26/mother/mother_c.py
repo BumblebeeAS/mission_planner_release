@@ -6,7 +6,7 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 from std_srvs.srv import Trigger
 
-from mission_planner_2.vehicles.auv.trees.robosub24.gate.gate import create_gate_root
+from mission_planner_2.vehicles.auv.trees.robosub26.gate.gate import create_gate_root
 
 # from mission_planner_2.vehicles.shared.trees.blackboard import MultiSetBlackboard
 
@@ -116,11 +116,6 @@ def create_mother(coords: dict):
         child=gate_root,
     )
 
-
-    root.add_children(
-        [
-            force_succeed_gate
-        ]
-    )
+    root.add_children([force_succeed_gate])
 
     return root

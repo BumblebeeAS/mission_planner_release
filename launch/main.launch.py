@@ -36,6 +36,7 @@ def generate_launch_description():
                     "single_tfs_file": LaunchConfiguration("single_tfs_file"),
                     "grouped_tfs_file": LaunchConfiguration("grouped_tfs_file"),
                     "default_suffix": LaunchConfiguration("default_suffix"),
+                    "use_sim_time": True,
                 }
             ],
             output="screen",
@@ -45,6 +46,7 @@ def generate_launch_description():
             executable="choice_server_node.py",
             name="choice_server_node",
             output="screen",
+            parameters=[{"use_sim_time": True}],
         ),
     ]
 
