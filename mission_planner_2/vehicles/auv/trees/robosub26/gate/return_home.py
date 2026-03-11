@@ -11,35 +11,43 @@ from mission_planner_2.common.util.namespace_utils import (
     generate_namespace,
 )
 from mission_planner_2.common.util.pose_utils import (
-    create_clustering_goal,
+    create_pose_clustering_goal,
     create_stamped_pose,
 )
 from mission_planner_2.vehicles.auv.config.node_registry import AUVSharedAction
-from mission_planner_2.vehicles.auv.trees.robosub24.goto import goto
+from mission_planner_2.vehicles.auv.trees.goto import goto
 
-NAMESPACE = generate_namespace()
-fk = full_key_generator(NAMESPACE)
+
 
 ######################### UPDATE CONSTANTS HERE #########################
-VISION_SERVER_TOPIC = "/auv4/gate_back/manage_nodes"
-
-CLUSTERING_DURATION = 15
-STABILIZE_DURATION = 5.0
+VISION_SERVER_TOPIC = "/auv4/gate/manage_nodes"
 
 GATE_APPROACH_HEIGHT = 0.40
 FORWARD_DISTANCE = 3.0
 NUM_RETRIES = 3
 
-WORLD_FRAME = "world_ned"
-CAMERA_FRAME = "auv4/front_cam_optical"
-TEMPLATE_FRAME_YOLO = "gate"
+# CLUSTERING
+ODOM_TOPIC = "/auv4/nav/odom_ned"
+TEMPLATE_POSE_YOLO = "/auv4/gate/gate/back/pose"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
-GATE_CENTRE_FRAME = "gate/centre"
+COLLECTION_DURATION = 4.0
+SYNC_TOLERANCE = 0.1
+MIN_POSES = 4
+
+# STATIC TFs
+GATE_CENTRE_FRAME = "gate/centre/after_gate"
+GATE_LEFT_FRAME = "gate/left/view"
+GATE_RIGHT_FRAME = "gate/right/view"
 #########################################################################
+NAMESPACE = generate_namespace()
+fk = full_key_generator(NAMESPACE)
+_START_VISION_KEY = fk("gate_start_vision")
+_STOP_VISION_KEY = fk("gate_stop_vision")
 
 
 def create_return_root():
 
+    # init
     seq_return_root = py_trees.composites.Sequence(
         name="Return root",
         memory=True,
@@ -50,7 +58,7 @@ def create_return_root():
         service_type=ChangeState,
         service_name=VISION_SERVER_TOPIC,
         service_request=create_start_vision_req(),
-        key_response=fk("gate_start_vision"),
+        key_response=_START_VISION_KEY,
         check_func=lambda x: x.success,
     )
 
@@ -60,19 +68,17 @@ def create_return_root():
         num_failures=NUM_RETRIES,
     )
 
-    # TODO: Eventually, we should cache some position after passing through the gate
-    #       and return to this position after doing all the tasks
-    gate_init_pose = create_stamped_pose("world_ned", position_z=GATE_APPROACH_HEIGHT)
-    goto_after_gate = goto.FromConstant("Goto after gate", gate_init_pose)
-
+    # assumes gate alr visible
     action_cluster_gate = shared_action_client.FromConstant(
         name="Cluster gate transforms",
-        shared_action=AUVSharedAction.CLUSTER,
-        action_goal=create_clustering_goal(
-            in_children=TEMPLATE_FRAME_YOLO,
-            out_children=TEMPLATE_FRAME_YOLO_CLUSTERED,
-            duration=CLUSTERING_DURATION,
-            use_cache=False,
+        shared_action=AUVSharedAction.CLUSTER_POSE,
+        action_goal=create_pose_clustering_goal(
+            odom_topic=ODOM_TOPIC,
+            pose_stamped_topic=TEMPLATE_POSE_YOLO,
+            clustered_child_frame_id=TEMPLATE_FRAME_YOLO_CLUSTERED,
+            collection_duration=COLLECTION_DURATION,
+            sync_tolerance=SYNC_TOLERANCE,
+            min_poses=MIN_POSES,
         ),
     )
 
@@ -82,21 +88,28 @@ def create_return_root():
         num_failures=NUM_RETRIES,
     )
 
-    goto_after_gate_center = goto.FromConstant(
-        "Goto after gate centre", create_stamped_pose(GATE_CENTRE_FRAME)
+
+
+    # movements
+    goto_gate_left = goto.FromConstant(
+        name="Goto gate left",
+        pose=create_stamped_pose(GATE_LEFT_FRAME),
+        depth_override_value=GATE_APPROACH_HEIGHT,
     )
 
-    forward_pose = create_stamped_pose(
-        "auv4/base_link_ned", position_x=FORWARD_DISTANCE
+    goto_through_gate = goto.FromConstant(
+        name="Goto through the gate",
+        pose= create_stamped_pose("auv4/base_link_ned", position_x=FORWARD_DISTANCE),
+        depth_override_value=GATE_APPROACH_HEIGHT,
     )
-    goto_through_gate = goto.FromConstant("Goto through gate", forward_pose)
 
+    # clean up
     srv_end_vision = checked_service.FromConstant(
         name="End vision",
         service_type=ChangeState,
         service_name=VISION_SERVER_TOPIC,
         service_request=create_end_vision_req(),
-        key_response=fk("gate_end_vision"),
+        key_response=_STOP_VISION_KEY,
         check_func=lambda x: x.success,
     )
 
@@ -113,11 +126,13 @@ def create_return_root():
 
     seq_return_root.add_children(
         children=[
+            # init
             retry_start_vision,
-            goto_after_gate,
             retry_cluster_gate,
-            goto_after_gate_center,
+            # movements
+            goto_gate_left,
             goto_through_gate,
+            # cleanup
             force_success_end_vision,
         ]
     )

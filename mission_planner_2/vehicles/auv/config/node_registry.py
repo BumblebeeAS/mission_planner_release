@@ -4,7 +4,7 @@ from bb_auv_msgs.action import Grabber
 from bb_auv_msgs.msg import ColorRgb
 from bb_behavior_msgs.action import AlignAndCollect, ControlledAscent, ControlledSpin
 from bb_controls_msgs.action import Locomotion
-from bb_perception_msgs.action import ClusterTfAction
+from bb_perception_msgs.action import ClusterTfAction, ClusterPosesAction
 from bb_planner_msgs.srv import GetPoseToControlsFrame
 from rclpy.qos import qos_profile_sensor_data
 
@@ -20,6 +20,7 @@ from mission_planner_2.common.core.tree_node import TreeNode
 class AUVSharedAction(SharedAction):
     LOCOMOTION = ActionRegistry("/auv4/controls", Locomotion)
     CLUSTER = ActionRegistry("/auv4/cluster_tf", ClusterTfAction)
+    CLUSTER_POSE = ActionRegistry("/auv4/cluster_poses", ClusterPosesAction)
     CLUSTER_MULTI = ActionRegistry("/auv4/cluster_tf_multi", ClusterTfAction)
     TRASH = ActionRegistry("/auv4/trash_align_and_collect", AlignAndCollect)
     CONTROLLED_ASCENT = ActionRegistry("/auv4/controlled_ascent", ControlledAscent)
