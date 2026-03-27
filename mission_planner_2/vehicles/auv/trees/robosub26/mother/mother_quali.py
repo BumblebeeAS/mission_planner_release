@@ -62,10 +62,50 @@ def create_mother():
         name="Force succeed gate",
         child=gate_root,
     )
+    goto_dive = goto.FromConstant(
+        name="Dive",
+        pose=create_stamped_pose(BASE_LINK_FRAME, position_x=0.0, position_y=0.0, position_z=0.8 ),
+        stabilize_duration=30,
+        z_threshold=0.02
+    )
+    go_left = goto.FromConstant(
+        name="Go left",
+        pose=create_stamped_pose(BASE_LINK_FRAME, position_x=0.0, position_y=-1.0),
+        stabilize_duration=30
+    )
+    go_right = goto.FromConstant(
+        name="Go right",
+        pose=create_stamped_pose(BASE_LINK_FRAME, position_x=0.0, position_y=1.0),
+        stabilize_duration=30
+    )
+    goto_u_turn_right = goto.FromConstant(
+        name="forward",
+        pose=create_stamped_pose(BASE_LINK_FRAME, position_x=10.0, position_y=1.0),
+        stabilize_duration=30,
+        yaw_threshold=0.1
+    )
+    goto_u_turn = goto.FromConstant(
+        name="Do u-turn",
+        pose=create_stamped_pose(BASE_LINK_FRAME, position_y=-2.0, yaw=180.0),
+        yaw_threshold=0.1,
+        stabilize_duration=30,
 
-    goto_yaw_back = goto.FromConstant(
-        name="turn around to face gate again",
+    )
+
+    goto_approach_gate = goto.FromConstant(
+        name="forward again",
+        pose=create_stamped_pose(BASE_LINK_FRAME, position_x=9.5, position_y=1.0),
+        yaw_threshold=0.1,
+        stabilize_duration=30,
+
+    )
+
+    goto_turnaround = goto.FromConstant(
+        name="turnaround",
         pose=create_stamped_pose(BASE_LINK_FRAME, yaw=180.0),
+        yaw_threshold=0.1,
+        stabilize_duration=30,
+
     )
 
     return_home_root = create_return_root()
@@ -74,11 +114,21 @@ def create_mother():
             child=return_home_root
     )
 
+    # children = [goto_dive]
+    # for _ in range(10):
+    #     children.append(goto.FromConstant(name="Go left", pose=create_stamped_pose(BASE_LINK_FRAME, position_x=0.0, position_y=-1.0), stabilize_duration=3))
+    #     children.append(goto.FromConstant(name="Go right", pose=create_stamped_pose(BASE_LINK_FRAME, position_x=0.0, position_y=1.0), stabilize_duration=3))
+
+    # root.add_children(children)
+
     root.add_children([
         seq_reset_clustering,
         force_succeed_gate,
-        goto_yaw_back,
+        goto_u_turn_right,
+        goto_u_turn,
+        goto_approach_gate,
+        # goto_turnaround,
         force_succeed_return,
-    ])
+    ])      
 
     return root

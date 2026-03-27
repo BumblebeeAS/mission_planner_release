@@ -23,14 +23,16 @@ from mission_planner_2.vehicles.auv.trees.goto import goto
 VISION_SERVER_TOPIC = "/auv4/gate/manage_nodes"
 
 GATE_APPROACH_HEIGHT = 0.5
-FORWARD_DISTANCE = 3.0
+FORWARD_DISTANCE = 1.5
 NUM_RETRIES = 1
+
+STABILISE_DURATION = 15
 
 # CLUSTERING
 CAMERA_FRAME = "auv4/front_cam_optical"
 TEMPLATE_FRAME_YOLO = "gate/front"
 TEMPLATE_FRAME_YOLO_CLUSTERED = "gate/clustered"
-COLLECTION_DURATION = 4.0
+COLLECTION_DURATION = 15.0
 SYNC_TOLERANCE = 0.1
 MIN_POSES = 4
 # STATIC TFs
@@ -72,6 +74,11 @@ def create_gate_root():
         num_failures=NUM_RETRIES,
     )
 
+    force_success_start_vision = py_trees.decorators.FailureIsSuccess(
+        name="Force Success Start Vision",
+        child=retry_start_vision,
+    )
+
     # cluster
     action_cluster_gate = shared_action_client.FromConstant(
         name="Cluster gate transforms",
@@ -97,12 +104,14 @@ def create_gate_root():
         "Goto picture position",
         create_stamped_pose(GATE_CENTRE_FRAME),
         depth_override_value=GATE_APPROACH_HEIGHT,
+        stabilize_duration=STABILISE_DURATION
     )
 
     goto_right_approach = goto.FromConstant(
         name="Goto right approach",
         pose=create_stamped_pose(GATE_RIGHT_FRAME),
         depth_override_value=GATE_APPROACH_HEIGHT,
+        stabilize_duration=STABILISE_DURATION
     )
 
     forward_pose = create_stamped_pose("auv4/base_link_ned", position_x=FORWARD_DISTANCE)
@@ -110,11 +119,14 @@ def create_gate_root():
         name="Goto through gate",
         pose=forward_pose,
         depth_override_value=GATE_APPROACH_HEIGHT,
+        stabilize_duration=STABILISE_DURATION
     )
 
     goto_centre_after_gate = goto.FromConstant(
         name="Goto centre after gate",
-        pose=create_stamped_pose(GATE_CENTRE_AFTER_GATE_FRAME)
+        pose=create_stamped_pose(GATE_CENTRE_AFTER_GATE_FRAME),
+        yaw_threshold=0.1,
+        stabilize_duration=STABILISE_DURATION
     )
 
     # cleanup
@@ -140,7 +152,7 @@ def create_gate_root():
     # Assemble tree in execution order
     seq_gate_root.add_children(
         children=[
-            retry_start_vision,
+            force_success_start_vision,
             retry_cluster_gate,
 
             goto_gate_centre,

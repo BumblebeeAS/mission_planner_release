@@ -68,6 +68,11 @@ def create_return_root():
         num_failures=NUM_RETRIES,
     )
 
+    force_success_start_vision = py_trees.decorators.FailureIsSuccess(
+        name="Force Success Start Vision",
+        child=retry_start_vision,
+    )
+
     # assumes gate alr visible
     action_cluster_gate = shared_action_client.FromConstant(
         name="Cluster gate transforms",
@@ -95,12 +100,14 @@ def create_return_root():
         name="Goto gate left",
         pose=create_stamped_pose(GATE_LEFT_FRAME),
         depth_override_value=GATE_APPROACH_HEIGHT,
+        stabilize_duration=15
     )
 
     goto_through_gate = goto.FromConstant(
         name="Goto through the gate",
         pose= create_stamped_pose("auv4/base_link_ned", position_x=FORWARD_DISTANCE),
         depth_override_value=GATE_APPROACH_HEIGHT,
+        stabilize_duration=15
     )
 
     # clean up
@@ -127,7 +134,7 @@ def create_return_root():
     seq_return_root.add_children(
         children=[
             # init
-            retry_start_vision,
+            force_success_start_vision,
             retry_cluster_gate,
             # movements
             goto_gate_left,
