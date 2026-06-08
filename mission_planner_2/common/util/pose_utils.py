@@ -7,6 +7,7 @@ from collections.abc import Callable
 import numpy as np
 from bb_controls_msgs.srv import Limits
 from bb_perception_msgs.action import ClusterPosesAction, ClusterTfAction
+from bb_perception_msgs.msg import ClusterPosesRequest
 from bb_perception_msgs.srv import ClusterTfSrv
 from bb_robosub_msgs.srv import ClusterSlalomTfsStart, ClusterSlalomTfsStop
 from builtin_interfaces.msg import Time
@@ -184,18 +185,35 @@ def create_pose_clustering_goal(
     min_cluster_size: int = 2,
     min_samples: int = 1,
     cluster_selection_epsilon: float = 0.05,
+    sync_queue_size: int = 100,
+    max_detection_age_s: float = 0.0,
+    top_k: int = 1,
+    sort_key: int = ClusterPosesRequest.SORT_BY_NUM_CLUSTER_POSES,
 ):
-    """Create a ClusterPosesAction goal for collecting and clustering coordinate transforms."""
+    """Create a ClusterPosesAction goal for collecting and clustering poses.
+
+    The new cluster API nests all per-call config under a ClusterPosesRequest
+    `params` field; `collection_duration` stays top-level on the goal. The node
+    broadcasts each of the top_k clusters as ``<clustered_child_frame_id>_<i>``
+    (so a single cluster lands at ``<clustered_child_frame_id>_0``).
+    """
     goal = ClusterPosesAction.Goal()
-    goal.odom_topic = odom_topic
-    goal.pose_stamped_topic = pose_stamped_topic
-    goal.clustered_child_frame_id = clustered_child_frame_id
-    goal.collection_duration = collection_duration
-    goal.sync_tolerance = sync_tolerance
-    goal.min_poses = min_poses
-    goal.min_cluster_size = min_cluster_size
-    goal.min_samples = min_samples
-    goal.cluster_selection_epsilon = cluster_selection_epsilon
+    goal.collection_duration = float(collection_duration)
+
+    params = ClusterPosesRequest()
+    params.odom_topic = odom_topic
+    params.pose_stamped_topics = [pose_stamped_topic]
+    params.sync_queue_size = int(sync_queue_size)
+    params.sync_tolerance = float(sync_tolerance)
+    params.clustered_child_frame_ids = [clustered_child_frame_id]
+    params.min_poses = int(min_poses)
+    params.min_cluster_size = int(min_cluster_size)
+    params.min_samples = int(min_samples)
+    params.cluster_selection_epsilon = float(cluster_selection_epsilon)
+    params.max_detection_age_s = float(max_detection_age_s)
+    params.top_k = int(top_k)
+    params.sort_key = int(sort_key)
+    goal.params = params
     return goal
 
 
