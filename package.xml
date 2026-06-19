@@ -18,8 +18,34 @@
   <depend>py_trees</depend>
   <depend>py_trees_ros</depend>
   <depend>tf_transformations</depend>
-
   <depend>std_srvs</depend>
+
+  <!-- Python runtime dependencies -->
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-transforms3d</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <!-- ROS message/interface dependencies -->
+  <exec_depend>action_msgs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
+  <exec_depend>geographic_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>lifecycle_msgs</exec_depend>
+  <exec_depend>mavros_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>robot_localization</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>turtlesim</exec_depend>
+
+  <!-- Bumblebee message dependencies -->
+  <exec_depend>bb_auv_msgs</exec_depend>
+  <exec_depend>bb_behavior_msgs</exec_depend>
+  <exec_depend>bb_controls_msgs</exec_depend>
+  <exec_depend>bb_perception_msgs</exec_depend>
+  <exec_depend>bb_planner_msgs</exec_depend>
+  <exec_depend>bb_robosub_msgs</exec_depend>
+  <exec_depend>bb_uav_msgs</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
