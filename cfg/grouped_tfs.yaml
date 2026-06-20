@@ -2,28 +2,28 @@ torpedo:
   - name: torpedo_1_fish
     suffix: fish
     parents:
-      - "torpedo_1"
+      - "torpedo_1_0"
       - "torpedo_1/yolo"
     x: 0.408
     y: 0.391
   - name: torpedo_1_shark
     suffix: shark
     parents:
-      - "torpedo_1"
+      - "torpedo_1_0"
       - "torpedo_1/yolo"
     x: 0.268
     y: 0.09
   - name: torpedo_2_fish
     suffix: fish
     parents:
-      - "torpedo_2"
+      - "torpedo_2_0"
       - "torpedo_2/yolo"
     x: 0.429
     y: 0.084
   - name: torpedo_2_shark
     suffix: shark
     parents:
-      - "torpedo_2"
+      - "torpedo_2_0"
       - "torpedo_2/yolo"
     x: 0.319
     y: 0.336
@@ -35,10 +35,10 @@ torpedo:
     pitch: -90.0
   - name: shoot_view
     parents:
-      - "torpedo_1/fish"
-      - "torpedo_1/shark"
-      - "torpedo_2/fish"
-      - "torpedo_2/shark"
+      - "torpedo_1_0/fish"
+      - "torpedo_1_0/shark"
+      - "torpedo_2_0/fish"
+      - "torpedo_2_0/shark"
     z: -0.45
     roll: -90.0
     pitch: -90.0
