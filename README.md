@@ -25,6 +25,10 @@ ros2 run mission_planner_2 test.py
 python scripts/render.py
 ```
 
+## Development guide
+
+See [Mission Planner conventions](docs/behavior_trees.md) for our conventions.
+
 ## Organization
 - Convenience API is located in `mission_planner_2/commons`
 - Trees are written under `mission_planner_2/trees/<vehicle>/<mission>`
