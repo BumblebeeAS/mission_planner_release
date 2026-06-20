@@ -1,10 +1,41 @@
 # Mission Planner 2
 
 ## About
-New BumblebeeAS mission planner stack using py_trees.
-Refer to the [notion page](https://www.notion.so/nusbbas/Mission-Planner-2-1683cacaefa180c28574f8291d6e2977) for documentation to get started. The development guide is at the bottom of the documentation.
+BumblebeeAS mission planner stack using py_trees.
+
+Useful references:
+
+- [py_trees repositories](https://github.com/splintered-reality/py_trees_ros)
+- [py_trees module API](https://py-trees.readthedocs.io/en/release-2.2.x/modules.html#)
+- [py_trees_ros module API](https://py-trees.readthedocs.io/en/release-2.2.x/modules.html#)
+- [py_trees_ros tutorial](https://py-trees-ros-tutorials.readthedocs.io/en/release-2.1.x/)
 
 ## Quickstart
+
+### Installation
+To install py_trees:
+```
+sudo apt-get install \
+  ros-humble-py-trees \
+  ros-humble-py-trees-ros-interfaces \
+  ros-humble-py-trees-ros
+```
+
+The GUI debugging utility doesn’t exist for humble as of writing this. However, there exists a workaround to get a working installation as follows.
+
+First install the dependencies:
+```
+sudo apt-get install \
+  libqt5webengine5 \
+  libqt5webenginewidgets5 \
+  python3-pyqt5.qtwebengine
+```
+
+Then clone the following ROS packages and colcon build.
+```
+git clone https://github.com/splintered-reality/py_trees_js.git
+git clone https://github.com/splintered-reality/py_trees_ros_viewer.git
+```
 
 ### Launch the Mission Planner
 ```bash
@@ -21,9 +52,8 @@ ros2 run mission_planner_2 test.py
 ```
 
 ### Generate Behavior Tree Diagram
-```bash
-python scripts/render.py
-```
+
+See [py-trees-render](https://py-trees.readthedocs.io/en/devel/programs.html#py-trees-render).
 
 ## Development guide
 
