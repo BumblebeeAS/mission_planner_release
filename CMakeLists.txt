@@ -41,6 +41,7 @@ install(PROGRAMS
   scripts/main26.py
   scripts/test.py
   scripts/uav2_main.py
+  scripts/uav2_offboard_demo_main.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
