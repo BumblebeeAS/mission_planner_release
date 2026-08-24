@@ -7,6 +7,9 @@ from py_trees.common import Duration
 from py_trees.visitors import VisitorBase
 from py_trees_ros.visitors import SetupLogger
 
+# task3: import LoggingSnapshotVisitor
+from mission_planner_2.common.core.visitors import LoggingSnapshotVisitor, StructuredSnapshotVisitor
+
 from mission_planner_2.common.core.tree_node import TreeNode
 
 
@@ -46,6 +49,22 @@ class BumbleTree(py_trees.trees.BehaviourTree):
         if visitor is None:
             visitor = SetupLogger(node=node)
 
+        # task3: add LoggingSnapshotVisitor, StructuredSnapshotVisitor to tree
+        log_visitor = LoggingSnapshotVisitor(
+            node=node,
+            display_only_visited_behaviours=True,
+            display_blackboard=False,
+            display_activity_stream=True,
+        )
+        self.add_visitor(log_visitor)
+        structured_visitor = StructuredSnapshotVisitor(
+            node=node,
+            display_only_visited_behaviours=True,
+            display_blackboard=False,
+            display_activity_stream=True,
+        )
+        self.add_visitor(structured_visitor)
+
         try:
             super().setup(
                 timeout=timeout,
@@ -84,20 +103,6 @@ class BumbleTree(py_trees.trees.BehaviourTree):
         pre_tick_handler=None,
         post_tick_handler=None,
     ):
-        """
-        Tick continuously at the period specified.
-
-        This is a re-implementation of the
-        :meth:`~py_trees.trees.BehaviourTree.tick_tock`
-        tick_tock that takes advantage of the rclpy timers so callbacks are interleaved inbetween
-        rclpy callbacks (keeps everything synchronous so no need for locks).
-
-        Args:
-            period_ms (:obj:`float`): sleep this much between ticks (milliseconds)
-            number_of_iterations (:obj:`int`): number of iterations to tick-tock
-            pre_tick_handler (:obj:`func`): function to execute before ticking
-            post_tick_handler (:obj:`func`): function to execute after ticking
-        """
         self.timer = self.node.create_timer(
             period_ms / 1000.0,  # unit 'seconds'
             functools.partial(
@@ -112,14 +117,6 @@ class BumbleTree(py_trees.trees.BehaviourTree):
     def _tick_tock_timer_callback(
         self, number_of_iterations, pre_tick_handler, post_tick_handler
     ):
-        """
-        Tick tock callback passed to the timer to be periodically triggered.
-
-        Args:
-            number_of_iterations (:obj:`int`): number of iterations to tick-tock
-            pre_tick_handler (:obj:`func`): function to execute before ticking
-            post_tick_handler (:obj:`func`): function to execute after ticking
-        """
         if (
             number_of_iterations == py_trees.trees.CONTINUOUS_TICK_TOCK
             or self.tick_tock_count < number_of_iterations
