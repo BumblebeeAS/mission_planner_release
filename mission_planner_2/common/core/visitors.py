@@ -8,6 +8,13 @@ from rclpy.node import Node
 from rclpy.time import Time
 from std_msgs.msg import String
 import json
+from uuid import UUID
+
+from mission_planner_interfaces.msg import (
+    AttemptSnapshot as AttemptSnapshotMsg,
+    BehaviourNodeSnapshot as BehaviourNodeSnapshotMsg,
+    BehaviourTreeSnapshot as BehaviourTreeSnapshotMsg,
+)
 
 class LoggingSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
     """
@@ -107,9 +114,12 @@ class LoggingSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
 #         tree_msg.data = 'test2' # *200
 #         self.tree_pub.publish(tree_msg)import collections
 
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 
 class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
-    """Profiles and serializes Behavior Tree execution metrics into standard ROS 2 string topics."""
+    """Profiles and serializes Behavior Tree execution metrics into structured ROS 2 messages."""
 
     def __init__(
         self,
@@ -121,7 +131,9 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
     ):
         super().__init__()
         self.node = node if node is not None else Node("tree_snapshot_publisher")
-        self.tree_pub = self.node.create_publisher(String, "~/tree_snapshot", 10)
+        self.tree_pub = self.node.create_publisher(
+            BehaviourTreeSnapshotMsg, "~/tree_snapshot", 10
+        )
 
         self.display_only_visited_behaviours = display_only_visited_behaviours
         self.display_blackboard = display_blackboard
@@ -133,15 +145,15 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
 
         # Dictionaries storing (node_id: ([start ticks], [end ticks])) and (node_id: ([start times], [end times]))
         self.node_span_ticks: typing.Dict[
-            py_trees.common.Uuid, typing.Tuple[typing.List[int], typing.List[int]]
+            UUID, typing.Tuple[typing.List[int], typing.List[int]]
         ] = collections.defaultdict(lambda: ([], []))
         self.node_span_times: typing.Dict[
-            py_trees.common.Uuid, typing.Tuple[typing.List[float], typing.List[float]]
+            UUID, typing.Tuple[typing.List[float], typing.List[float]]
         ] = collections.defaultdict(lambda: ([], []))
 
         # Tracks raw execution intervals per node
         self.node_executed_intervals: typing.Dict[
-            py_trees.common.Uuid, typing.List[typing.Tuple[int, int]]
+            UUID, typing.List[typing.Tuple[int, int]]
         ] = collections.defaultdict(list)
 
         self._modified_nodes: typing.List[
@@ -180,11 +192,11 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         merged = [sorted_ivs[0]]
         for curr_st, curr_et in sorted_ivs[1:]:
             prev_st, prev_et = merged[-1]
-            if curr_st <= prev_et:  # Overlapping or same tick
+            if curr_st <= prev_et:
                 merged[-1] = (prev_st, max(prev_et, curr_et))
-            elif curr_st == prev_et + 1:  # Contiguous ticks
+            elif curr_st == prev_et + 1:
                 merged[-1] = (prev_st, curr_et)
-            else:  # Disjoint gap
+            else:
                 merged.append((curr_st, curr_et))
         return merged
 
@@ -221,6 +233,45 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             return current_retries, max_retries
         return None
 
+    def _get_behaviour_symbol(self, node: behaviour.Behaviour) -> str:
+        """Resolves visual display symbol matching py_trees conventions."""
+        if isinstance(node, py_trees.composites.Sequence):
+            return "{-}" if getattr(node, "memory", False) else "[-]"
+        elif isinstance(node, py_trees.composites.Selector):
+            return "{o}" if getattr(node, "memory", False) else "[o]"
+        elif isinstance(node, py_trees.composites.Parallel):
+            return "/_/"
+        elif isinstance(node, py_trees.decorators.Decorator) or self._is_retry_node(node):
+            return "-^-"
+        elif isinstance(node, py_trees.behaviour.Behaviour):
+            return "-->"
+        return "-->"
+
+    def _get_node_status_info(
+        self, node: behaviour.Behaviour
+    ) -> typing.Tuple[int, str, str]:
+        """Returns (status_code, status_raw, status_str)."""
+        is_visited = node.id in self.visited
+        status = self.visited.get(node.id, getattr(node, "status", py_trees.common.Status.INVALID))
+
+        if not is_visited and self.display_only_visited_behaviours:
+            return (
+                BehaviourNodeSnapshotMsg.STATUS_UNVISITED,
+                "-",
+                "unvisited",
+            )
+
+        if status == py_trees.common.Status.SUCCESS:
+            return BehaviourNodeSnapshotMsg.STATUS_SUCCESS, "✓", "success"
+        elif status == py_trees.common.Status.FAILURE:
+            return BehaviourNodeSnapshotMsg.STATUS_FAILURE, "✕", "failure"
+        elif status == py_trees.common.Status.RUNNING:
+            return BehaviourNodeSnapshotMsg.STATUS_RUNNING, "*", "running"
+        elif status == py_trees.common.Status.INVALID:
+            return BehaviourNodeSnapshotMsg.STATUS_UNVISITED, "-", "unvisited"
+        else:
+            return BehaviourNodeSnapshotMsg.STATUS_INVALID, "-", "unknown"
+
     def run(self, behaviour_node: behaviour.Behaviour) -> None:
         """Executes once per visited behavior node in this tick."""
         if self.root is None:
@@ -241,17 +292,14 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         elif not node_intervals or node_intervals[-1][1] < curr_tick - 1:
             node_intervals.append((curr_tick, curr_tick))
 
-        # Determine attempt index: Retry node itself stays in attempt 0, child nodes index by retry count
         retry_ancestor = self._find_retry_ancestor(behaviour_node)
         attempt_idx = 0
         if retry_ancestor is not None:
             attempt_idx = getattr(retry_ancestor, "failures", 0)
 
-        # Record span ticks and span time entries
         start_ticks_list, end_ticks_list = self.node_span_ticks[node_id]
         start_times_list, end_times_list = self.node_span_times[node_id]
 
-        # Expand retry rows if new retry triggered
         while len(start_ticks_list) <= attempt_idx:
             start_ticks_list.append(0)
             end_ticks_list.append(0)
@@ -284,30 +332,32 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         return ticks_str, time_str
 
     def _accumulate_times(
-        self, node: behaviour.Behaviour
+        self,
+        node: behaviour.Behaviour,
+        metrics_map: typing.Dict[UUID, typing.Dict[str, typing.Any]],
     ) -> typing.Dict[str, typing.Any]:
-        """
-        Recursively calculates span, subtree, and self ticks/time cumulatively and per-retry attempt.
-        """
+        """Recursively calculates and caches metrics for all nodes in metrics_map."""
         now_sec = self.node.get_clock().now().nanoseconds / 1e9
         start_ticks, end_ticks = self.node_span_ticks[node.id]
 
-        has_children = bool(node.children)
+        has_children = bool(getattr(node, "children", []))
         is_parallel = isinstance(node, py_trees.composites.Parallel)
         is_retry = self._is_retry_node(node)
         retry_ancestor = self._find_retry_ancestor(node)
         is_under_retry = retry_ancestor is not None
         retry_info = self._get_retry_info(node)
 
-        # 1. Process Child Nodes Recursively
+        # 1. Process child nodes recursively, ensuring their metrics are stored in metrics_map
         child_metrics: typing.List[typing.Dict[str, typing.Any]] = []
         if has_children:
-            child_metrics = [self._accumulate_times(child) for child in node.children]
+            child_metrics = [
+                self._accumulate_times(child, metrics_map)
+                for child in node.children
+            ]
 
         attempts_data: typing.Dict[int, typing.Dict[str, typing.Any]] = {}
 
         if is_under_retry:
-            # Case 1: Node is inside a Retry decorator
             curr_retries = getattr(retry_ancestor, "failures", 0)
             num_attempts = max(len(start_ticks), curr_retries + 1)
             for cm in child_metrics:
@@ -407,7 +457,6 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             cum_intervals = self.merge_intervals(cum_intervals)
 
         elif is_retry:
-            # Case 2: Node IS a Retry decorator
             curr_retries = getattr(node, "failures", 0)
             num_attempts = curr_retries + 1
             for cm in child_metrics:
@@ -468,7 +517,6 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                     "s_str": s_str,
                 }
 
-            # Retry node cumulative span does not reset
             st = start_ticks[0] if (start_ticks and start_ticks[0] > 0) else 0
             et = end_ticks[0] if (end_ticks and end_ticks[0] > 0) else 0
             if st == 0:
@@ -479,7 +527,6 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
 
             cum_st = st
             cum_et = et
-
             own_t = (et - st + 1) if st > 0 else 0
             own_s = self._get_interval_duration(st, et, now_sec) if st > 0 else 0.0
 
@@ -493,7 +540,6 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             cum_intervals = [(cum_st, cum_et)] if cum_st > 0 else []
 
         else:
-            # Case 3: Node is NOT under retry and NOT a retry node (e.g. Root, Sequence, Leaf outside retry)
             st = start_ticks[0] if (start_ticks and start_ticks[0] > 0) else 0
             et = end_ticks[0] if (end_ticks and end_ticks[0] > 0) else 0
 
@@ -506,20 +552,16 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                     cum_span_t = 0
                     cum_span_s = 0.0
                     cum_intervals = []
-                cum_sub_t = 0
-                cum_sub_s = 0.0
-                cum_self_t = 0
-                cum_self_s = 0.0
-                cum_st = st
-                cum_et = et
+                cum_sub_t, cum_sub_s = 0, 0.0
+                cum_self_t, cum_self_s = 0, 0.0
+                cum_st, cum_et = st, et
             else:
                 c_sts = [cm["cum_st"] for cm in child_metrics if cm["cum_st"] > 0]
                 c_ets = [cm["cum_et"] for cm in child_metrics if cm["cum_et"] > 0]
                 if st == 0 and c_sts:
                     st = min(c_sts)
                     et = max(c_ets)
-                cum_st = st
-                cum_et = et
+                cum_st, cum_et = st, et
 
                 if is_parallel:
                     cum_sub_t = max((cm["cum_span_t"] for cm in child_metrics), default=0)
@@ -548,7 +590,7 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                 cum_self_t = max(0, cum_span_t - cum_sub_t)
                 cum_self_s = max(0.0, cum_span_s - cum_sub_s)
 
-        # 2. Format Display String and Tag
+        # 2. Format Metric String and Tag
         cum_t_str, cum_s_str = self._format_metric_str(
             cum_span_t, cum_self_t, cum_sub_t, cum_span_s, cum_self_s, cum_sub_s, has_children
         )
@@ -593,7 +635,7 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         else:
             node.feedback_message = tag
 
-        return {
+        node_metrics = {
             "cum_span_t": cum_span_t,
             "cum_span_s": cum_span_s,
             "cum_self_t": cum_self_t,
@@ -603,8 +645,39 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             "cum_st": cum_st,
             "cum_et": cum_et,
             "cum_intervals": cum_intervals,
+            "cum_t_str": cum_t_str,
+            "cum_s_str": cum_s_str,
+            "tag": tag,
+            "clean_feedback": clean_feedback,
             "attempts": attempts_data,
         }
+
+        # Crucial: Store node metrics for every node in the tree
+        metrics_map[node.id] = node_metrics
+        return node_metrics
+
+    def _build_paths_recursive(
+        self,
+        node: behaviour.Behaviour,
+        parent_path: typing.Optional[str],
+        sibling_count_map: typing.Dict[str, int],
+        node_paths: typing.Dict[UUID, str],
+        node_depths: typing.Dict[UUID, int],
+        depth: int = 0,
+    ) -> None:
+        sibling_key = f"{parent_path or 'root'}/{node.name}"
+        sibling_count = sibling_count_map[sibling_key]
+        sibling_count_map[sibling_key] += 1
+        current_path = f"{parent_path}/{node.name}" if parent_path else f"/{node.name}"
+        if sibling_count > 0:
+            current_path += f"#{sibling_count}"
+
+        node_paths[node.id] = current_path
+        node_depths[node.id] = depth
+        for child in getattr(node, "children", []):
+            self._build_paths_recursive(
+                child, current_path, sibling_count_map, node_paths, node_depths, depth + 1
+            )
 
     def finalise(self) -> None:
         """Called after all nodes have finished their tick."""
@@ -614,8 +687,11 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                 curr = curr.parent
             self.root = curr
 
-            self._accumulate_times(self.root)
+            # 1. Accumulate metrics for all nodes into metrics_dict
+            metrics_dict: typing.Dict[UUID, typing.Dict[str, typing.Any]] = {}
+            self._accumulate_times(self.root, metrics_dict)
 
+            # 2. Render unicode text tree for logs and backward compatibility
             tree_str = display.unicode_tree(
                 root=self.root,
                 show_only_visited=self.display_only_visited_behaviours,
@@ -624,10 +700,118 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                 previously_visited=self.previously_visited,
             )
 
+            # 3. Restore original feedback messages
             for node, original_feedback in self._modified_nodes:
                 node.feedback_message = original_feedback
             self._modified_nodes.clear()
 
-            tree_msg = String()
-            tree_msg.data = tree_str
+            # 4. Build hierarchical paths and depths
+            sibling_count_map: typing.Dict[str, int] = collections.defaultdict(int)
+            node_paths: typing.Dict[UUID, str] = {}
+            node_depths: typing.Dict[UUID, int] = {}
+            self._build_paths_recursive(
+                self.root, None, sibling_count_map, node_paths, node_depths, 0
+            )
+
+            # 5. Populate structured ROS 2 message
+            tree_msg = BehaviourTreeSnapshotMsg()
+            tree_msg.header.stamp = self.node.get_clock().now().to_msg()
+            tree_msg.header.frame_id = ""
+            tree_msg.global_tick_count = self.global_tick_count
+            tree_msg.raw_text_tree = tree_str
+
+            node_msgs: typing.List[BehaviourNodeSnapshotMsg] = []
+            for behaviour_node in self.root.iterate():
+                node_id = behaviour_node.id
+                metrics = metrics_dict.get(node_id, {})
+                status_code, status_raw, status_str = self._get_node_status_info(behaviour_node)
+                symbol = self._get_behaviour_symbol(behaviour_node)
+                depth = node_depths.get(node_id, 0)
+                current_path = node_paths.get(node_id, f"/{behaviour_node.name}")
+
+                parent = getattr(behaviour_node, "parent", None)
+                parent_path = node_paths.get(parent.id, "") if parent is not None else ""
+                child_paths = [
+                    node_paths.get(c.id, "") for c in getattr(behaviour_node, "children", [])
+                ]
+
+                has_children = bool(getattr(behaviour_node, "children", []))
+                retry_info = self._get_retry_info(behaviour_node)
+
+                node_msg = BehaviourNodeSnapshotMsg()
+                node_msg.id = current_path
+                node_msg.name = behaviour_node.name
+                node_msg.behaviour_type = type(behaviour_node).__name__
+                node_msg.symbol = symbol
+                node_msg.depth = depth
+                node_msg.parent_id = parent_path
+                node_msg.child_ids = child_paths
+                node_msg.has_children = has_children
+                node_msg.is_active = (node_id in self.visited)
+                node_msg.status = status_code
+                node_msg.status_raw = status_raw
+                node_msg.status_str = status_str
+
+                if retry_info is not None:
+                    curr_retries, max_retries = retry_info
+                    node_msg.attempts = curr_retries
+                    node_msg.max_attempts = max_retries
+                    node_msg.retry_str = f"{curr_retries}/{max_retries}"
+                else:
+                    node_msg.attempts = -1
+                    node_msg.max_attempts = -1
+                    node_msg.retry_str = ""
+
+                cum_st = metrics.get("cum_st", 0)
+                cum_et = metrics.get("cum_et", 0)
+                cum_span_t = metrics.get("cum_span_t", 0)
+                cum_t_str = metrics.get("cum_t_str", "0t (0t 0t)" if has_children else "0t")
+                cum_s_str = metrics.get("cum_s_str", "0.00s (0.00s 0.00s)" if has_children else "0.00s")
+
+                node_msg.ticks = cum_t_str
+                node_msg.seconds = cum_s_str
+                node_msg.ticks_num = cum_span_t
+                node_msg.seconds_num = float(metrics.get("cum_span_s", 0.0))
+                node_msg.self_ticks = metrics.get("cum_self_t", 0)
+                node_msg.self_seconds = float(metrics.get("cum_self_s", 0.0))
+                node_msg.sub_ticks = metrics.get("cum_sub_t", 0)
+                node_msg.sub_seconds = float(metrics.get("cum_sub_s", 0.0))
+                node_msg.start_tick = cum_st
+                node_msg.end_tick = cum_et
+                node_msg.is_same_tick = (cum_st > 0 and cum_st == cum_et and cum_span_t == 1)
+
+                clean_fb = metrics.get("clean_feedback", "")
+                node_msg.feedback = clean_fb
+
+                tag = metrics.get("tag", f"[{cum_t_str} / {cum_s_str}]")
+                indent = "    " * depth
+                dash = f" -- {tag}" if tag else ""
+                fb_str = f" {clean_fb}" if clean_fb else ""
+                node_msg.raw_line = f"{indent}{symbol} {behaviour_node.name} [{status_raw}]{dash}{fb_str}"
+
+                # Populate attempt history
+                attempt_msgs: typing.List[AttemptSnapshotMsg] = []
+                for att_idx, att in sorted(metrics.get("attempts", {}).items(), key=lambda x: x[0]):
+                    att_msg = AttemptSnapshotMsg()
+                    att_msg.attempt_index = att_idx
+                    att_msg.ticks = att["t_str"]
+                    att_msg.seconds = att["s_str"]
+                    att_msg.ticks_num = att["span_t"]
+                    att_msg.seconds_num = float(att["span_s"])
+                    att_msg.self_ticks = att["self_t"]
+                    att_msg.self_seconds = float(att["self_s"])
+                    att_msg.sub_ticks = att["sub_t"]
+                    att_msg.sub_seconds = float(att["sub_s"])
+                    att_msg.start_tick = att["st"]
+                    att_msg.end_tick = att["et"]
+                    att_msg.is_same_tick = (att["st"] > 0 and att["st"] == att["et"] and att["span_t"] == 1)
+                    att_msg.feedback = ""
+                    att_msg.status = status_code
+                    att_msg.status_str = status_str
+                    attempt_msgs.append(att_msg)
+
+                node_msg.attempt_history = attempt_msgs
+                node_msgs.append(node_msg)
+
+            tree_msg.nodes = node_msgs
             self.tree_pub.publish(tree_msg)

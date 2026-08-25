@@ -49,5 +49,6 @@ install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}
 )
+message(STATUS "Current Source Dir: ${CMAKE_CURRENT_SOURCE_DIR}")
 
 ament_package()
