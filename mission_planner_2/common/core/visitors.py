@@ -112,15 +112,12 @@ class LoggingSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
 #         # 4. Publish the Tree
 #         tree_msg = String()
 #         tree_msg.data = 'test2' # *200
-#         self.tree_pub.publish(tree_msg)import collections
+#         self.tree_pub.publish(tree_msg)import collections4
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
 
 
 class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
-    """Profiles and serializes Behavior Tree execution metrics into structured ROS 2 messages."""
-
     def __init__(
         self,
         node: typing.Optional[Node] = None,
@@ -143,18 +140,18 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         self.global_tick_count: int = 0
         self.tick_start_sim_times: typing.Dict[int, float] = {}
 
-        # Dictionaries storing (node_id: ([start ticks], [end ticks])) and (node_id: ([start times], [end times]))
+        # Multi-attempt tracking keyed by attempt path tuple (e.g. (0,), (0, 2), (1, 1))
         self.node_span_ticks: typing.Dict[
-            UUID, typing.Tuple[typing.List[int], typing.List[int]]
-        ] = collections.defaultdict(lambda: ([], []))
+            UUID, typing.Dict[typing.Tuple[int, ...], typing.Tuple[int, int]]
+        ] = collections.defaultdict(dict)
         self.node_span_times: typing.Dict[
-            UUID, typing.Tuple[typing.List[float], typing.List[float]]
-        ] = collections.defaultdict(lambda: ([], []))
+            UUID, typing.Dict[typing.Tuple[int, ...], typing.Tuple[float, float]]
+        ] = collections.defaultdict(dict)
 
-        # Tracks raw execution intervals per node
+        # Tracks raw execution intervals per attempt path
         self.node_executed_intervals: typing.Dict[
-            UUID, typing.List[typing.Tuple[int, int]]
-        ] = collections.defaultdict(list)
+            UUID, typing.Dict[typing.Tuple[int, ...], typing.List[typing.Tuple[int, int]]]
+        ] = collections.defaultdict(lambda: collections.defaultdict(list))
 
         self._modified_nodes: typing.List[
             typing.Tuple[behaviour.Behaviour, typing.Optional[str]]
@@ -172,7 +169,7 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         self, start_tick: int, end_tick: int, current_now_sec: float
     ) -> float:
         """Find ROS clock sim time elapsed between 2 tick values."""
-        if start_tick not in self.tick_start_sim_times or start_tick == 0:
+        if start_tick not in self.tick_start_sim_times or start_tick <= 0:
             return 0.0
         t_start = self.tick_start_sim_times[start_tick]
         if (end_tick + 1) in self.tick_start_sim_times:
@@ -201,7 +198,7 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         return merged
 
     def _is_retry_node(self, node: behaviour.Behaviour) -> bool:
-        """Checks if a node is a retry decorator."""
+        """Checks if a node is strictly a retry decorator."""
         return (
             (hasattr(node, "num_failures") and hasattr(node, "failures"))
             or (
@@ -211,25 +208,26 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             )
         )
 
-    def _find_retry_ancestor(
+    def _find_all_retry_ancestors(
         self, node: behaviour.Behaviour
-    ) -> typing.Optional[behaviour.Behaviour]:
-        """Finds the nearest retry decorator ancestor for this behaviour."""
+    ) -> typing.List[behaviour.Behaviour]:
+        """Finds all retry decorator ancestors strictly above this behaviour, ordered outer to inner."""
+        ancestors = []
         curr = getattr(node, "parent", None)
         while curr is not None:
             if self._is_retry_node(curr):
-                return curr
+                ancestors.append(curr)
             curr = getattr(curr, "parent", None)
-        return None
+        ancestors.reverse()
+        return ancestors
 
     def _get_retry_info(
         self, node: behaviour.Behaviour
     ) -> typing.Optional[typing.Tuple[int, int]]:
-        """Extracts current retry failure count and maximum retry count."""
-        target_node = node if self._is_retry_node(node) else self._find_retry_ancestor(node)
-        if target_node is not None:
-            current_retries = getattr(target_node, "failures", 0)
-            max_retries = getattr(target_node, "num_failures", 0)
+        """Extracts retry failure count and maximum retry count ONLY for retry nodes."""
+        if self._is_retry_node(node):
+            current_retries = getattr(node, "failures", 0)
+            max_retries = getattr(node, "num_failures", 0)
             return current_retries, max_retries
         return None
 
@@ -285,33 +283,32 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         curr_tick = self.global_tick_count
         now_sec = self.node.get_clock().now().nanoseconds / 1e9
 
-        # Update executed intervals
-        node_intervals = self.node_executed_intervals[node_id]
+        retry_ancestors = self._find_all_retry_ancestors(behaviour_node)
+        ancestor_path = tuple(getattr(a, "failures", 0) for a in retry_ancestors)
+        # If the node itself is a retry node, its own attempt path includes its current attempt
+        if self._is_retry_node(behaviour_node):
+            attempt_path = ancestor_path + (getattr(behaviour_node, "failures", 0),)
+        else:
+            attempt_path = ancestor_path
+
+        # Update executed intervals for this attempt path
+        node_intervals = self.node_executed_intervals[node_id][attempt_path]
         if node_intervals and node_intervals[-1][1] == curr_tick - 1:
             node_intervals[-1] = (node_intervals[-1][0], curr_tick)
         elif not node_intervals or node_intervals[-1][1] < curr_tick - 1:
             node_intervals.append((curr_tick, curr_tick))
 
-        retry_ancestor = self._find_retry_ancestor(behaviour_node)
-        attempt_idx = 0
-        if retry_ancestor is not None:
-            attempt_idx = getattr(retry_ancestor, "failures", 0)
+        st, et = self.node_span_ticks[node_id].get(attempt_path, (0, 0))
+        st_time, et_time = self.node_span_times[node_id].get(attempt_path, (0.0, 0.0))
 
-        start_ticks_list, end_ticks_list = self.node_span_ticks[node_id]
-        start_times_list, end_times_list = self.node_span_times[node_id]
+        if st == 0:
+            st = curr_tick
+            st_time = now_sec
+        et = curr_tick
+        et_time = now_sec
 
-        while len(start_ticks_list) <= attempt_idx:
-            start_ticks_list.append(0)
-            end_ticks_list.append(0)
-            start_times_list.append(0.0)
-            end_times_list.append(0.0)
-
-        if start_ticks_list[attempt_idx] == 0:
-            start_ticks_list[attempt_idx] = curr_tick
-            start_times_list[attempt_idx] = now_sec
-
-        end_ticks_list[attempt_idx] = curr_tick
-        end_times_list[attempt_idx] = now_sec
+        self.node_span_ticks[node_id][attempt_path] = (st, et)
+        self.node_span_times[node_id][attempt_path] = (st_time, et_time)
 
     @staticmethod
     def _format_metric_str(
@@ -336,18 +333,16 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         node: behaviour.Behaviour,
         metrics_map: typing.Dict[UUID, typing.Dict[str, typing.Any]],
     ) -> typing.Dict[str, typing.Any]:
-        """Recursively calculates and caches metrics for all nodes in metrics_map."""
+        """Recursively calculates metrics for multi-dimensional retry paths."""
         now_sec = self.node.get_clock().now().nanoseconds / 1e9
-        start_ticks, end_ticks = self.node_span_ticks[node.id]
-
         has_children = bool(getattr(node, "children", []))
         is_parallel = isinstance(node, py_trees.composites.Parallel)
         is_retry = self._is_retry_node(node)
-        retry_ancestor = self._find_retry_ancestor(node)
-        is_under_retry = retry_ancestor is not None
+        retry_ancestors = self._find_all_retry_ancestors(node)
+        is_under_retry = len(retry_ancestors) > 0
         retry_info = self._get_retry_info(node)
 
-        # 1. Process child nodes recursively, ensuring their metrics are stored in metrics_map
+        # 1. Recurse down children first
         child_metrics: typing.List[typing.Dict[str, typing.Any]] = []
         if has_children:
             child_metrics = [
@@ -355,90 +350,148 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                 for child in node.children
             ]
 
-        attempts_data: typing.Dict[int, typing.Dict[str, typing.Any]] = {}
+        expected_depth = len(retry_ancestors) + (1 if is_retry else 0)
 
-        if is_under_retry:
-            curr_retries = getattr(retry_ancestor, "failures", 0)
-            num_attempts = max(len(start_ticks), curr_retries + 1)
-            for cm in child_metrics:
-                num_attempts = max(num_attempts, len(cm["attempts"]))
-            if num_attempts == 0:
-                num_attempts = 1
+        # 2. Discover only actively executed attempt paths
+        attempt_paths_set: typing.Set[typing.Tuple[int, ...]] = set()
 
-            for att_idx in range(num_attempts):
-                st = start_ticks[att_idx] if att_idx < len(start_ticks) else 0
-                et = end_ticks[att_idx] if att_idx < len(end_ticks) else 0
+        for p, (st_val, _) in self.node_span_ticks[node.id].items():
+            if len(p) == expected_depth and st_val > 0:
+                attempt_paths_set.add(p)
 
-                if not has_children:
-                    if st > 0:
-                        att_span_t = et - st + 1
-                        att_span_s = self._get_interval_duration(st, et, now_sec)
-                        att_intervals = [(st, et)]
-                    else:
-                        att_span_t = 0
-                        att_span_s = 0.0
-                        att_intervals = []
-                    att_sub_t, att_sub_s = 0, 0.0
-                    att_self_t, att_self_s = 0, 0.0
+        # Include paths from children (truncated to this node's attempt depth)
+        for cm in child_metrics:
+            for c_path in cm["attempts"].keys():
+                if len(c_path) >= expected_depth:
+                    attempt_paths_set.add(c_path[:expected_depth])
+
+        # If currently visited in this tick, ensure current attempt path is captured
+        if node.id in self.visited:
+            curr_prefix = tuple(getattr(a, "failures", 0) for a in retry_ancestors)
+            curr_path = curr_prefix + (getattr(node, "failures", 0),) if is_retry else curr_prefix
+            attempt_paths_set.add(curr_path)
+
+        attempts_data: typing.Dict[typing.Tuple[int, ...], typing.Dict[str, typing.Any]] = {}
+
+        for att_path in sorted(attempt_paths_set):
+            st, et = self.node_span_ticks[node.id].get(att_path, (0, 0))
+            own_ivs = self.node_executed_intervals[node.id].get(att_path, [])
+
+            if not has_children:
+                if st > 0:
+                    merged_ivs = self.merge_intervals(own_ivs) if own_ivs else [(st, et)]
+                    att_span_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_ivs)
+                    att_span_s = sum(
+                        self._get_interval_duration(iv_st, iv_et, now_sec)
+                        for iv_st, iv_et in merged_ivs
+                    )
+                    att_intervals = merged_ivs
                 else:
-                    c_atts = [
-                        cm["attempts"][att_idx]
-                        for cm in child_metrics
-                        if att_idx in cm["attempts"]
+                    att_span_t = 0
+                    att_span_s = 0.0
+                    att_intervals = []
+                att_sub_t, att_sub_s = 0, 0.0
+                att_self_t, att_self_s = att_span_t, att_span_s
+            else:
+                child_contributions = []
+                for cm in child_metrics:
+                    matching_c = [
+                        c_att
+                        for c_key, c_att in cm["attempts"].items()
+                        if c_key[:len(att_path)] == att_path
                     ]
-                    c_sts = [c["st"] for c in c_atts if c["st"] > 0]
-                    c_ets = [c["et"] for c in c_atts if c["et"] > 0]
-
-                    if st == 0 and c_sts:
-                        st = min(c_sts)
-                        et = max(c_ets)
-
-                    if is_parallel:
-                        att_sub_t = max((c["span_t"] for c in c_atts), default=0)
-                        att_sub_s = max((c["span_s"] for c in c_atts), default=0.0)
-                        att_intervals = [(st, et)] if st > 0 else []
-                    else:
-                        child_ivs: typing.List[typing.Tuple[int, int]] = []
-                        for c in c_atts:
-                            if c.get("intervals"):
-                                child_ivs.extend(c["intervals"])
-                            elif c["st"] > 0 and c["et"] >= c["st"]:
-                                child_ivs.append((c["st"], c["et"]))
-
-                        merged_child_ivs = self.merge_intervals(child_ivs)
-                        att_sub_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_child_ivs)
-                        att_sub_s = sum(
+                    if matching_c:
+                        c_st_vals = [c["st"] for c in matching_c if c["st"] > 0]
+                        c_et_vals = [c["et"] for c in matching_c if c["et"] > 0]
+                        c_st = min(c_st_vals) if c_st_vals else 0
+                        c_et = max(c_et_vals) if c_et_vals else 0
+                        c_ivs: typing.List[typing.Tuple[int, int]] = []
+                        for c in matching_c:
+                            c_ivs.extend(c.get("intervals", []))
+                        merged_c_ivs = self.merge_intervals(c_ivs)
+                        c_span_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_c_ivs)
+                        c_span_s = sum(
                             self._get_interval_duration(iv_st, iv_et, now_sec)
-                            for iv_st, iv_et in merged_child_ivs
+                            for iv_st, iv_et in merged_c_ivs
                         )
-                        att_intervals = [(st, et)] if st > 0 else merged_child_ivs
+                        child_contributions.append({
+                            "st": c_st,
+                            "et": c_et,
+                            "span_t": c_span_t,
+                            "span_s": c_span_s,
+                            "intervals": merged_c_ivs,
+                        })
 
+                c_sts = [c["st"] for c in child_contributions if c["st"] > 0]
+                c_ets = [c["et"] for c in child_contributions if c["et"] > 0]
+
+                if st == 0 and c_sts:
+                    st = min(c_sts)
+                    et = max(c_ets)
+                elif st > 0 and c_sts:
+                    st = min(st, min(c_sts))
+                    et = max(et, max(c_ets))
+
+                if is_parallel:
+                    att_sub_t = max((c["span_t"] for c in child_contributions), default=0)
+                    att_sub_s = max((c["span_s"] for c in child_contributions), default=0.0)
+                    att_intervals = [(st, et)] if st > 0 else []
                     own_t = (et - st + 1) if st > 0 else 0
                     own_s = self._get_interval_duration(st, et, now_sec) if st > 0 else 0.0
-
                     att_span_t = max(own_t, att_sub_t)
                     att_span_s = max(own_s, att_sub_s)
                     att_self_t = max(0, att_span_t - att_sub_t)
                     att_self_s = max(0.0, att_span_s - att_sub_s)
+                else:
+                    child_ivs: typing.List[typing.Tuple[int, int]] = []
+                    for c in child_contributions:
+                        child_ivs.extend(c.get("intervals", []))
+                    merged_child_ivs = self.merge_intervals(child_ivs)
+                    att_sub_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_child_ivs)
+                    att_sub_s = sum(
+                        self._get_interval_duration(iv_st, iv_et, now_sec)
+                        for iv_st, iv_et in merged_child_ivs
+                    )
+                    if own_ivs:
+                        merged_all_ivs = self.merge_intervals(own_ivs + child_ivs)
+                        att_span_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_all_ivs)
+                        att_span_s = sum(
+                            self._get_interval_duration(iv_st, iv_et, now_sec)
+                            for iv_st, iv_et in merged_all_ivs
+                        )
+                        att_intervals = merged_all_ivs
+                    else:
+                        att_span_t = att_sub_t
+                        att_span_s = att_sub_s
+                        att_intervals = merged_child_ivs
 
-                t_str, s_str = self._format_metric_str(
-                    att_span_t, att_self_t, att_sub_t, att_span_s, att_self_s, att_sub_s, has_children
-                )
+                    att_self_t = max(0, att_span_t - att_sub_t)
+                    att_self_s = max(0.0, att_span_s - att_sub_s)
 
-                attempts_data[att_idx] = {
-                    "span_t": att_span_t,
-                    "span_s": att_span_s,
-                    "self_t": att_self_t,
-                    "self_s": att_self_s,
-                    "sub_t": att_sub_t,
-                    "sub_s": att_sub_s,
-                    "st": st,
-                    "et": et,
-                    "intervals": att_intervals,
-                    "t_str": t_str,
-                    "s_str": s_str,
-                }
+            # Filter out attempt paths that never triggered
+            if st == 0 and att_span_t == 0:
+                continue
 
+            t_str, s_str = self._format_metric_str(
+                att_span_t, att_self_t, att_sub_t, att_span_s, att_self_s, att_sub_s, has_children
+            )
+
+            attempts_data[att_path] = {
+                "span_t": att_span_t,
+                "span_s": att_span_s,
+                "self_t": att_self_t,
+                "self_s": att_self_s,
+                "sub_t": att_sub_t,
+                "sub_s": att_sub_s,
+                "st": st,
+                "et": et,
+                "intervals": att_intervals,
+                "t_str": t_str,
+                "s_str": s_str,
+            }
+
+        # Calculate cumulative metrics across all executed attempts (Total = Exact Sum of Attempts)
+        if attempts_data:
             cum_span_t = sum(a["span_t"] for a in attempts_data.values())
             cum_span_s = sum(a["span_s"] for a in attempts_data.values())
             cum_self_t = sum(a["self_t"] for a in attempts_data.values())
@@ -446,151 +499,24 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             cum_sub_t = sum(a["sub_t"] for a in attempts_data.values())
             cum_sub_s = sum(a["sub_s"] for a in attempts_data.values())
 
+            all_ivs = []
+            for a in attempts_data.values():
+                all_ivs.extend(a.get("intervals", []))
+            cum_intervals = self.merge_intervals(all_ivs)
+
             valid_sts = [a["st"] for a in attempts_data.values() if a["st"] > 0]
             valid_ets = [a["et"] for a in attempts_data.values() if a["et"] > 0]
             cum_st = min(valid_sts) if valid_sts else 0
             cum_et = max(valid_ets) if valid_ets else 0
-
-            cum_intervals: typing.List[typing.Tuple[int, int]] = []
-            for a in attempts_data.values():
-                cum_intervals.extend(a.get("intervals", []))
-            cum_intervals = self.merge_intervals(cum_intervals)
-
-        elif is_retry:
-            curr_retries = getattr(node, "failures", 0)
-            num_attempts = curr_retries + 1
-            for cm in child_metrics:
-                num_attempts = max(num_attempts, len(cm["attempts"]))
-            if num_attempts == 0:
-                num_attempts = 1
-
-            for att_idx in range(num_attempts):
-                c_atts = [
-                    cm["attempts"][att_idx]
-                    for cm in child_metrics
-                    if att_idx in cm["attempts"]
-                ]
-                c_sts = [c["st"] for c in c_atts if c["st"] > 0]
-                c_ets = [c["et"] for c in c_atts if c["et"] > 0]
-
-                att_st = min(c_sts) if c_sts else 0
-                att_et = max(c_ets) if c_ets else 0
-
-                child_ivs = []
-                for c in c_atts:
-                    if c.get("intervals"):
-                        child_ivs.extend(c["intervals"])
-                    elif c["st"] > 0 and c["et"] >= c["st"]:
-                        child_ivs.append((c["st"], c["et"]))
-
-                merged_child_ivs = self.merge_intervals(child_ivs)
-                att_sub_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_child_ivs)
-                att_sub_s = sum(
-                    self._get_interval_duration(iv_st, iv_et, now_sec)
-                    for iv_st, iv_et in merged_child_ivs
-                )
-
-                own_att_t = (att_et - att_st + 1) if att_st > 0 else 0
-                own_att_s = self._get_interval_duration(att_st, att_et, now_sec) if att_st > 0 else 0.0
-
-                att_span_t = max(own_att_t, att_sub_t)
-                att_span_s = max(own_att_s, att_sub_s)
-                att_self_t = max(0, att_span_t - att_sub_t)
-                att_self_s = max(0.0, att_span_s - att_sub_s)
-                att_intervals = [(att_st, att_et)] if att_st > 0 else merged_child_ivs
-
-                t_str, s_str = self._format_metric_str(
-                    att_span_t, att_self_t, att_sub_t, att_span_s, att_self_s, att_sub_s, True
-                )
-
-                attempts_data[att_idx] = {
-                    "span_t": att_span_t,
-                    "span_s": att_span_s,
-                    "self_t": att_self_t,
-                    "self_s": att_self_s,
-                    "sub_t": att_sub_t,
-                    "sub_s": att_sub_s,
-                    "st": att_st,
-                    "et": att_et,
-                    "intervals": att_intervals,
-                    "t_str": t_str,
-                    "s_str": s_str,
-                }
-
-            st = start_ticks[0] if (start_ticks and start_ticks[0] > 0) else 0
-            et = end_ticks[0] if (end_ticks and end_ticks[0] > 0) else 0
-            if st == 0:
-                valid_sts = [a["st"] for a in attempts_data.values() if a["st"] > 0]
-                valid_ets = [a["et"] for a in attempts_data.values() if a["et"] > 0]
-                st = min(valid_sts) if valid_sts else 0
-                et = max(valid_ets) if valid_ets else 0
-
-            cum_st = st
-            cum_et = et
-            own_t = (et - st + 1) if st > 0 else 0
-            own_s = self._get_interval_duration(st, et, now_sec) if st > 0 else 0.0
-
-            cum_sub_t = sum(a["sub_t"] for a in attempts_data.values())
-            cum_sub_s = sum(a["sub_s"] for a in attempts_data.values())
-
-            cum_span_t = max(own_t, cum_sub_t)
-            cum_span_s = max(own_s, cum_sub_s)
-            cum_self_t = max(0, cum_span_t - cum_sub_t)
-            cum_self_s = max(0.0, cum_span_s - cum_sub_s)
-            cum_intervals = [(cum_st, cum_et)] if cum_st > 0 else []
-
         else:
-            st = start_ticks[0] if (start_ticks and start_ticks[0] > 0) else 0
-            et = end_ticks[0] if (end_ticks and end_ticks[0] > 0) else 0
+            st, et = self.node_span_ticks[node.id].get((), (0, 0))
+            cum_st, cum_et = st, et
+            cum_span_t = (et - st + 1) if st > 0 else 0
+            cum_span_s = self._get_interval_duration(st, et, now_sec) if st > 0 else 0.0
+            cum_sub_t, cum_sub_s = 0, 0.0
+            cum_self_t, cum_self_s = cum_span_t, cum_span_s
+            cum_intervals = [(st, et)] if st > 0 else []
 
-            if not has_children:
-                if st > 0:
-                    cum_span_t = et - st + 1
-                    cum_span_s = self._get_interval_duration(st, et, now_sec)
-                    cum_intervals = [(st, et)]
-                else:
-                    cum_span_t = 0
-                    cum_span_s = 0.0
-                    cum_intervals = []
-                cum_sub_t, cum_sub_s = 0, 0.0
-                cum_self_t, cum_self_s = 0, 0.0
-                cum_st, cum_et = st, et
-            else:
-                c_sts = [cm["cum_st"] for cm in child_metrics if cm["cum_st"] > 0]
-                c_ets = [cm["cum_et"] for cm in child_metrics if cm["cum_et"] > 0]
-                if st == 0 and c_sts:
-                    st = min(c_sts)
-                    et = max(c_ets)
-                cum_st, cum_et = st, et
-
-                if is_parallel:
-                    cum_sub_t = max((cm["cum_span_t"] for cm in child_metrics), default=0)
-                    cum_sub_s = max((cm["cum_span_s"] for cm in child_metrics), default=0.0)
-                    cum_intervals = [(st, et)] if st > 0 else []
-                else:
-                    child_ivs = []
-                    for cm in child_metrics:
-                        if cm.get("cum_intervals"):
-                            child_ivs.extend(cm["cum_intervals"])
-                        elif cm["cum_st"] > 0 and cm["cum_et"] >= cm["cum_st"]:
-                            child_ivs.append((cm["cum_st"], cm["cum_et"]))
-                    merged_child_ivs = self.merge_intervals(child_ivs)
-                    cum_sub_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_child_ivs)
-                    cum_sub_s = sum(
-                        self._get_interval_duration(iv_st, iv_et, now_sec)
-                        for iv_st, iv_et in merged_child_ivs
-                    )
-                    cum_intervals = [(st, et)] if st > 0 else merged_child_ivs
-
-                own_t = (et - st + 1) if st > 0 else 0
-                own_s = self._get_interval_duration(st, et, now_sec) if st > 0 else 0.0
-
-                cum_span_t = max(own_t, cum_sub_t)
-                cum_span_s = max(own_s, cum_sub_s)
-                cum_self_t = max(0, cum_span_t - cum_sub_t)
-                cum_self_s = max(0.0, cum_span_s - cum_sub_s)
-
-        # 2. Format Metric String and Tag
         cum_t_str, cum_s_str = self._format_metric_str(
             cum_span_t, cum_self_t, cum_sub_t, cum_span_s, cum_self_s, cum_sub_s, has_children
         )
@@ -600,12 +526,16 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
 
         if has_multiple_attempts:
             tag_parts = [f"{cum_t_str} / {cum_s_str}{cum_range}"]
-            for att_idx in sorted(attempts_data.keys()):
-                att = attempts_data[att_idx]
+            for att_path, att in sorted(attempts_data.items(), key=lambda x: x[0]):
                 att_range = f" @{att['st']}-{att['et']}" if att["st"] > 0 else ""
-                tag_parts.append(
-                    f"x{att_idx}: {att['t_str']} / {att['s_str']}{att_range}"
-                )
+                if len(att_path) == 1:
+                    prefix = f"x{att_path[0]}"
+                elif len(att_path) > 1:
+                    prefix = f"x{','.join(map(str, att_path))}"
+                else:
+                    prefix = "x0"
+                tag_parts.append(f"{prefix}: {att['t_str']} / {att['s_str']}{att_range}")
+
             if is_retry and retry_info is not None:
                 curr_retries, max_retries = retry_info
                 tag_parts.append(f"across {curr_retries}/{max_retries} attempts")
@@ -629,11 +559,7 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             clean_feedback = re.sub(r"\s+", " ", clean_feedback).strip()
 
         self._modified_nodes.append((node, original_feedback))
-
-        if clean_feedback:
-            node.feedback_message = f"{tag} {clean_feedback}"
-        else:
-            node.feedback_message = tag
+        node.feedback_message = f"{tag} {clean_feedback}".strip() if clean_feedback else tag
 
         node_metrics = {
             "cum_span_t": cum_span_t,
@@ -652,7 +578,6 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             "attempts": attempts_data,
         }
 
-        # Crucial: Store node metrics for every node in the tree
         metrics_map[node.id] = node_metrics
         return node_metrics
 
@@ -687,11 +612,9 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                 curr = curr.parent
             self.root = curr
 
-            # 1. Accumulate metrics for all nodes into metrics_dict
             metrics_dict: typing.Dict[UUID, typing.Dict[str, typing.Any]] = {}
             self._accumulate_times(self.root, metrics_dict)
 
-            # 2. Render unicode text tree for logs and backward compatibility
             tree_str = display.unicode_tree(
                 root=self.root,
                 show_only_visited=self.display_only_visited_behaviours,
@@ -700,12 +623,10 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                 previously_visited=self.previously_visited,
             )
 
-            # 3. Restore original feedback messages
             for node, original_feedback in self._modified_nodes:
                 node.feedback_message = original_feedback
             self._modified_nodes.clear()
 
-            # 4. Build hierarchical paths and depths
             sibling_count_map: typing.Dict[str, int] = collections.defaultdict(int)
             node_paths: typing.Dict[UUID, str] = {}
             node_depths: typing.Dict[UUID, int] = {}
@@ -713,7 +634,6 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                 self.root, None, sibling_count_map, node_paths, node_depths, 0
             )
 
-            # 5. Populate structured ROS 2 message
             tree_msg = BehaviourTreeSnapshotMsg()
             tree_msg.header.stamp = self.node.get_clock().now().to_msg()
             tree_msg.header.frame_id = ""
@@ -789,11 +709,13 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                 fb_str = f" {clean_fb}" if clean_fb else ""
                 node_msg.raw_line = f"{indent}{symbol} {behaviour_node.name} [{status_raw}]{dash}{fb_str}"
 
-                # Populate attempt history
+                # Populate only actually executed attempts
                 attempt_msgs: typing.List[AttemptSnapshotMsg] = []
-                for att_idx, att in sorted(metrics.get("attempts", {}).items(), key=lambda x: x[0]):
+                for att_path, att in sorted(metrics.get("attempts", {}).items(), key=lambda x: x[0]):
                     att_msg = AttemptSnapshotMsg()
-                    att_msg.attempt_index = att_idx
+                    att_msg.attempt_index = att_path[-1] if len(att_path) > 0 else 0
+                    att_msg.attempt_indices = list(att_path)
+                    att_msg.attempt_key = ",".join(map(str, att_path))
                     att_msg.ticks = att["t_str"]
                     att_msg.seconds = att["s_str"]
                     att_msg.ticks_num = att["span_t"]
