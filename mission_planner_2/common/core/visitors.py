@@ -7,6 +7,7 @@ from py_trees import blackboard, behaviour, display
 from rclpy.node import Node
 from rclpy.time import Time
 from std_msgs.msg import String
+import json
 
 class LoggingSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
     """
@@ -104,7 +105,7 @@ class LoggingSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
 #         # 4. Publish the Tree
 #         tree_msg = String()
 #         tree_msg.data = 'test2' # *200
-#         self.tree_pub.publish(tree_msg)
+#         self.tree_pub.publish(tree_msg)import collections
 
 
 class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
@@ -116,15 +117,11 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         display_only_visited_behaviours: bool = False,
         display_blackboard: bool = False,
         display_activity_stream: bool = False,
-        debug: bool = False,
+        debug: bool = True,
     ):
         super().__init__()
         self.node = node if node is not None else Node("tree_snapshot_publisher")
-
         self.tree_pub = self.node.create_publisher(String, "~/tree_snapshot", 10)
-        self.blackboard_pub = self.node.create_publisher(
-            String, "~/blackboard_snapshot", 10
-        )
 
         self.display_only_visited_behaviours = display_only_visited_behaviours
         self.display_blackboard = display_blackboard
@@ -134,82 +131,81 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         self.global_tick_count: int = 0
         self.tick_start_sim_times: typing.Dict[int, float] = {}
 
-        self.node_start_times: typing.Dict[py_trees.common.Uuid, Time] = {}
-        self.node_start_ticks: typing.Dict[py_trees.common.Uuid, int] = {}
-        self.node_span_times: typing.Dict[py_trees.common.Uuid, float] = {}
-        self.node_span_ticks: typing.Dict[py_trees.common.Uuid, int] = {}
+        # Dictionaries storing (node_id: ([start ticks], [end ticks])) and (node_id: ([start times], [end times]))
+        self.node_span_ticks: typing.Dict[
+            py_trees.common.Uuid, typing.Tuple[typing.List[int], typing.List[int]]
+        ] = collections.defaultdict(lambda: ([], []))
+        self.node_span_times: typing.Dict[
+            py_trees.common.Uuid, typing.Tuple[typing.List[float], typing.List[float]]
+        ] = collections.defaultdict(lambda: ([], []))
 
+        # Tracks raw execution intervals per node
         self.node_executed_intervals: typing.Dict[
             py_trees.common.Uuid, typing.List[typing.Tuple[int, int]]
         ] = collections.defaultdict(list)
-
-        if self.display_activity_stream:
-            blackboard.Blackboard.enable_activity_stream()
 
         self._modified_nodes: typing.List[
             typing.Tuple[behaviour.Behaviour, typing.Optional[str]]
         ] = []
 
     def initialise(self) -> None:
+        """Called once before each tick of the tree begins."""
         self.root: typing.Optional[behaviour.Behaviour] = None
         super().initialise()
-
         self.global_tick_count += 1
         now = self.node.get_clock().now()
         self.tick_start_sim_times[self.global_tick_count] = now.nanoseconds / 1e9
 
-        if self.display_activity_stream and blackboard.Blackboard.activity_stream is not None:
-            blackboard.Blackboard.activity_stream.clear()
-
-    @staticmethod
-    def _merge_intervals(
-        intervals: typing.List[typing.Tuple[int, int]],
-    ) -> typing.List[typing.Tuple[int, int]]:
-        if not intervals:
-            return []
-
-        sorted_intervals = sorted(intervals, key=lambda iv: iv[0])
-        merged: typing.List[typing.Tuple[int, int]] = [sorted_intervals[0]]
-
-        for start, end in sorted_intervals[1:]:
-            last_start, last_end = merged[-1]
-            if start <= last_end + 1:
-                merged[-1] = (last_start, max(last_end, end))
-            else:
-                merged.append((start, end))
-
-        return merged
-
     def _get_interval_duration(
         self, start_tick: int, end_tick: int, current_now_sec: float
     ) -> float:
-        if start_tick not in self.tick_start_sim_times:
+        """Find ROS clock sim time elapsed between 2 tick values."""
+        if start_tick not in self.tick_start_sim_times or start_tick == 0:
             return 0.0
         t_start = self.tick_start_sim_times[start_tick]
         if (end_tick + 1) in self.tick_start_sim_times:
             t_end = self.tick_start_sim_times[end_tick + 1]
         else:
-            # Ongoing tick (end_tick == global_tick_count): determine tick duration dt
-            if self.global_tick_count > 1 and 1 in self.tick_start_sim_times:
-                avg_dt = (
-                    self.tick_start_sim_times[self.global_tick_count]
-                    - self.tick_start_sim_times[1]
-                ) / (self.global_tick_count - 1)
-            else:
-                avg_dt = max(0.0, current_now_sec - t_start)
-
-            if end_tick in self.tick_start_sim_times:
-                t_end = max(current_now_sec, self.tick_start_sim_times[end_tick] + avg_dt)
-            else:
-                t_end = current_now_sec
+            t_end = current_now_sec
         return max(0.0, t_end - t_start)
+
+    def merge_intervals(
+        self, intervals: typing.List[typing.Tuple[int, int]]
+    ) -> typing.List[typing.Tuple[int, int]]:
+        """Merges overlapping or contiguous [start_tick, end_tick] intervals."""
+        valid = [iv for iv in intervals if iv[0] > 0 and iv[1] >= iv[0]]
+        if not valid:
+            return []
+        sorted_ivs = sorted(valid, key=lambda x: (x[0], x[1]))
+        merged = [sorted_ivs[0]]
+        for curr_st, curr_et in sorted_ivs[1:]:
+            prev_st, prev_et = merged[-1]
+            if curr_st <= prev_et:  # Overlapping or same tick
+                merged[-1] = (prev_st, max(prev_et, curr_et))
+            elif curr_st == prev_et + 1:  # Contiguous ticks
+                merged[-1] = (prev_st, curr_et)
+            else:  # Disjoint gap
+                merged.append((curr_st, curr_et))
+        return merged
+
+    def _is_retry_node(self, node: behaviour.Behaviour) -> bool:
+        """Checks if a node is a retry decorator."""
+        return (
+            (hasattr(node, "num_failures") and hasattr(node, "failures"))
+            or (
+                hasattr(py_trees, "decorators")
+                and hasattr(py_trees.decorators, "Retry")
+                and isinstance(node, py_trees.decorators.Retry)
+            )
+        )
 
     def _find_retry_ancestor(
         self, node: behaviour.Behaviour
     ) -> typing.Optional[behaviour.Behaviour]:
-        curr = node
+        """Finds the nearest retry decorator ancestor for this behaviour."""
+        curr = getattr(node, "parent", None)
         while curr is not None:
-            if hasattr(curr, "num_failures") and hasattr(curr, "failures"):
+            if self._is_retry_node(curr):
                 return curr
             curr = getattr(curr, "parent", None)
         return None
@@ -217,156 +213,407 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
     def _get_retry_info(
         self, node: behaviour.Behaviour
     ) -> typing.Optional[typing.Tuple[int, int]]:
-        retry_node = self._find_retry_ancestor(node)
-        if retry_node is not None:
-            current_retries = getattr(retry_node, "failures", 0)
-            max_retries = getattr(retry_node, "num_failures", 0)
+        """Extracts current retry failure count and maximum retry count."""
+        target_node = node if self._is_retry_node(node) else self._find_retry_ancestor(node)
+        if target_node is not None:
+            current_retries = getattr(target_node, "failures", 0)
+            max_retries = getattr(target_node, "num_failures", 0)
             return current_retries, max_retries
         return None
 
     def run(self, behaviour_node: behaviour.Behaviour) -> None:
-        self.root = behaviour_node
+        """Executes once per visited behavior node in this tick."""
+        if self.root is None:
+            curr = behaviour_node
+            while getattr(curr, "parent", None) is not None:
+                curr = curr.parent
+            self.root = curr
+
         super().run(behaviour_node)
-
         node_id = behaviour_node.id
-        node_intervals = self.node_executed_intervals[node_id]
         curr_tick = self.global_tick_count
+        now_sec = self.node.get_clock().now().nanoseconds / 1e9
 
+        # Update executed intervals
+        node_intervals = self.node_executed_intervals[node_id]
         if node_intervals and node_intervals[-1][1] == curr_tick - 1:
             node_intervals[-1] = (node_intervals[-1][0], curr_tick)
         elif not node_intervals or node_intervals[-1][1] < curr_tick - 1:
             node_intervals.append((curr_tick, curr_tick))
 
-        now = self.node.get_clock().now()
-        if now.nanoseconds == 0:
-            self.node_span_times[node_id] = 0.0
-            self.node_span_ticks[node_id] = 0
-            return
+        # Determine attempt index: Retry node itself stays in attempt 0, child nodes index by retry count
+        retry_ancestor = self._find_retry_ancestor(behaviour_node)
+        attempt_idx = 0
+        if retry_ancestor is not None:
+            attempt_idx = getattr(retry_ancestor, "failures", 0)
 
-        if behaviour_node.status == py_trees.common.Status.RUNNING:
-            if node_id not in self.node_start_times:
-                self.node_start_times[node_id] = now
-                self.node_start_ticks[node_id] = self.global_tick_count
+        # Record span ticks and span time entries
+        start_ticks_list, end_ticks_list = self.node_span_ticks[node_id]
+        start_times_list, end_times_list = self.node_span_times[node_id]
 
-            diff_ns = (now - self.node_start_times[node_id]).nanoseconds
-            if diff_ns < 0:
-                self.node_start_times[node_id] = now
-                self.node_start_ticks[node_id] = self.global_tick_count
-                span_time = 0.0
-                span_ticks = 1
-            else:
-                span_time = diff_ns / 1e9
-                span_ticks = max(1, self.global_tick_count - self.node_start_ticks[node_id] + 1)
+        # Expand retry rows if new retry triggered
+        while len(start_ticks_list) <= attempt_idx:
+            start_ticks_list.append(0)
+            end_ticks_list.append(0)
+            start_times_list.append(0.0)
+            end_times_list.append(0.0)
 
-        elif behaviour_node.status in (
-            py_trees.common.Status.SUCCESS,
-            py_trees.common.Status.FAILURE,
-        ):
-            if node_id in self.node_start_times:
-                start_time = self.node_start_times.pop(node_id)
-                start_tick = self.node_start_ticks.pop(node_id, self.global_tick_count)
-                diff_ns = (now - start_time).nanoseconds
-                span_time = diff_ns / 1e9 if diff_ns >= 0 else 0.0
-                span_ticks = max(1, self.global_tick_count - start_tick + 1)
-            else:
-                span_time = self.node_span_times.get(node_id, 0.0)
-                span_ticks = self.node_span_ticks.get(node_id, 1)
-        else:  # INVALID / UNVISITED
-            self.node_start_times.pop(node_id, None)
-            self.node_start_ticks.pop(node_id, None)
-            span_time = self.node_span_times.get(node_id, 0.0)
-            span_ticks = self.node_span_ticks.get(node_id, 0)
+        if start_ticks_list[attempt_idx] == 0:
+            start_ticks_list[attempt_idx] = curr_tick
+            start_times_list[attempt_idx] = now_sec
 
-        self.node_span_times[node_id] = span_time
-        self.node_span_ticks[node_id] = span_ticks
+        end_ticks_list[attempt_idx] = curr_tick
+        end_times_list[attempt_idx] = now_sec
+
+    @staticmethod
+    def _format_metric_str(
+        span_t: int,
+        self_t: int,
+        sub_t: int,
+        span_s: float,
+        self_s: float,
+        sub_s: float,
+        has_children: bool,
+    ) -> typing.Tuple[str, str]:
+        if has_children:
+            ticks_str = f"{span_t}t ({self_t}t {sub_t}t)"
+            time_str = f"{span_s:.2f}s ({self_s:.2f}s {sub_s:.2f}s)"
+        else:
+            ticks_str = f"{span_t}t"
+            time_str = f"{span_s:.2f}s"
+        return ticks_str, time_str
 
     def _accumulate_times(
         self, node: behaviour.Behaviour
-    ) -> typing.Tuple[int, float]:
-        """Recursively calculates (total_ticks, total_seconds) such that:
-
-        total = self_node_time + sum(immediate_child_totals).
+    ) -> typing.Dict[str, typing.Any]:
+        """
+        Recursively calculates span, subtree, and self ticks/time cumulatively and per-retry attempt.
         """
         now_sec = self.node.get_clock().now().nanoseconds / 1e9
-        self_intervals = self.node_executed_intervals.get(node.id, [])
+        start_ticks, end_ticks = self.node_span_ticks[node.id]
 
-        # 1. Calculate self execution time and ticks
-        if not node.children:
-            # Leaf node: all its execution intervals constitute self work
-            self_ticks = sum(end - start + 1 for start, end in self_intervals)
-            self_time = sum(
-                self._get_interval_duration(start, end, now_sec)
-                for start, end in self_intervals
-            )
-        else:
-            # Composite/Decorator node: self work is time spent when no children ran
-            node_tick_set = {
-                t
-                for start, end in self_intervals
-                for t in range(start, end + 1)
-            }
-            child_tick_set: typing.Set[int] = set()
-            for child in node.children:
-                c_intervals = self.node_executed_intervals.get(child.id, [])
-                for start, end in c_intervals:
-                    child_tick_set.update(range(start, end + 1))
-
-
-            exclusive_ticks = sorted(node_tick_set - child_tick_set)
-            self_ticks = len(exclusive_ticks)
-
-            # Telescoping: merge contiguous exclusive ticks into intervals
-            exclusive_intervals: typing.List[typing.Tuple[int, int]] = []
-            for t in exclusive_ticks:
-                if exclusive_intervals and exclusive_intervals[-1][1] == t - 1:
-                    exclusive_intervals[-1] = (exclusive_intervals[-1][0], t)
-                else:
-                    exclusive_intervals.append((t, t))
-
-            self_time = sum(
-                self._get_interval_duration(start, end, now_sec)
-                for start, end in exclusive_intervals
-            )
-
-        # 2. Accumulate totals from immediate children
-        child_total_ticks = 0
-        child_total_time = 0.0
-        for child in node.children:
-            c_ticks, c_time = self._accumulate_times(child)
-            child_total_ticks += c_ticks
-            child_total_time += c_time
-
-        # 3. Compute strict additive totals
-        total_ticks = self_ticks + child_total_ticks
-        total_time = self_time + child_total_time
-
-        # 4. Format as <total> (<self>) for parents, or pure <total> for leaf nodes
-        if node.children:
-            ticks_str = f"{total_ticks}t ({self_ticks}t)"
-            time_str = f"{total_time:.2f}s ({self_time:.2f}s)"
-        else:
-            ticks_str = f"{total_ticks}t"
-            time_str = f"{total_time:.2f}s"
-        
+        has_children = bool(node.children)
+        is_parallel = isinstance(node, py_trees.composites.Parallel)
+        is_retry = self._is_retry_node(node)
+        retry_ancestor = self._find_retry_ancestor(node)
+        is_under_retry = retry_ancestor is not None
         retry_info = self._get_retry_info(node)
-        if retry_info is not None:
-            curr_retries, max_retries = retry_info
-            tag = f"[{ticks_str} / {time_str} across {curr_retries}/{max_retries} attempts]"
+
+        # 1. Process Child Nodes Recursively
+        child_metrics: typing.List[typing.Dict[str, typing.Any]] = []
+        if has_children:
+            child_metrics = [self._accumulate_times(child) for child in node.children]
+
+        attempts_data: typing.Dict[int, typing.Dict[str, typing.Any]] = {}
+
+        if is_under_retry:
+            # Case 1: Node is inside a Retry decorator
+            curr_retries = getattr(retry_ancestor, "failures", 0)
+            num_attempts = max(len(start_ticks), curr_retries + 1)
+            for cm in child_metrics:
+                num_attempts = max(num_attempts, len(cm["attempts"]))
+            if num_attempts == 0:
+                num_attempts = 1
+
+            for att_idx in range(num_attempts):
+                st = start_ticks[att_idx] if att_idx < len(start_ticks) else 0
+                et = end_ticks[att_idx] if att_idx < len(end_ticks) else 0
+
+                if not has_children:
+                    if st > 0:
+                        att_span_t = et - st + 1
+                        att_span_s = self._get_interval_duration(st, et, now_sec)
+                        att_intervals = [(st, et)]
+                    else:
+                        att_span_t = 0
+                        att_span_s = 0.0
+                        att_intervals = []
+                    att_sub_t, att_sub_s = 0, 0.0
+                    att_self_t, att_self_s = 0, 0.0
+                else:
+                    c_atts = [
+                        cm["attempts"][att_idx]
+                        for cm in child_metrics
+                        if att_idx in cm["attempts"]
+                    ]
+                    c_sts = [c["st"] for c in c_atts if c["st"] > 0]
+                    c_ets = [c["et"] for c in c_atts if c["et"] > 0]
+
+                    if st == 0 and c_sts:
+                        st = min(c_sts)
+                        et = max(c_ets)
+
+                    if is_parallel:
+                        att_sub_t = max((c["span_t"] for c in c_atts), default=0)
+                        att_sub_s = max((c["span_s"] for c in c_atts), default=0.0)
+                        att_intervals = [(st, et)] if st > 0 else []
+                    else:
+                        child_ivs: typing.List[typing.Tuple[int, int]] = []
+                        for c in c_atts:
+                            if c.get("intervals"):
+                                child_ivs.extend(c["intervals"])
+                            elif c["st"] > 0 and c["et"] >= c["st"]:
+                                child_ivs.append((c["st"], c["et"]))
+
+                        merged_child_ivs = self.merge_intervals(child_ivs)
+                        att_sub_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_child_ivs)
+                        att_sub_s = sum(
+                            self._get_interval_duration(iv_st, iv_et, now_sec)
+                            for iv_st, iv_et in merged_child_ivs
+                        )
+                        att_intervals = [(st, et)] if st > 0 else merged_child_ivs
+
+                    own_t = (et - st + 1) if st > 0 else 0
+                    own_s = self._get_interval_duration(st, et, now_sec) if st > 0 else 0.0
+
+                    att_span_t = max(own_t, att_sub_t)
+                    att_span_s = max(own_s, att_sub_s)
+                    att_self_t = max(0, att_span_t - att_sub_t)
+                    att_self_s = max(0.0, att_span_s - att_sub_s)
+
+                t_str, s_str = self._format_metric_str(
+                    att_span_t, att_self_t, att_sub_t, att_span_s, att_self_s, att_sub_s, has_children
+                )
+
+                attempts_data[att_idx] = {
+                    "span_t": att_span_t,
+                    "span_s": att_span_s,
+                    "self_t": att_self_t,
+                    "self_s": att_self_s,
+                    "sub_t": att_sub_t,
+                    "sub_s": att_sub_s,
+                    "st": st,
+                    "et": et,
+                    "intervals": att_intervals,
+                    "t_str": t_str,
+                    "s_str": s_str,
+                }
+
+            cum_span_t = sum(a["span_t"] for a in attempts_data.values())
+            cum_span_s = sum(a["span_s"] for a in attempts_data.values())
+            cum_self_t = sum(a["self_t"] for a in attempts_data.values())
+            cum_self_s = sum(a["self_s"] for a in attempts_data.values())
+            cum_sub_t = sum(a["sub_t"] for a in attempts_data.values())
+            cum_sub_s = sum(a["sub_s"] for a in attempts_data.values())
+
+            valid_sts = [a["st"] for a in attempts_data.values() if a["st"] > 0]
+            valid_ets = [a["et"] for a in attempts_data.values() if a["et"] > 0]
+            cum_st = min(valid_sts) if valid_sts else 0
+            cum_et = max(valid_ets) if valid_ets else 0
+
+            cum_intervals: typing.List[typing.Tuple[int, int]] = []
+            for a in attempts_data.values():
+                cum_intervals.extend(a.get("intervals", []))
+            cum_intervals = self.merge_intervals(cum_intervals)
+
+        elif is_retry:
+            # Case 2: Node IS a Retry decorator
+            curr_retries = getattr(node, "failures", 0)
+            num_attempts = curr_retries + 1
+            for cm in child_metrics:
+                num_attempts = max(num_attempts, len(cm["attempts"]))
+            if num_attempts == 0:
+                num_attempts = 1
+
+            for att_idx in range(num_attempts):
+                c_atts = [
+                    cm["attempts"][att_idx]
+                    for cm in child_metrics
+                    if att_idx in cm["attempts"]
+                ]
+                c_sts = [c["st"] for c in c_atts if c["st"] > 0]
+                c_ets = [c["et"] for c in c_atts if c["et"] > 0]
+
+                att_st = min(c_sts) if c_sts else 0
+                att_et = max(c_ets) if c_ets else 0
+
+                child_ivs = []
+                for c in c_atts:
+                    if c.get("intervals"):
+                        child_ivs.extend(c["intervals"])
+                    elif c["st"] > 0 and c["et"] >= c["st"]:
+                        child_ivs.append((c["st"], c["et"]))
+
+                merged_child_ivs = self.merge_intervals(child_ivs)
+                att_sub_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_child_ivs)
+                att_sub_s = sum(
+                    self._get_interval_duration(iv_st, iv_et, now_sec)
+                    for iv_st, iv_et in merged_child_ivs
+                )
+
+                own_att_t = (att_et - att_st + 1) if att_st > 0 else 0
+                own_att_s = self._get_interval_duration(att_st, att_et, now_sec) if att_st > 0 else 0.0
+
+                att_span_t = max(own_att_t, att_sub_t)
+                att_span_s = max(own_att_s, att_sub_s)
+                att_self_t = max(0, att_span_t - att_sub_t)
+                att_self_s = max(0.0, att_span_s - att_sub_s)
+                att_intervals = [(att_st, att_et)] if att_st > 0 else merged_child_ivs
+
+                t_str, s_str = self._format_metric_str(
+                    att_span_t, att_self_t, att_sub_t, att_span_s, att_self_s, att_sub_s, True
+                )
+
+                attempts_data[att_idx] = {
+                    "span_t": att_span_t,
+                    "span_s": att_span_s,
+                    "self_t": att_self_t,
+                    "self_s": att_self_s,
+                    "sub_t": att_sub_t,
+                    "sub_s": att_sub_s,
+                    "st": att_st,
+                    "et": att_et,
+                    "intervals": att_intervals,
+                    "t_str": t_str,
+                    "s_str": s_str,
+                }
+
+            # Retry node cumulative span does not reset
+            st = start_ticks[0] if (start_ticks and start_ticks[0] > 0) else 0
+            et = end_ticks[0] if (end_ticks and end_ticks[0] > 0) else 0
+            if st == 0:
+                valid_sts = [a["st"] for a in attempts_data.values() if a["st"] > 0]
+                valid_ets = [a["et"] for a in attempts_data.values() if a["et"] > 0]
+                st = min(valid_sts) if valid_sts else 0
+                et = max(valid_ets) if valid_ets else 0
+
+            cum_st = st
+            cum_et = et
+
+            own_t = (et - st + 1) if st > 0 else 0
+            own_s = self._get_interval_duration(st, et, now_sec) if st > 0 else 0.0
+
+            cum_sub_t = sum(a["sub_t"] for a in attempts_data.values())
+            cum_sub_s = sum(a["sub_s"] for a in attempts_data.values())
+
+            cum_span_t = max(own_t, cum_sub_t)
+            cum_span_s = max(own_s, cum_sub_s)
+            cum_self_t = max(0, cum_span_t - cum_sub_t)
+            cum_self_s = max(0.0, cum_span_s - cum_sub_s)
+            cum_intervals = [(cum_st, cum_et)] if cum_st > 0 else []
+
         else:
-            tag = f"[{ticks_str} / {time_str}]"
+            # Case 3: Node is NOT under retry and NOT a retry node (e.g. Root, Sequence, Leaf outside retry)
+            st = start_ticks[0] if (start_ticks and start_ticks[0] > 0) else 0
+            et = end_ticks[0] if (end_ticks and end_ticks[0] > 0) else 0
+
+            if not has_children:
+                if st > 0:
+                    cum_span_t = et - st + 1
+                    cum_span_s = self._get_interval_duration(st, et, now_sec)
+                    cum_intervals = [(st, et)]
+                else:
+                    cum_span_t = 0
+                    cum_span_s = 0.0
+                    cum_intervals = []
+                cum_sub_t = 0
+                cum_sub_s = 0.0
+                cum_self_t = 0
+                cum_self_s = 0.0
+                cum_st = st
+                cum_et = et
+            else:
+                c_sts = [cm["cum_st"] for cm in child_metrics if cm["cum_st"] > 0]
+                c_ets = [cm["cum_et"] for cm in child_metrics if cm["cum_et"] > 0]
+                if st == 0 and c_sts:
+                    st = min(c_sts)
+                    et = max(c_ets)
+                cum_st = st
+                cum_et = et
+
+                if is_parallel:
+                    cum_sub_t = max((cm["cum_span_t"] for cm in child_metrics), default=0)
+                    cum_sub_s = max((cm["cum_span_s"] for cm in child_metrics), default=0.0)
+                    cum_intervals = [(st, et)] if st > 0 else []
+                else:
+                    child_ivs = []
+                    for cm in child_metrics:
+                        if cm.get("cum_intervals"):
+                            child_ivs.extend(cm["cum_intervals"])
+                        elif cm["cum_st"] > 0 and cm["cum_et"] >= cm["cum_st"]:
+                            child_ivs.append((cm["cum_st"], cm["cum_et"]))
+                    merged_child_ivs = self.merge_intervals(child_ivs)
+                    cum_sub_t = sum(iv_et - iv_st + 1 for iv_st, iv_et in merged_child_ivs)
+                    cum_sub_s = sum(
+                        self._get_interval_duration(iv_st, iv_et, now_sec)
+                        for iv_st, iv_et in merged_child_ivs
+                    )
+                    cum_intervals = [(st, et)] if st > 0 else merged_child_ivs
+
+                own_t = (et - st + 1) if st > 0 else 0
+                own_s = self._get_interval_duration(st, et, now_sec) if st > 0 else 0.0
+
+                cum_span_t = max(own_t, cum_sub_t)
+                cum_span_s = max(own_s, cum_sub_s)
+                cum_self_t = max(0, cum_span_t - cum_sub_t)
+                cum_self_s = max(0.0, cum_span_s - cum_sub_s)
+
+        # 2. Format Display String and Tag
+        cum_t_str, cum_s_str = self._format_metric_str(
+            cum_span_t, cum_self_t, cum_sub_t, cum_span_s, cum_self_s, cum_sub_s, has_children
+        )
+
+        cum_range = f" @{cum_st}-{cum_et}" if cum_st > 0 else ""
+        has_multiple_attempts = len(attempts_data) > 0 and (is_under_retry or is_retry)
+
+        if has_multiple_attempts:
+            tag_parts = [f"{cum_t_str} / {cum_s_str}{cum_range}"]
+            for att_idx in sorted(attempts_data.keys()):
+                att = attempts_data[att_idx]
+                att_range = f" @{att['st']}-{att['et']}" if att["st"] > 0 else ""
+                tag_parts.append(
+                    f"x{att_idx}: {att['t_str']} / {att['s_str']}{att_range}"
+                )
+            if is_retry and retry_info is not None:
+                curr_retries, max_retries = retry_info
+                tag_parts.append(f"across {curr_retries}/{max_retries} attempts")
+            tag = f"[{' | '.join(tag_parts)}]"
+        else:
+            tag = f"[{cum_t_str} / {cum_s_str}{cum_range}]"
 
         original_feedback = node.feedback_message
+        clean_feedback = ""
+        if original_feedback:
+            clean_feedback = re.sub(r"\[[^\]]*\]", "", original_feedback)
+            clean_feedback = re.sub(
+                r"across\s+\d+\s*(?:/|\s+of\s+)\s*\d+\s+attempts", "", clean_feedback, flags=re.IGNORECASE
+            )
+            clean_feedback = re.sub(
+                r"retries:\s*\d+(?:\s*/\s*\d+)?", "", clean_feedback, flags=re.IGNORECASE
+            )
+            clean_feedback = re.sub(
+                r"status:\s*\d+\s+failure\s+from\s+\d+", "", clean_feedback, flags=re.IGNORECASE
+            )
+            clean_feedback = re.sub(r"\s+", " ", clean_feedback).strip()
+
         self._modified_nodes.append((node, original_feedback))
 
-        if original_feedback:
-            node.feedback_message = f"{tag} {original_feedback}"
+        if clean_feedback:
+            node.feedback_message = f"{tag} {clean_feedback}"
         else:
             node.feedback_message = tag
 
-        return total_ticks, total_time
+        return {
+            "cum_span_t": cum_span_t,
+            "cum_span_s": cum_span_s,
+            "cum_self_t": cum_self_t,
+            "cum_self_s": cum_self_s,
+            "cum_sub_t": cum_sub_t,
+            "cum_sub_s": cum_sub_s,
+            "cum_st": cum_st,
+            "cum_et": cum_et,
+            "cum_intervals": cum_intervals,
+            "attempts": attempts_data,
+        }
 
     def finalise(self) -> None:
+        """Called after all nodes have finished their tick."""
         if self.root is not None:
+            curr = self.root
+            while getattr(curr, "parent", None) is not None:
+                curr = curr.parent
+            self.root = curr
+
             self._accumulate_times(self.root)
 
             tree_str = display.unicode_tree(
@@ -384,9 +631,3 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             tree_msg = String()
             tree_msg.data = tree_str
             self.tree_pub.publish(tree_msg)
-
-        if self.display_blackboard:
-            bb_str = display.unicode_blackboard(key_filter=self.visited_blackboard_keys)
-            bb_msg = String()
-            bb_msg.data = bb_str
-            self.blackboard_pub.publish(bb_msg)
