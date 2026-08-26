@@ -153,6 +153,13 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             UUID, typing.Dict[typing.Tuple[int, ...], typing.List[typing.Tuple[int, int]]]
         ] = collections.defaultdict(lambda: collections.defaultdict(list))
 
+        # Ordinary nodes retain terminal status; retry paths retain one status
+        # per attempt so a later unvisited tick cannot erase the result.
+        self.node_latched_status: typing.Dict[UUID, typing.Tuple[int, str, str]] = {}
+        self.node_attempt_status: typing.Dict[
+            UUID, typing.Dict[typing.Tuple[int, ...], typing.Tuple[int, str, str]]
+        ] = collections.defaultdict(dict)
+
         self._modified_nodes: typing.List[
             typing.Tuple[behaviour.Behaviour, typing.Optional[str]]
         ] = []
@@ -231,6 +238,16 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             return current_retries, max_retries
         return None
 
+    def _status_tuple(self, status: py_trees.common.Status) -> typing.Tuple[int, str, str]:
+        """Convert a py_trees status to the ROS status representation."""
+        if status == py_trees.common.Status.SUCCESS:
+            return BehaviourNodeSnapshotMsg.STATUS_SUCCESS, "✓", "success"
+        if status == py_trees.common.Status.FAILURE:
+            return BehaviourNodeSnapshotMsg.STATUS_FAILURE, "✕", "failure"
+        if status == py_trees.common.Status.RUNNING:
+            return BehaviourNodeSnapshotMsg.STATUS_RUNNING, "*", "running"
+        return BehaviourNodeSnapshotMsg.STATUS_UNVISITED, "-", "unvisited"
+
     def _get_behaviour_symbol(self, node: behaviour.Behaviour) -> str:
         """Resolves visual display symbol matching py_trees conventions."""
         if isinstance(node, py_trees.composites.Sequence):
@@ -251,6 +268,18 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
         """Returns (status_code, status_raw, status_str)."""
         is_visited = node.id in self.visited
         status = self.visited.get(node.id, getattr(node, "status", py_trees.common.Status.INVALID))
+
+        retry_ancestors = self._find_all_retry_ancestors(node)
+        if retry_ancestors or self._is_retry_node(node):
+            attempt_path = tuple(getattr(a, "failures", 0) for a in retry_ancestors)
+            if self._is_retry_node(node):
+                attempt_path += (getattr(node, "failures", 0),)
+            return self.node_attempt_status.get(node.id, {}).get(
+                attempt_path, self._status_tuple(status)
+            )
+
+        if not is_visited and node.id in self.node_latched_status:
+            return self.node_latched_status[node.id]
 
         if not is_visited and self.display_only_visited_behaviours:
             return (
@@ -290,6 +319,18 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
             attempt_path = ancestor_path + (getattr(behaviour_node, "failures", 0),)
         else:
             attempt_path = ancestor_path
+
+        observed_status = self.visited.get(
+            node_id, getattr(behaviour_node, "status", py_trees.common.Status.INVALID)
+        )
+        status_info = self._status_tuple(observed_status)
+        if retry_ancestors or self._is_retry_node(behaviour_node):
+            self.node_attempt_status[node_id][attempt_path] = status_info
+        elif observed_status in (
+            py_trees.common.Status.SUCCESS,
+            py_trees.common.Status.FAILURE,
+        ):
+            self.node_latched_status[node_id] = status_info
 
         # Update executed intervals for this attempt path
         node_intervals = self.node_executed_intervals[node_id][attempt_path]
@@ -488,6 +529,9 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                 "intervals": att_intervals,
                 "t_str": t_str,
                 "s_str": s_str,
+                "status": self.node_attempt_status.get(node.id, {}).get(
+                    att_path, self._status_tuple(getattr(node, "status", py_trees.common.Status.INVALID))
+                ),
             }
 
         # Calculate cumulative metrics across all executed attempts (Total = Exact Sum of Attempts)
@@ -728,8 +772,11 @@ class StructuredSnapshotVisitor(py_trees.visitors.SnapshotVisitor):
                     att_msg.end_tick = att["et"]
                     att_msg.is_same_tick = (att["st"] > 0 and att["st"] == att["et"] and att["span_t"] == 1)
                     att_msg.feedback = ""
-                    att_msg.status = status_code
-                    att_msg.status_str = status_str
+                    att_status_code, _, att_status_str = att.get(
+                        "status", (status_code, status_raw, status_str)
+                    )
+                    att_msg.status = att_status_code
+                    att_msg.status_str = att_status_str
                     attempt_msgs.append(att_msg)
 
                 node_msg.attempt_history = attempt_msgs
